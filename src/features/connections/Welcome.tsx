@@ -1,6 +1,21 @@
-import { ArrowRight, Database, Ellipsis, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronRight,
+  Database,
+  KeyRound,
+  Plus,
+  Server,
+  ShieldCheck,
+} from "lucide-react";
 import { AppRail } from "../../shared/components/AppRail";
 import { TopBar } from "../../shared/components/TopBar";
+
+const connectionDetails = [
+  { label: "Host", value: "localhost" },
+  { label: "Port", value: "5432" },
+  { label: "Database", value: "postgres" },
+  { label: "SSL", value: "Prefer" },
+];
 
 export function Welcome({ onConnect }: { onConnect: () => void }) {
   return (
@@ -8,71 +23,96 @@ export function Welcome({ onConnect }: { onConnect: () => void }) {
       <AppRail />
       <div className="home-main">
         <TopBar
-          title="Opaline"
-          subtitle="Local-first PostgreSQL workspace"
+          title="Connections"
+          subtitle="PostgreSQL workspace"
           action={
             <button className="button secondary compact" onClick={onConnect}>
               <Plus size={16} /> New connection
             </button>
           }
         />
-        <main className="welcome">
-          <section className="welcome-copy">
-            <div className="eyebrow">
-              <Sparkles size={14} /> Open source · private by default
+        <main className="connection-manager">
+          <header className="manager-heading">
+            <div>
+              <span className="section-kicker">Local workspace</span>
+              <h1>Database connections</h1>
+              <p>Open a recent connection or configure a new PostgreSQL server.</p>
             </div>
-            <h1>
-              Your databases,
-              <br />
-              <span>without the noise.</span>
-            </h1>
-            <p>
-              A calm, precise workspace for PostgreSQL. Credentials stay on your
-              machine and queries go straight to your database.
-            </p>
-            <button className="button primary hero-action" onClick={onConnect}>
-              Connect PostgreSQL <ArrowRight size={17} />
-            </button>
-          </section>
+          </header>
 
-          <section className="connection-section" aria-labelledby="connections-title">
-            <div className="section-heading">
-              <div>
-                <span className="section-kicker">Workspace</span>
-                <h2 id="connections-title">Connections</h2>
+          <div className="connection-browser">
+            <aside className="connection-list" aria-label="Database connections">
+              <div className="connection-list-heading">
+                <span>Connections</span>
+                <span className="connection-count">1</span>
               </div>
-              <button className="icon-button" aria-label="Connection options" disabled>
-                <Ellipsis size={18} />
+
+              <button className="connection-row selected" onClick={onConnect}>
+                <div className="postgres-glyph">
+                  <Database size={19} />
+                </div>
+                <span className="connection-row-copy">
+                  <strong>Local PostgreSQL</strong>
+                  <small>postgres@localhost:5432</small>
+                </span>
+                <ChevronRight size={15} />
               </button>
-            </div>
-            <button className="connection-card" onClick={onConnect}>
-              <div className="postgres-glyph">
-                <Database size={22} />
-              </div>
-              <div className="connection-card-copy">
-                <strong>Local PostgreSQL</strong>
-                <span>localhost:5432 · postgres</span>
-              </div>
-              <span className="connect-label">
-                Connect <ArrowRight size={15} />
-              </span>
-            </button>
-            <button className="new-connection-card" onClick={onConnect}>
-              <Plus size={18} />
-              <span>
-                <strong>Add another connection</strong>
-                <small>PostgreSQL is available in this first release</small>
-              </span>
-            </button>
-          </section>
 
-          <div className="privacy-note">
-            <ShieldCheck size={18} />
-            <span>
-              <strong>No account. No cloud.</strong> Your database credentials never
-              touch our servers.
-            </span>
+              <button className="add-connection-row" onClick={onConnect}>
+                <Plus size={16} />
+                <span>Add connection</span>
+              </button>
+            </aside>
+
+            <section className="connection-detail" aria-labelledby="connection-detail-title">
+              <div className="connection-detail-header">
+                <div className="postgres-glyph large">
+                  <Database size={23} />
+                </div>
+                <div>
+                  <span className="connection-type">PostgreSQL</span>
+                  <h2 id="connection-detail-title">Local PostgreSQL</h2>
+                  <p>Local development connection</p>
+                </div>
+                <span className="provider-badge">
+                  <Server size={12} /> PostgreSQL
+                </span>
+              </div>
+
+              <dl className="connection-properties">
+                {connectionDetails.map((detail) => (
+                  <div key={detail.label}>
+                    <dt>{detail.label}</dt>
+                    <dd>{detail.value}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="credential-note">
+                <KeyRound size={16} />
+                <span>
+                  <strong>Credentials are session-only</strong>
+                  Enter the password when connecting. Nothing is stored on disk.
+                </span>
+              </div>
+
+              <div className="connection-detail-actions">
+                <button className="button primary" onClick={onConnect}>
+                  Connect <ArrowRight size={16} />
+                </button>
+                <button className="button ghost" onClick={onConnect}>
+                  Edit details
+                </button>
+              </div>
+            </section>
           </div>
+
+          <footer className="manager-status">
+            <span>
+              <ShieldCheck size={14} /> Local-only credentials
+            </span>
+            <span>PostgreSQL provider</span>
+          </footer>
         </main>
       </div>
     </div>

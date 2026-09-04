@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { databaseApi, errorMessage } from "../../shared/lib/database-api";
+import {
+  databaseObjectKey,
+  qualifiedObjectName,
+} from "../../shared/lib/database-object";
 import type {
   ColumnInfo,
   DatabaseObject,
@@ -13,9 +17,13 @@ const starterQuery = `select
 
 export function useWorkspace() {
   const queryInFlight = useRef(false);
+  const expandedObject = useRef<string | null>(null);
+  const columnRequest = useRef(0);
+  const columnCache = useRef(new Map<string, ColumnInfo[]>());
   const [objects, setObjects] = useState<DatabaseObject[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [selected, setSelected] = useState<DatabaseObject | null>(null);
+  const [expandedObjectKey, setExpandedObjectKey] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [query, setQuery] = useState(starterQuery);
   const [result, setResult] = useState<QueryResult | null>(null);
@@ -24,6 +32,8 @@ export function useWorkspace() {
   const [explorerError, setExplorerError] = useState<string | null>(null);
   const [queryBusy, setQueryBusy] = useState(false);
   const [explorerBusy, setExplorerBusy] = useState(false);
+  const [columnsBusy, setColumnsBusy] = useState(false);
+  const [columnsError, setColumnsError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const refreshObjects = useCallback(async () => {
@@ -42,17 +52,63 @@ export function useWorkspace() {
     void refreshObjects();
   }, [refreshObjects]);
 
-  const selectObject = useCallback(async (object: DatabaseObject) => {
-    setSelected(object);
+  const expandObject = useCallback(async (object: DatabaseObject) => {
+    const key = databaseObjectKey(object);
+    const request = ++columnRequest.current;
+    expandedObject.current = key;
+    setExpandedObjectKey(key);
+    setColumnsError(null);
+
+    if (columnCache.current.has(key)) {
+      setColumns(columnCache.current.get(key) ?? []);
+      setColumnsBusy(false);
+      return;
+    }
+
     setColumns([]);
-    setExplorerError(null);
-    setQuery(`select *\nfrom "${object.schema}"."${object.name}"\nlimit 100;`);
+    setColumnsBusy(true);
     try {
-      setColumns(await databaseApi.listColumns(object.schema, object.name));
+      const nextColumns = await databaseApi.listColumns(object.schema, object.name);
+      columnCache.current.set(key, nextColumns);
+      if (request === columnRequest.current && expandedObject.current === key) {
+        setColumns(nextColumns);
+      }
     } catch (error) {
-      setExplorerError(errorMessage(error));
+      if (request === columnRequest.current && expandedObject.current === key) {
+        setColumnsError(errorMessage(error));
+      }
+    } finally {
+      if (request === columnRequest.current) setColumnsBusy(false);
     }
   }, []);
+
+  const selectObject = useCallback(
+    (object: DatabaseObject) => {
+      setSelected(object);
+      setQuery(`select *\nfrom ${qualifiedObjectName(object)}\nlimit 100;`);
+      if (expandedObject.current !== databaseObjectKey(object)) {
+        void expandObject(object);
+      }
+    },
+    [expandObject],
+  );
+
+  const toggleObject = useCallback(
+    (object: DatabaseObject) => {
+      const key = databaseObjectKey(object);
+      if (expandedObject.current === key) {
+        columnRequest.current += 1;
+        expandedObject.current = null;
+        setExpandedObjectKey(null);
+        setColumns([]);
+        setColumnsError(null);
+        setColumnsBusy(false);
+        return;
+      }
+      void expandObject(object);
+    },
+    [expandObject],
+  );
 
   const runQuery = useCallback(async () => {
     if (queryInFlight.current) return;
@@ -92,6 +148,7 @@ export function useWorkspace() {
     objects,
     columns,
     selected,
+    expandedObjectKey,
     filter,
     query,
     result,
@@ -100,12 +157,15 @@ export function useWorkspace() {
     explorerError,
     queryBusy,
     explorerBusy,
+    columnsBusy,
+    columnsError,
     copied,
     setFilter,
     setQuery,
     setActiveResultIndex,
     refreshObjects,
     selectObject,
+    toggleObject,
     runQuery,
     copyQuery,
   };

@@ -11,7 +11,8 @@ import {
   Search,
   Table2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { databaseObjectKey } from "../../shared/lib/database-object";
 import type {
   ColumnInfo,
   ConnectionInfo,
@@ -22,28 +23,39 @@ type ExplorerProps = {
   connection: ConnectionInfo;
   objects: DatabaseObject[];
   selected: DatabaseObject | null;
+  expandedObjectKey: string | null;
   columns: ColumnInfo[];
   filter: string;
   loading: boolean;
+  columnsLoading: boolean;
   error: string | null;
+  columnsError: string | null;
   onFilter: (value: string) => void;
   onRefresh: () => void;
   onSelect: (object: DatabaseObject) => void;
+  onToggle: (object: DatabaseObject) => void;
 };
 
 export function Explorer({
   connection,
   objects,
   selected,
+  expandedObjectKey,
   columns,
   filter,
   loading,
+  columnsLoading,
   error,
+  columnsError,
   onFilter,
   onRefresh,
   onSelect,
+  onToggle,
 }: ExplorerProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const [collapsedSchemas, setCollapsedSchemas] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -70,6 +82,15 @@ export function Explorer({
 
     return [...groups.entries()];
   }, [objects, filter]);
+
+  const toggleSchema = (schema: string) => {
+    setCollapsedSchemas((current) => {
+      const next = new Set(current);
+      if (next.has(schema)) next.delete(schema);
+      else next.add(schema);
+      return next;
+    });
+  };
 
   return (
     <aside className="explorer" aria-label="Database explorer">
@@ -115,52 +136,85 @@ export function Explorer({
         ) : (
           schemas.map(([schema, schemaObjects]) => (
             <div className="tree-group" key={schema}>
-              <div className="tree-schema">
-                <ChevronDown size={14} />
+              <button
+                className="tree-schema"
+                onClick={() => toggleSchema(schema)}
+                aria-expanded={!collapsedSchemas.has(schema)}
+              >
+                <ChevronRight
+                  className={collapsedSchemas.has(schema) ? "" : "open"}
+                  size={14}
+                />
                 <Folder size={15} /> <span>{schema}</span>
-              </div>
-              <div className="tree-branch">
-                {schemaObjects.map((object) => {
-                  const isSelected =
-                    selected?.schema === object.schema && selected?.name === object.name;
-                  const isView = object.objectType.includes("view");
-                  return (
-                    <div key={`${object.schema}.${object.name}`}>
-                      <button
-                        className={`tree-item ${isSelected ? "selected" : ""}`}
-                        onClick={() => onSelect(object)}
-                        aria-expanded={isSelected}
-                      >
-                        <ChevronRight
-                          size={13}
-                          className={isSelected ? "open" : ""}
-                        />
-                        {isView ? <Eye size={14} /> : <Table2 size={14} />}
-                        <span>{object.name}</span>
-                      </button>
-                      {isSelected && columns.length > 0 && (
-                        <div className="column-list">
-                          {columns.map((column) => (
-                            <div
-                              className="column-item"
-                              key={column.name}
-                              title={`${column.dataType}${column.nullable ? " · nullable" : ""}`}
-                            >
-                              {column.primaryKey ? (
-                                <KeyRound size={12} />
-                              ) : (
-                                <Columns3 size={12} />
-                              )}
-                              <span>{column.name}</span>
-                              <small>{column.dataType}</small>
-                            </div>
-                          ))}
+              </button>
+              {!collapsedSchemas.has(schema) && (
+                <div className="tree-branch">
+                  {schemaObjects.map((object) => {
+                    const objectKey = databaseObjectKey(object);
+                    const isSelected =
+                      selected?.schema === object.schema &&
+                      selected?.name === object.name;
+                    const isExpanded = expandedObjectKey === objectKey;
+                    const isView = object.objectType.includes("view");
+                    return (
+                      <div className="tree-node" key={objectKey}>
+                        <div
+                          className={`tree-node-row ${isSelected ? "selected" : ""}`}
+                        >
+                          <button
+                            className="tree-toggle"
+                            onClick={() => onToggle(object)}
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${object.name}`}
+                          >
+                            <ChevronRight
+                              size={13}
+                              className={isExpanded ? "open" : ""}
+                            />
+                          </button>
+                          <button
+                            className="tree-item"
+                            onClick={() => onSelect(object)}
+                            aria-current={isSelected ? "true" : undefined}
+                          >
+                            {isView ? <Eye size={14} /> : <Table2 size={14} />}
+                            <span>{object.name}</span>
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        {isExpanded && (
+                          <div className="column-list">
+                            {columnsLoading ? (
+                              <div className="column-state">
+                                <Loader2 className="spin" size={12} /> Loading columns…
+                              </div>
+                            ) : columnsError ? (
+                              <div className="column-state error">{columnsError}</div>
+                            ) : columns.length === 0 ? (
+                              <div className="column-state">No visible columns.</div>
+                            ) : (
+                              columns.map((column) => (
+                                <div
+                                  className="column-item"
+                                  key={column.name}
+                                  title={`${column.dataType}${column.nullable ? " · nullable" : ""}`}
+                                >
+                                  {column.primaryKey ? (
+                                    <KeyRound size={12} />
+                                  ) : (
+                                    <Columns3 size={12} />
+                                  )}
+                                  <span>{column.name}</span>
+                                  <small>{column.dataType}</small>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ))
         )}

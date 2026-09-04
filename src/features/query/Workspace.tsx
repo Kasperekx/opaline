@@ -38,13 +38,17 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
         connection={connection}
         objects={workspace.objects}
         selected={workspace.selected}
+        expandedObjectKey={workspace.expandedObjectKey}
         columns={workspace.columns}
         filter={workspace.filter}
         loading={workspace.explorerBusy}
+        columnsLoading={workspace.columnsBusy}
         error={workspace.explorerError}
+        columnsError={workspace.columnsError}
         onFilter={workspace.setFilter}
         onRefresh={() => void workspace.refreshObjects()}
         onSelect={(object) => void workspace.selectObject(object)}
+        onToggle={(object) => workspace.toggleObject(object)}
       />
       <main className="query-workspace">
         <TopBar
