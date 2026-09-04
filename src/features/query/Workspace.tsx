@@ -7,15 +7,18 @@ import {
   LayoutGrid,
   Loader2,
   PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Plus,
   SquareTerminal,
   Unplug,
   X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Explorer } from "../explorer/Explorer";
 import { AppRail } from "../../shared/components/AppRail";
 import { TopBar } from "../../shared/components/TopBar";
+import { useMediaQuery } from "../../shared/hooks/useMediaQuery";
 import type { ConnectionInfo } from "../../shared/types/database";
 import { editorTheme, sqlHighlighting } from "./editor-theme";
 import { ResultsGrid } from "./ResultsGrid";
@@ -28,11 +31,19 @@ type WorkspaceProps = {
 
 export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
   const workspace = useWorkspace();
+  const compactLayout = useMediaQuery("(max-width: 980px)");
+  const [explorerVisible, setExplorerVisible] = useState(() => !compactLayout);
   const activeSet = workspace.result?.resultSets[workspace.activeResultIndex] ?? null;
   const resultCount = activeSet?.rows.length ?? 0;
 
+  useEffect(() => {
+    setExplorerVisible(!compactLayout);
+  }, [compactLayout]);
+
   return (
-    <div className="workspace-shell">
+    <div
+      className={`workspace-shell ${explorerVisible ? "" : "explorer-hidden"}`}
+    >
       <AppRail connected />
       <Explorer
         connection={connection}
@@ -47,9 +58,19 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
         columnsError={workspace.columnsError}
         onFilter={workspace.setFilter}
         onRefresh={() => void workspace.refreshObjects()}
-        onSelect={(object) => void workspace.selectObject(object)}
+        onSelect={(object) => {
+          workspace.selectObject(object);
+          if (compactLayout) setExplorerVisible(false);
+        }}
         onToggle={(object) => workspace.toggleObject(object)}
       />
+      {compactLayout && explorerVisible && (
+        <button
+          className="explorer-backdrop"
+          aria-label="Close database explorer"
+          onClick={() => setExplorerVisible(false)}
+        />
+      )}
       <main className="query-workspace">
         <TopBar
           title={connection.database}
@@ -86,11 +107,17 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
           <div className="tab-spacer" />
           <button
             className="icon-button subtle"
-            aria-label="Toggle sidebar"
-            title="Coming soon"
-            disabled
+            aria-label={`${explorerVisible ? "Hide" : "Show"} database explorer`}
+            aria-controls="database-explorer"
+            aria-pressed={explorerVisible}
+            title={`${explorerVisible ? "Hide" : "Show"} database explorer`}
+            onClick={() => setExplorerVisible((visible) => !visible)}
           >
-            <PanelLeftClose size={16} />
+            {explorerVisible ? (
+              <PanelLeftClose size={17} />
+            ) : (
+              <PanelLeftOpen size={17} />
+            )}
           </button>
         </div>
         <section className="editor-pane" aria-label="SQL editor">

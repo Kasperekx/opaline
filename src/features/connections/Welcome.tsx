@@ -27,7 +27,7 @@ export function Welcome({ onConnect }: { onConnect: () => void }) {
           subtitle="PostgreSQL workspace"
           action={
             <button className="button secondary compact" onClick={onConnect}>
-              <Plus size={16} /> New connection
+              <Plus size={17} /> <span className="button-label">New connection</span>
             </button>
           }
         />

@@ -93,7 +93,7 @@ export function Explorer({
   };
 
   return (
-    <aside className="explorer" aria-label="Database explorer">
+    <aside id="database-explorer" className="explorer" aria-label="Database explorer">
       <div className="explorer-connection">
         <div className="tiny-db">
           <Database size={15} />
