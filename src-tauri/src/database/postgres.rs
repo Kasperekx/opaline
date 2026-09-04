@@ -102,7 +102,9 @@ pub(crate) async fn list_columns(
                     WHERE i.indrelid = a.attrelid
                       AND i.indisprimary
                       AND a.attnum = ANY(i.indkey)
-                )
+                ),
+                a.attidentity <> '',
+                a.attgenerated <> ''
             FROM pg_catalog.pg_attribute a
             JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -127,6 +129,8 @@ pub(crate) async fn list_columns(
             nullable: row.get(2),
             default_value: row.get(3),
             primary_key: row.get(4),
+            identity: row.get(5),
+            generated: row.get(6),
         })
         .collect())
 }

@@ -4,10 +4,7 @@ import {
   errorMessage,
   isQueryExecutionError,
 } from "../../shared/lib/database-api";
-import {
-  databaseObjectKey,
-  qualifiedObjectName,
-} from "../../shared/lib/database-object";
+import { databaseObjectKey } from "../../shared/lib/database-object";
 import type {
   ColumnInfo,
   DatabaseObject,
@@ -16,7 +13,7 @@ import type {
 import type { QueryHistoryStatus } from "./query-types";
 import { useQueryHistory } from "./useQueryHistory";
 import { useQueryPreferences } from "./useQueryPreferences";
-import { useQueryTabs } from "./useQueryTabs";
+import { useWorkspaceTabs } from "./useWorkspaceTabs";
 
 export type QuerySubmission = {
   sql: string;
@@ -52,7 +49,7 @@ export function useWorkspace(database: string) {
   const expandedObject = useRef<string | null>(null);
   const columnRequest = useRef(0);
   const columnCache = useRef(new Map<string, ColumnInfo[]>());
-  const tabs = useQueryTabs();
+  const tabs = useWorkspaceTabs();
   const history = useQueryHistory();
   const queryPreferences = useQueryPreferences();
   const [objects, setObjects] = useState<DatabaseObject[]>([]);
@@ -118,10 +115,7 @@ export function useWorkspace(database: string) {
   const selectObject = useCallback(
     (object: DatabaseObject) => {
       setSelected(object);
-      tabs.updateSql(
-        tabs.activeTab.id,
-        `select *\nfrom ${qualifiedObjectName(object)}\nlimit 100;`,
-      );
+      tabs.openTable(object);
       if (expandedObject.current !== databaseObjectKey(object)) {
         void expandObject(object);
       }
@@ -150,6 +144,7 @@ export function useWorkspace(database: string) {
     async (submission?: QuerySubmission) => {
       if (queryInFlight.current) return;
       const tab = tabs.activeTab;
+      if (tab.kind !== "query") return;
       const querySubmission = submission ?? {
         sql: tab.sql,
         offset: 0,
@@ -228,10 +223,11 @@ export function useWorkspace(database: string) {
   }, [cancelling]);
 
   const copyQuery = useCallback(async () => {
+    if (tabs.activeTab.kind !== "query") return;
     await navigator.clipboard.writeText(tabs.activeTab.sql);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
-  }, [tabs.activeTab.sql]);
+  }, [tabs.activeTab]);
 
   return {
     objects,

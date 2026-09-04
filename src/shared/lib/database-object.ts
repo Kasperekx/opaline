@@ -3,8 +3,11 @@ import type { DatabaseObject } from "../types/database";
 export const databaseObjectKey = (object: DatabaseObject) =>
   JSON.stringify([object.schema, object.name]);
 
-const quoteIdentifier = (identifier: string) =>
+export const quoteIdentifier = (identifier: string) =>
   `"${identifier.replace(/"/g, '""')}"`;
 
+export const qualifiedRelationName = (schema: string, name: string) =>
+  `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
+
 export const qualifiedObjectName = (object: DatabaseObject) =>
-  `${quoteIdentifier(object.schema)}.${quoteIdentifier(object.name)}`;
+  qualifiedRelationName(object.schema, object.name);

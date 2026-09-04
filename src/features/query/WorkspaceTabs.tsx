@@ -1,28 +1,28 @@
-import { Loader2, Plus, X } from "lucide-react";
+import { FileCode2, Loader2, Plus, Table2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { QueryTab } from "./query-types";
+import type { QueryTab, WorkspaceTab } from "./query-types";
 
-type QueryTabsProps = {
-  tabs: QueryTab[];
+type WorkspaceTabsProps = {
+  tabs: WorkspaceTab[];
   activeTabId: string;
   runningTabId: string | null;
   endAction: ReactNode;
-  onAdd: () => void;
+  onAddQuery: () => void;
   onClose: (id: string) => void;
-  onRename: (id: string, title: string) => void;
+  onRenameQuery: (id: string, title: string) => void;
   onSelect: (id: string) => void;
 };
 
-export function QueryTabs({
+export function WorkspaceTabs({
   tabs,
   activeTabId,
   runningTabId,
   endAction,
-  onAdd,
+  onAddQuery,
   onClose,
-  onRename,
+  onRenameQuery,
   onSelect,
-}: QueryTabsProps) {
+}: WorkspaceTabsProps) {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +35,7 @@ export function QueryTabs({
   };
 
   const finishRenaming = () => {
-    if (editingTabId) onRename(editingTabId, draftTitle);
+    if (editingTabId) onRenameQuery(editingTabId, draftTitle);
     setEditingTabId(null);
   };
 
@@ -44,21 +44,24 @@ export function QueryTabs({
       <div
         className="query-tabs-scroll"
         role="tablist"
-        aria-label="SQL query tabs"
+        aria-label="Workspace tabs"
       >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
           const running = tab.id === runningTabId;
-          const dirty = tab.sql !== tab.lastExecutedSql;
+          const dirty = tab.kind === "query" && tab.sql !== tab.lastExecutedSql;
           return (
-            <div className={`editor-tab ${active ? "active" : ""}`} key={tab.id}>
-              {editingTabId === tab.id ? (
+            <div
+              className={`editor-tab ${tab.kind} ${active ? "active" : ""}`}
+              key={tab.id}
+            >
+              {tab.kind === "query" && editingTabId === tab.id ? (
                 <div
                   className="tab-select editing"
                   role="tab"
                   aria-selected={active}
                 >
-                  <span className={`tab-dot ${dirty ? "dirty" : ""}`} />
+                  <FileCode2 size={14} />
                   <input
                     ref={inputRef}
                     value={draftTitle}
@@ -77,15 +80,24 @@ export function QueryTabs({
                   className="tab-select"
                   role="tab"
                   aria-selected={active}
-                  title="Double-click to rename"
+                  title={
+                    tab.kind === "query"
+                      ? "Double-click to rename"
+                      : `${tab.schema}.${tab.table}`
+                  }
                   onClick={() => onSelect(tab.id)}
-                  onDoubleClick={() => startRenaming(tab)}
+                  onDoubleClick={() => {
+                    if (tab.kind === "query") startRenaming(tab);
+                  }}
                 >
                   {running ? (
-                    <Loader2 className="spin" size={13} />
+                    <Loader2 className="spin" size={14} />
+                  ) : tab.kind === "table" ? (
+                    <Table2 size={14} />
                   ) : (
-                    <span className={`tab-dot ${dirty ? "dirty" : ""}`} />
+                    <FileCode2 size={14} />
                   )}
+                  {dirty && <span className="tab-dot dirty" aria-label="Modified" />}
                   <span>{tab.title}</span>
                 </button>
               )}
@@ -101,7 +113,12 @@ export function QueryTabs({
           );
         })}
       </div>
-      <button className="new-tab" aria-label="New query" onClick={onAdd}>
+      <button
+        className="new-tab"
+        aria-label="New SQL query"
+        title="New SQL query"
+        onClick={onAddQuery}
+      >
         <Plus size={17} />
       </button>
       <div className="tab-spacer" />

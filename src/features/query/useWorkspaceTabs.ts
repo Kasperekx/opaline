@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { databaseObjectKey } from "../../shared/lib/database-object";
 import { readLocalJson, writeLocalJson } from "../../shared/lib/local-storage";
-import type { QueryExecutionError, QueryResult } from "../../shared/types/database";
-import type { QueryTab } from "./query-types";
+import type {
+  DatabaseObject,
+  QueryExecutionError,
+  QueryResult,
+} from "../../shared/types/database";
+import type { QueryTab, TableTab, WorkspaceTab } from "./query-types";
 
 const STORAGE_KEY = "opaline.query-session.v1";
 const starterQuery = `select
@@ -16,9 +21,9 @@ type StoredQuerySession = {
   tabs: StoredQueryTab[];
 };
 
-type QuerySession = {
+type WorkspaceSession = {
   activeTabId: string;
-  tabs: QueryTab[];
+  tabs: WorkspaceTab[];
 };
 
 const createId = () =>
@@ -26,7 +31,8 @@ const createId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const createTab = (title: string, sql = ""): QueryTab => ({
+const createQueryTab = (title: string, sql = ""): QueryTab => ({
+  kind: "query",
   id: createId(),
   title,
   sql,
@@ -35,12 +41,21 @@ const createTab = (title: string, sql = ""): QueryTab => ({
   error: null,
 });
 
-const initialSession = (): QuerySession => {
-  const tab = createTab("Query 1", starterQuery);
+const createTableTab = (object: DatabaseObject): TableTab => ({
+  kind: "table",
+  id: `table:${databaseObjectKey(object)}`,
+  title: object.name,
+  schema: object.schema,
+  table: object.name,
+  objectType: object.objectType,
+});
+
+const initialSession = (): WorkspaceSession => {
+  const tab = createQueryTab("Query 1", starterQuery);
   return { activeTabId: tab.id, tabs: [tab] };
 };
 
-const loadSession = (): QuerySession => {
+const loadSession = (): WorkspaceSession => {
   const value = readLocalJson<unknown>(STORAGE_KEY, null);
   if (!value || typeof value !== "object") return initialSession();
   const stored = value as Partial<StoredQuerySession>;
@@ -57,7 +72,10 @@ const loadSession = (): QuerySession => {
         typeof tab.sql === "string",
     )
     .map<QueryTab>((tab) => ({
-      ...tab,
+      kind: "query",
+      id: tab.id,
+      title: tab.title,
+      sql: tab.sql,
       lastExecutedSql:
         typeof tab.lastExecutedSql === "string" ? tab.lastExecutedSql : null,
       result: null,
@@ -70,15 +88,12 @@ const loadSession = (): QuerySession => {
     tabs.some((tab) => tab.id === stored.activeTabId)
       ? stored.activeTabId
       : tabs[0].id;
-  return {
-    tabs,
-    activeTabId,
-  };
+  return { tabs, activeTabId };
 };
 
-export function useQueryTabs() {
+export function useWorkspaceTabs() {
   const [session] = useState(loadSession);
-  const [tabs, setTabs] = useState<QueryTab[]>(session.tabs);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(session.tabs);
   const [activeTabId, setActiveTabId] = useState(session.activeTabId);
 
   const activeTab = useMemo(
@@ -88,9 +103,13 @@ export function useQueryTabs() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const queryTabs = tabs.filter((tab): tab is QueryTab => tab.kind === "query");
+      const activeQueryId = queryTabs.some((tab) => tab.id === activeTabId)
+        ? activeTabId
+        : queryTabs[0]?.id ?? "";
       writeLocalJson(STORAGE_KEY, {
-        activeTabId,
-        tabs: tabs.map(({ id, title, sql, lastExecutedSql }) => ({
+        activeTabId: activeQueryId,
+        tabs: queryTabs.map(({ id, title, sql, lastExecutedSql }) => ({
           id,
           title,
           sql,
@@ -101,49 +120,66 @@ export function useQueryTabs() {
     return () => window.clearTimeout(timer);
   }, [activeTabId, tabs]);
 
-  const updateTab = useCallback(
+  const updateQueryTab = useCallback(
     (id: string, update: (tab: QueryTab) => QueryTab) => {
-      setTabs((current) => current.map((tab) => (tab.id === id ? update(tab) : tab)));
+      setTabs((current) =>
+        current.map((tab) =>
+          tab.id === id && tab.kind === "query" ? update(tab) : tab,
+        ),
+      );
     },
     [],
   );
 
   const updateSql = useCallback(
     (id: string, sql: string) => {
-      updateTab(id, (tab) => ({ ...tab, sql, error: null }));
+      updateQueryTab(id, (tab) => ({ ...tab, sql, error: null }));
     },
-    [updateTab],
+    [updateQueryTab],
   );
 
-  const addTab = useCallback((sql = "", preferredTitle?: string) => {
-    const tab = createTab(preferredTitle ?? `Query ${tabs.length + 1}`, sql);
-    setTabs((current) => [...current, tab]);
+  const addQueryTab = useCallback(
+    (sql = "", preferredTitle?: string) => {
+      const queryCount = tabs.filter((tab) => tab.kind === "query").length;
+      const tab = createQueryTab(preferredTitle ?? `Query ${queryCount + 1}`, sql);
+      setTabs((current) => [...current, tab]);
+      setActiveTabId(tab.id);
+      return tab.id;
+    },
+    [tabs],
+  );
+
+  const openTable = useCallback((object: DatabaseObject) => {
+    const tab = createTableTab(object);
+    setTabs((current) =>
+      current.some((candidate) => candidate.id === tab.id)
+        ? current
+        : [...current, tab],
+    );
     setActiveTabId(tab.id);
     return tab.id;
-  }, [tabs.length]);
+  }, []);
 
   const closeTab = useCallback(
     (id: string) => {
-      setTabs((current) => {
-        if (current.length === 1) return current;
-        const index = current.findIndex((tab) => tab.id === id);
-        if (index < 0) return current;
-        const nextTabs = current.filter((tab) => tab.id !== id);
-        if (activeTabId === id) {
-          setActiveTabId(nextTabs[Math.min(index, nextTabs.length - 1)].id);
-        }
-        return nextTabs;
-      });
+      if (tabs.length === 1) return;
+      const index = tabs.findIndex((tab) => tab.id === id);
+      if (index < 0) return;
+      const nextTabs = tabs.filter((tab) => tab.id !== id);
+      setTabs(nextTabs);
+      if (activeTabId === id) {
+        setActiveTabId(nextTabs[Math.min(index, nextTabs.length - 1)].id);
+      }
     },
-    [activeTabId],
+    [activeTabId, tabs],
   );
 
-  const renameTab = useCallback(
+  const renameQueryTab = useCallback(
     (id: string, title: string) => {
       const trimmed = title.trim();
-      if (trimmed) updateTab(id, (tab) => ({ ...tab, title: trimmed }));
+      if (trimmed) updateQueryTab(id, (tab) => ({ ...tab, title: trimmed }));
     },
-    [updateTab],
+    [updateQueryTab],
   );
 
   const setExecution = useCallback(
@@ -153,14 +189,14 @@ export function useQueryTabs() {
       error: QueryExecutionError | null,
       lastExecutedSql?: string,
     ) => {
-      updateTab(id, (tab) => ({
+      updateQueryTab(id, (tab) => ({
         ...tab,
         lastExecutedSql: lastExecutedSql ?? tab.lastExecutedSql,
         result,
         error,
       }));
     },
-    [updateTab],
+    [updateQueryTab],
   );
 
   return {
@@ -169,9 +205,10 @@ export function useQueryTabs() {
     activeTabId,
     setActiveTabId,
     updateSql,
-    addTab,
+    addQueryTab,
+    openTable,
     closeTab,
-    renameTab,
+    renameQueryTab,
     setExecution,
   };
 }

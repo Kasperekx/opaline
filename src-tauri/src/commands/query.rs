@@ -19,7 +19,7 @@ pub(crate) async fn run_query(
     timeout_ms: Option<u64>,
     state: tauri::State<'_, AppState>,
 ) -> Result<QueryResult, QueryExecutionError> {
-    let (client, ssl_mode, _lease) = state.begin_query().await?;
+    let (client, ssl_mode, _lease) = state.begin_operation().await?;
     let timeout = Duration::from_millis(
         timeout_ms
             .unwrap_or(DEFAULT_QUERY_TIMEOUT_MS)
@@ -44,10 +44,10 @@ pub(crate) async fn run_query(
 
 #[tauri::command]
 pub(crate) async fn cancel_query(state: tauri::State<'_, AppState>) -> Result<bool, String> {
-    let Some(active_query) = state.active_query() else {
+    let Some(active_operation) = state.active_operation() else {
         return Ok(false);
     };
 
-    postgres::cancel_query(&active_query.cancel_token, active_query.ssl_mode).await?;
+    postgres::cancel_query(&active_operation.cancel_token, active_operation.ssl_mode).await?;
     Ok(true)
 }

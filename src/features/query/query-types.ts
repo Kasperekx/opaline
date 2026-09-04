@@ -4,6 +4,7 @@ import type {
 } from "../../shared/types/database";
 
 export type QueryTab = {
+  kind: "query";
   id: string;
   title: string;
   sql: string;
@@ -11,6 +12,17 @@ export type QueryTab = {
   result: QueryResult | null;
   error: QueryExecutionError | null;
 };
+
+export type TableTab = {
+  kind: "table";
+  id: string;
+  title: string;
+  schema: string;
+  table: string;
+  objectType: string;
+};
+
+export type WorkspaceTab = QueryTab | TableTab;
 
 export type QueryHistoryStatus =
   | "success"

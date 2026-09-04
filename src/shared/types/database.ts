@@ -27,7 +27,55 @@ export type ColumnInfo = {
   nullable: boolean;
   defaultValue: string | null;
   primaryKey: boolean;
+  identity: boolean;
+  generated: boolean;
 };
+
+export type SortDirection = "asc" | "desc";
+
+export type TableSort = {
+  column: string;
+  direction: SortDirection;
+};
+
+export type TablePageRequest = {
+  schema: string;
+  table: string;
+  page: number;
+  pageSize: number;
+  filter: string | null;
+  sort: TableSort | null;
+};
+
+export type TableDataRow = {
+  values: Array<string | null>;
+  rowVersion: string | null;
+};
+
+export type TableDataPage = {
+  columns: ColumnInfo[];
+  rows: TableDataRow[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  editable: boolean;
+  editabilityReason: string | null;
+};
+
+export type TableCellValue = {
+  column: string;
+  value: string | null;
+};
+
+export type UpdateTableRowRequest = {
+  schema: string;
+  table: string;
+  key: TableCellValue[];
+  changes: TableCellValue[];
+  rowVersion: string;
+};
+
+export type DeleteTableRowRequest = Omit<UpdateTableRowRequest, "changes">;
 
 export type QueryResultSet = {
   columns: string[];

@@ -12,7 +12,7 @@ type ResultsGridProps = {
 };
 
 const errorTitle: Record<QueryExecutionError["kind"], string> = {
-  busy: "Another query is running",
+  busy: "Database is busy",
   cancelled: "Query cancelled",
   database: "Query failed",
   timeout: "Query timed out",

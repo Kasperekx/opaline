@@ -18,6 +18,11 @@ local-first database client with a precise interface and no required account.
 - streamed query execution with configurable, bounded result retention
 - multiple result-set navigation for multi-statement queries
 - multiple renamable query tabs with local session restore
+- dedicated table tabs opened directly from the database explorer
+- paginated table browsing with per-column sorting and all-column filtering
+- guarded inline row editing and deletion for tables with a primary key
+- optimistic concurrency checks that prevent silent overwrites of changed rows
+- automatic read-only mode for views, foreign tables, and tables without a primary key
 - local query history with duration, row count, and execution status
 - structured PostgreSQL errors with SQLSTATE, detail, hint, and cursor position
 - resizable explorer and editor/result panels with keyboard-accessible handles
@@ -78,9 +83,9 @@ development only.
 1. read-only connection safeguards and explicit transaction controls
 2. encrypted connection profiles backed by the operating system keychain
 3. saved queries, SQL autocomplete, and keyboard command palette
-4. paginated table browsing and transactional data editing
+4. row creation, multi-row selection, and CSV/JSON export
 5. table structure, indexes, constraints, and object DDL views
-6. CSV/JSON export, SSH tunnels, and custom CA certificates
+6. SSH tunnels and custom CA certificates
 7. signed release builds for macOS, Windows, and Linux
 
 ## Contributing

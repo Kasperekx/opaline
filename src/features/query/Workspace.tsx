@@ -25,13 +25,14 @@ import { TopBar } from "../../shared/components/TopBar";
 import { useMediaQuery } from "../../shared/hooks/useMediaQuery";
 import { primaryModifierLabel } from "../../shared/lib/platform";
 import type { ConnectionInfo } from "../../shared/types/database";
+import { TableDataView } from "../table/TableDataView";
 import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { QueryPreferencesPanel } from "./QueryPreferencesPanel";
-import { QueryTabs } from "./QueryTabs";
 import { ResultsGrid } from "./ResultsGrid";
 import { SqlEditor, type SqlEditorHandle } from "./SqlEditor";
 import { useWorkspace } from "./useWorkspace";
 import { useWorkspaceLayout } from "./useWorkspaceLayout";
+import { WorkspaceTabs } from "./WorkspaceTabs";
 
 type WorkspaceProps = {
   connection: ConnectionInfo;
@@ -49,11 +50,13 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
   const [explorerVisible, setExplorerVisible] = useState(() => !compactLayout);
   const [openPanel, setOpenPanel] = useState<WorkspacePanel | null>(null);
   const activeTab = workspace.tabs.activeTab;
-  const activeResult = activeTab.result;
+  const activeQueryTab = activeTab.kind === "query" ? activeTab : null;
+  const activeResult = activeQueryTab?.result ?? null;
   const activeSet = activeResult?.resultSets[workspace.activeResultIndex] ?? null;
   const resultCount = activeSet?.rows.length ?? 0;
-  const queryBusy = workspace.runningTabId === activeTab.id;
-  const dirty = activeTab.sql !== activeTab.lastExecutedSql;
+  const queryBusy = workspace.runningTabId === activeQueryTab?.id;
+  const dirty =
+    activeQueryTab !== null && activeQueryTab.sql !== activeQueryTab.lastExecutedSql;
 
   useEffect(() => setExplorerVisible(!compactLayout), [compactLayout]);
 
@@ -152,13 +155,13 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
             </div>
           }
         />
-        <QueryTabs
+        <WorkspaceTabs
           tabs={workspace.tabs.tabs}
           activeTabId={activeTab.id}
           runningTabId={workspace.runningTabId}
-          onAdd={() => workspace.tabs.addTab()}
+          onAddQuery={() => workspace.tabs.addQueryTab()}
           onClose={workspace.tabs.closeTab}
-          onRename={workspace.tabs.renameTab}
+          onRenameQuery={workspace.tabs.renameQueryTab}
           onSelect={(id) => {
             workspace.tabs.setActiveTabId(id);
             workspace.setActiveResultIndex(0);
@@ -180,12 +183,13 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
             </button>
           }
         />
+        {activeTab.kind === "query" ? (
         <div className="query-split" ref={querySplitRef} style={splitStyle}>
           <section className="editor-pane" aria-label="SQL editor">
             <div className="editor-toolbar">
               <div className="query-path">
                 <SquareTerminal size={14} />
-                <span>{activeTab.title}</span>
+                <span>{activeQueryTab?.title}</span>
                 {dirty && <span className="unsaved">Modified</span>}
               </div>
               <div className="editor-actions">
@@ -294,13 +298,24 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
             />
           </section>
         </div>
+        ) : (
+          <TableDataView
+            key={activeTab.id}
+            tab={activeTab}
+            onOpenQuery={(sql, title) => workspace.tabs.addQueryTab(sql, title)}
+          />
+        )}
         <footer className="status-bar">
           <span>
             <i /> Connected
           </span>
           <span>{connection.database}</span>
           <span className="status-spacer" />
-          <span>{workspace.queryPreferences.preferences.maxRows} row limit</span>
+          <span>
+            {activeTab.kind === "query"
+              ? `${workspace.queryPreferences.preferences.maxRows} row limit`
+              : "Table browse mode"}
+          </span>
           <span>UTF-8</span>
         </footer>
       </main>
@@ -310,7 +325,7 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
           onClear={workspace.history.clearHistory}
           onClose={() => setOpenPanel(null)}
           onOpen={(entry) => {
-            workspace.tabs.addTab(entry.sql, entry.title);
+            workspace.tabs.addQueryTab(entry.sql, entry.title);
             setOpenPanel(null);
           }}
         />

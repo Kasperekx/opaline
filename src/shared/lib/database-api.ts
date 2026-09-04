@@ -4,9 +4,14 @@ import type {
   ConnectionConfig,
   ConnectionInfo,
   DatabaseObject,
+  DeleteTableRowRequest,
   QueryExecutionError,
   QueryResult,
   RunQueryOptions,
+  TableDataPage,
+  TableDataRow,
+  TablePageRequest,
+  UpdateTableRowRequest,
 } from "../types/database";
 
 export const isDesktopRuntime = () => "__TAURI_INTERNALS__" in window;
@@ -40,4 +45,10 @@ export const databaseApi = {
       timeoutMs: options.timeoutMs,
     }),
   cancelQuery: () => invoke<boolean>("cancel_query"),
+  loadTablePage: (input: TablePageRequest) =>
+    invoke<TableDataPage>("load_table_page", { input }),
+  updateTableRow: (input: UpdateTableRowRequest) =>
+    invoke<TableDataRow>("update_table_row", { input }),
+  deleteTableRow: (input: DeleteTableRowRequest) =>
+    invoke<void>("delete_table_row", { input }),
 };
