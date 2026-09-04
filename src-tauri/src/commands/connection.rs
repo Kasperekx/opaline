@@ -12,7 +12,9 @@ pub(crate) async fn connect_postgres(
     state: tauri::State<'_, AppState>,
 ) -> Result<ConnectionInfo, String> {
     let (client, info) = postgres::connect(&input).await?;
-    state.set_session(client, info.clone()).await;
+    state
+        .set_session(client, info.clone(), input.ssl_mode)
+        .await;
     Ok(info)
 }
 

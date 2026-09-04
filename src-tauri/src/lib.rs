@@ -4,7 +4,7 @@ mod state;
 
 use commands::{
     connection::{connect_postgres, connection_info, disconnect_postgres},
-    query::run_query,
+    query::{cancel_query, run_query},
     schema::{list_columns, list_database_objects},
 };
 use state::AppState;
@@ -19,7 +19,8 @@ pub fn run() {
             connection_info,
             list_database_objects,
             list_columns,
-            run_query
+            run_query,
+            cancel_query
         ])
         .run(tauri::generate_context!())
         .expect("error while running Opaline");

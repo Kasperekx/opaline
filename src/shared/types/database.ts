@@ -40,3 +40,24 @@ export type QueryResult = {
   resultSets: QueryResultSet[];
   durationMs: number;
 };
+
+export type QueryErrorKind =
+  | "busy"
+  | "cancelled"
+  | "database"
+  | "timeout"
+  | "validation";
+
+export type QueryExecutionError = {
+  kind: QueryErrorKind;
+  message: string;
+  detail: string | null;
+  hint: string | null;
+  code: string | null;
+  position: number | null;
+};
+
+export type RunQueryOptions = {
+  maxRows: number;
+  timeoutMs: number;
+};

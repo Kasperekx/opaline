@@ -3,13 +3,13 @@ use std::{future::Future, time::Duration};
 use futures_util::{pin_mut, TryStreamExt};
 use rustls_tokio_postgres::{config_platform_verifier, MakeRustlsConnect};
 use tokio_postgres::{
-    config::SslMode as PostgresSslMode, Client, Config as PostgresConfig, Error, NoTls,
-    SimpleQueryMessage,
+    config::SslMode as PostgresSslMode, error::ErrorPosition, CancelToken, Client,
+    Config as PostgresConfig, Error, NoTls, SimpleQueryMessage,
 };
 
 use super::models::{
-    ColumnInfo, ConnectionConfig, ConnectionInfo, DatabaseObject, QueryResult, QueryResultSet,
-    SslMode,
+    ColumnInfo, ConnectionConfig, ConnectionInfo, DatabaseObject, QueryErrorKind,
+    QueryExecutionError, QueryResult, QueryResultSet, SslMode,
 };
 
 const CONNECTION_TIMEOUT: Duration = Duration::from_secs(12);
@@ -135,26 +135,19 @@ pub(crate) async fn execute_query(
     client: &Client,
     sql: &str,
     max_rows: Option<usize>,
-) -> Result<QueryResult, String> {
+) -> Result<QueryResult, QueryExecutionError> {
     validate_query(sql)?;
 
     let started = std::time::Instant::now();
     let row_limit = max_rows
         .unwrap_or(DEFAULT_ROW_LIMIT)
         .clamp(1, MAX_ROW_LIMIT);
-    let messages = client
-        .simple_query_raw(sql)
-        .await
-        .map_err(|error| database_error("Query failed", error))?;
+    let messages = client.simple_query_raw(sql).await.map_err(query_error)?;
     pin_mut!(messages);
     let mut result_sets = Vec::new();
     let mut current: Option<QueryResultSet> = None;
 
-    while let Some(message) = messages
-        .try_next()
-        .await
-        .map_err(|error| database_error("Query failed", error))?
-    {
+    while let Some(message) = messages.try_next().await.map_err(query_error)? {
         match message {
             SimpleQueryMessage::RowDescription(columns) => {
                 current = Some(empty_result_set(
@@ -204,12 +197,37 @@ pub(crate) async fn execute_query(
     })
 }
 
-fn validate_query(sql: &str) -> Result<(), String> {
+pub(crate) async fn cancel_query(
+    cancel_token: &CancelToken,
+    ssl_mode: SslMode,
+) -> Result<(), String> {
+    if matches!(ssl_mode, SslMode::Disable) {
+        return cancel_token
+            .cancel_query(NoTls)
+            .await
+            .map_err(|error| database_error("Could not cancel query", error));
+    }
+
+    let tls_config = config_platform_verifier()
+        .map_err(|error| format!("Could not load system TLS certificates: {error}"))?;
+    cancel_token
+        .cancel_query(MakeRustlsConnect::new(tls_config))
+        .await
+        .map_err(|error| database_error("Could not cancel query", error))
+}
+
+fn validate_query(sql: &str) -> Result<(), QueryExecutionError> {
     if sql.trim().is_empty() {
-        return Err("Write a query before running it.".into());
+        return Err(QueryExecutionError::simple(
+            QueryErrorKind::Validation,
+            "Write a query before running it.",
+        ));
     }
     if sql.len() > MAX_QUERY_BYTES {
-        return Err("Query is too large (maximum 1 MB).".into());
+        return Err(QueryExecutionError::simple(
+            QueryErrorKind::Validation,
+            "Query is too large (maximum 1 MB).",
+        ));
     }
     Ok(())
 }
@@ -287,6 +305,32 @@ fn database_error(context: &str, error: Error) -> String {
     format!("{context}: {error}")
 }
 
+fn query_error(error: Error) -> QueryExecutionError {
+    let Some(database_error) = error.as_db_error() else {
+        return QueryExecutionError::simple(
+            QueryErrorKind::Database,
+            format!("Query failed: {error}"),
+        );
+    };
+
+    let code = database_error.code().code().to_string();
+    QueryExecutionError {
+        kind: if code == "57014" {
+            QueryErrorKind::Cancelled
+        } else {
+            QueryErrorKind::Database
+        },
+        message: database_error.message().to_string(),
+        detail: database_error.detail().map(str::to_string),
+        hint: database_error.hint().map(str::to_string),
+        code: Some(code),
+        position: match database_error.position() {
+            Some(ErrorPosition::Original(position)) => Some(*position),
+            _ => None,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -321,7 +365,7 @@ mod tests {
     #[test]
     fn rejects_empty_and_oversized_queries() {
         assert_eq!(
-            validate_query("  ").unwrap_err(),
+            validate_query("  ").unwrap_err().message,
             "Write a query before running it."
         );
         assert!(validate_query(&"x".repeat(MAX_QUERY_BYTES + 1)).is_err());
@@ -348,5 +392,32 @@ mod tests {
 
         assert_eq!(result.result_sets[0].rows[0][0].as_deref(), Some("opaline"));
         assert_eq!(result.result_sets[0].rows[0][1].as_deref(), Some("42"));
+
+        let limited = execute_query(&client, "SELECT generate_series(1, 25) AS number", Some(10))
+            .await
+            .expect("Opaline should limit large result sets");
+        assert_eq!(limited.result_sets[0].rows.len(), 10);
+        assert!(limited.result_sets[0].truncated);
+
+        let syntax_error = execute_query(&client, "SELEC 1", None)
+            .await
+            .expect_err("invalid SQL should return a structured error");
+        assert_eq!(syntax_error.code.as_deref(), Some("42601"));
+        assert_eq!(syntax_error.position, Some(1));
+
+        let cancel_token = client.cancel_token();
+        let cancel_task = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            cancel_query(&cancel_token, SslMode::Disable).await
+        });
+        let cancelled = execute_query(&client, "SELECT pg_sleep(10)", None)
+            .await
+            .expect_err("the long query should be cancelled");
+        cancel_task
+            .await
+            .expect("the cancellation task should finish")
+            .expect("PostgreSQL should accept the cancellation request");
+        assert!(matches!(cancelled.kind, QueryErrorKind::Cancelled));
+        assert_eq!(cancelled.code.as_deref(), Some("57014"));
     }
 }

@@ -12,9 +12,16 @@ local-first database client with a precise interface and no required account.
 - in-memory credentials for the active session
 - schema, table, view, and column discovery
 - SQL editing with PostgreSQL syntax highlighting
+- execution of selected SQL or the full editor with `Cmd/Ctrl+Enter`
 - multi-statement query execution
-- streamed query execution with bounded result retention (500 rows in the UI)
+- cancellable queries with a configurable timeout
+- streamed query execution with configurable, bounded result retention
 - multiple result-set navigation for multi-statement queries
+- multiple renamable query tabs with local session restore
+- local query history with duration, row count, and execution status
+- structured PostgreSQL errors with SQLSTATE, detail, hint, and cursor position
+- resizable explorer and editor/result panels with keyboard-accessible handles
+- font-size and interface-density preferences
 - movable, resizable, minimizable, and maximizable desktop window
 - macOS, Windows, and Linux project configuration through Tauri 2
 
@@ -56,8 +63,8 @@ cd src-tauri && cargo fmt --check && cargo check && cargo test
 ## Security notes
 
 Opaline executes SQL using the privileges of the connected PostgreSQL user.
-Until transaction controls, query cancellation, and read-only connection modes
-land, use a least-privileged database role when connecting to important data.
+Until transaction controls and read-only connection modes land, use a
+least-privileged database role when connecting to important data.
 
 The desktop webview uses an explicit Content Security Policy and only exposes
 the Tauri window capabilities needed by the custom title bar.
@@ -68,9 +75,9 @@ development only.
 
 ## Near-term roadmap
 
-1. query cancellation, timeouts, and read-only safeguards
+1. read-only connection safeguards and explicit transaction controls
 2. encrypted connection profiles backed by the operating system keychain
-3. saved queries, history, autosave, and multiple query tabs
+3. saved queries, SQL autocomplete, and keyboard command palette
 4. paginated table browsing and transactional data editing
 5. table structure, indexes, constraints, and object DDL views
 6. CSV/JSON export, SSH tunnels, and custom CA certificates

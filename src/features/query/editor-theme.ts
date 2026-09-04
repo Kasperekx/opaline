@@ -8,14 +8,14 @@ export const editorTheme = EditorView.theme(
       height: "100%",
       backgroundColor: "transparent",
       color: "#dfe6dc",
-      fontSize: "clamp(15px, 0.95vw, 17px)",
+      fontSize: "var(--editor-font-size, clamp(15px, 0.95vw, 17px))",
     },
     ".cm-content": {
       caretColor: "#c8f26a",
       padding: "25px 0",
       fontFamily:
         '"SFMono-Regular", "Cascadia Code", "Roboto Mono", ui-monospace, monospace',
-      lineHeight: "1.7",
+      lineHeight: "var(--editor-line-height, 1.7)",
     },
     ".cm-line": { padding: "0 clamp(18px, 1.7vw, 28px)" },
     ".cm-gutters": {

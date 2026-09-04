@@ -65,3 +65,37 @@ pub(crate) struct QueryResult {
     pub(crate) result_sets: Vec<QueryResultSet>,
     pub(crate) duration_ms: u128,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct QueryExecutionError {
+    pub(crate) kind: QueryErrorKind,
+    pub(crate) message: String,
+    pub(crate) detail: Option<String>,
+    pub(crate) hint: Option<String>,
+    pub(crate) code: Option<String>,
+    pub(crate) position: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum QueryErrorKind {
+    Busy,
+    Cancelled,
+    Database,
+    Timeout,
+    Validation,
+}
+
+impl QueryExecutionError {
+    pub(crate) fn simple(kind: QueryErrorKind, message: impl Into<String>) -> Self {
+        Self {
+            kind,
+            message: message.into(),
+            detail: None,
+            hint: None,
+            code: None,
+            position: None,
+        }
+    }
+}

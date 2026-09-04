@@ -4,7 +4,9 @@ import type {
   ConnectionConfig,
   ConnectionInfo,
   DatabaseObject,
+  QueryExecutionError,
   QueryResult,
+  RunQueryOptions,
 } from "../types/database";
 
 export const isDesktopRuntime = () => "__TAURI_INTERNALS__" in window;
@@ -15,6 +17,14 @@ export const errorMessage = (error: unknown) => {
   return "Something went wrong. Please try again.";
 };
 
+export const isQueryExecutionError = (
+  error: unknown,
+): error is QueryExecutionError => {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as Partial<QueryExecutionError>;
+  return typeof candidate.kind === "string" && typeof candidate.message === "string";
+};
+
 export const databaseApi = {
   connectionInfo: () => invoke<ConnectionInfo | null>("connection_info"),
   connect: (input: ConnectionConfig) =>
@@ -23,6 +33,11 @@ export const databaseApi = {
   listObjects: () => invoke<DatabaseObject[]>("list_database_objects"),
   listColumns: (schema: string, table: string) =>
     invoke<ColumnInfo[]>("list_columns", { schema, table }),
-  runQuery: (sql: string, maxRows = 500) =>
-    invoke<QueryResult>("run_query", { sql, maxRows }),
+  runQuery: (sql: string, options: RunQueryOptions) =>
+    invoke<QueryResult>("run_query", {
+      sql,
+      maxRows: options.maxRows,
+      timeoutMs: options.timeoutMs,
+    }),
+  cancelQuery: () => invoke<boolean>("cancel_query"),
 };

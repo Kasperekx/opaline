@@ -1,10 +1,22 @@
 import { Check, Loader2, Play, SquareTerminal } from "lucide-react";
-import type { QueryResultSet } from "../../shared/types/database";
+import type {
+  QueryExecutionError,
+  QueryResultSet,
+} from "../../shared/types/database";
+import { primaryModifierLabel } from "../../shared/lib/platform";
 
 type ResultsGridProps = {
   resultSet: QueryResultSet | null;
   busy: boolean;
-  error: string | null;
+  error: QueryExecutionError | null;
+};
+
+const errorTitle: Record<QueryExecutionError["kind"], string> = {
+  busy: "Another query is running",
+  cancelled: "Query cancelled",
+  database: "Query failed",
+  timeout: "Query timed out",
+  validation: "Cannot run query",
 };
 
 export function ResultsGrid({ resultSet, busy, error }: ResultsGridProps) {
@@ -20,8 +32,17 @@ export function ResultsGrid({ resultSet, busy, error }: ResultsGridProps) {
     return (
       <div className="results-state error-state" role="alert">
         <SquareTerminal size={21} />
-        <strong>Query failed</strong>
-        <span>{error}</span>
+        <strong>{errorTitle[error.kind]}</strong>
+        <span>{error.message}</span>
+        {error.detail && <span className="error-detail">{error.detail}</span>}
+        {error.hint && <span className="error-hint">Hint: {error.hint}</span>}
+        {(error.code || error.position !== null) && (
+          <small>
+            {error.code && `SQLSTATE ${error.code}`}
+            {error.code && error.position !== null && " · "}
+            {error.position !== null && `Character ${error.position + 1}`}
+          </small>
+        )}
       </div>
     );
   }
@@ -30,7 +51,7 @@ export function ResultsGrid({ resultSet, busy, error }: ResultsGridProps) {
       <div className="results-state">
         <Play size={20} />
         <span>Run the query to see results</span>
-        <kbd>⌘ ↵</kbd>
+        <kbd>{primaryModifierLabel} ↵</kbd>
       </div>
     );
   }
