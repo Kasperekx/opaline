@@ -4,8 +4,8 @@ use tokio_postgres::{types::ToSql, Client, Row};
 
 use super::{
     models::{
-        ColumnInfo, DeleteTableRowRequest, SortDirection, TableCellValue, TableDataPage,
-        TableDataRow, TablePageRequest, UpdateTableRowRequest,
+        ColumnInfo, DeleteTableRowRequest, InsertTableRowRequest, SortDirection, TableCellValue,
+        TableDataPage, TableDataRow, TablePageRequest, UpdateTableRowRequest,
     },
     postgres,
 };
@@ -45,6 +45,17 @@ impl TableMetadata {
             );
         }
         (true, None)
+    }
+
+    fn insertability(&self) -> (bool, Option<String>) {
+        if self.supports_row_versions() {
+            (true, None)
+        } else {
+            (
+                false,
+                Some("Views and foreign tables do not support direct row insertion.".into()),
+            )
+        }
     }
 }
 
@@ -104,6 +115,7 @@ pub(crate) async fn fetch_page(
         .map(|row| map_row(row, &metadata))
         .collect::<Result<Vec<_>, _>>()?;
     let (editable, editability_reason) = metadata.editability();
+    let (insertable, insertability_reason) = metadata.insertability();
 
     Ok(TableDataPage {
         columns: metadata.columns,
@@ -113,7 +125,52 @@ pub(crate) async fn fetch_page(
         has_more,
         editable,
         editability_reason,
+        insertable,
+        insertability_reason,
     })
+}
+
+pub(crate) async fn insert_row(
+    client: &Client,
+    request: &InsertTableRowRequest,
+) -> Result<TableDataRow, String> {
+    validate_relation_name(&request.schema, &request.table)?;
+    let metadata = table_metadata(client, &request.schema, &request.table).await?;
+    ensure_insertable(&metadata)?;
+    let values = validated_insert_values(&metadata, &request.values)?;
+    let qualified_table = qualified_name(&request.schema, &request.table);
+    let returning = returning_clause(&metadata);
+    let mut parameters = Vec::with_capacity(values.len());
+
+    let sql = if values.is_empty() {
+        format!("INSERT INTO {qualified_table} DEFAULT VALUES RETURNING {returning}")
+    } else {
+        let columns = values
+            .iter()
+            .map(|(column, _)| quote_identifier(&column.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let placeholders = values
+            .iter()
+            .enumerate()
+            .map(|(index, (column, value))| {
+                parameters.push(value.clone());
+                typed_parameter(index + 1, column)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "INSERT INTO {qualified_table} ({columns}) VALUES ({placeholders}) \
+             RETURNING {returning}"
+        )
+    };
+    let parameter_refs = sql_parameters(&parameters);
+    let row = client
+        .query_one(&sql, &parameter_refs)
+        .await
+        .map_err(|error| format!("Could not insert row: {error}"))?;
+
+    map_row(&row, &metadata)
 }
 
 pub(crate) async fn update_row(
@@ -133,10 +190,9 @@ pub(crate) async fn update_row(
         .map(|(index, (column, value))| {
             parameters.push(value.clone());
             format!(
-                "{} = ${}::text::{}",
+                "{} = {}",
                 quote_identifier(&column.name),
-                index + 1,
-                column.data_type
+                typed_parameter(index + 1, column)
             )
         })
         .collect::<Vec<_>>()
@@ -148,10 +204,9 @@ pub(crate) async fn update_row(
         .map(|(index, (column, value))| {
             parameters.push(value.clone());
             format!(
-                "{} IS NOT DISTINCT FROM ${}::text::{}",
+                "{} IS NOT DISTINCT FROM {}",
                 quote_identifier(&column.name),
-                key_start + index + 1,
-                column.data_type
+                typed_parameter(key_start + index + 1, column)
             )
         })
         .collect::<Vec<_>>()
@@ -189,10 +244,9 @@ pub(crate) async fn delete_row(
         .map(|(index, (column, value))| {
             parameters.push(value.clone());
             format!(
-                "{} IS NOT DISTINCT FROM ${}::text::{}",
+                "{} IS NOT DISTINCT FROM {}",
                 quote_identifier(&column.name),
-                index + 1,
-                column.data_type
+                typed_parameter(index + 1, column)
             )
         })
         .collect::<Vec<_>>()
@@ -317,28 +371,56 @@ fn validated_changes<'a>(
     if changes.is_empty() {
         return Err("Change at least one value before saving.".into());
     }
-    if changes.len() > metadata.columns.len() {
-        return Err("The row update contains too many columns.".into());
+    validated_writable_values(metadata, changes)
+}
+
+fn validated_insert_values<'a>(
+    metadata: &'a TableMetadata,
+    values: &'a [TableCellValue],
+) -> Result<Vec<(&'a ColumnInfo, Option<String>)>, String> {
+    let values = validated_writable_values(metadata, values)?;
+    let included = values
+        .iter()
+        .map(|(column, _)| column.name.as_str())
+        .collect::<HashSet<_>>();
+    if let Some(column) = metadata.columns.iter().find(|column| {
+        !column.nullable
+            && column.default_value.is_none()
+            && !column.identity
+            && !column.generated
+            && !included.contains(column.name.as_str())
+    }) {
+        return Err(format!("{} requires a value.", column.name));
+    }
+    Ok(values)
+}
+
+fn validated_writable_values<'a>(
+    metadata: &'a TableMetadata,
+    values: &'a [TableCellValue],
+) -> Result<Vec<(&'a ColumnInfo, Option<String>)>, String> {
+    if values.len() > metadata.columns.len() {
+        return Err("The row mutation contains too many columns.".into());
     }
     let mut seen = HashSet::new();
-    changes
+    values
         .iter()
-        .map(|change| {
-            if !seen.insert(change.column.as_str()) {
-                return Err("A column can only be changed once per update.".to_string());
+        .map(|value| {
+            if !seen.insert(value.column.as_str()) {
+                return Err("A column can only be submitted once.".to_string());
             }
             let column = metadata
                 .columns
                 .iter()
-                .find(|column| column.name == change.column)
-                .ok_or_else(|| "An updated column no longer exists.".to_string())?;
+                .find(|column| column.name == value.column)
+                .ok_or_else(|| "A submitted column no longer exists.".to_string())?;
             if column.identity || column.generated {
                 return Err(format!("{} is managed by PostgreSQL.", column.name));
             }
-            if !column.nullable && change.value.is_none() {
+            if !column.nullable && value.value.is_none() {
                 return Err(format!("{} cannot be NULL.", column.name));
             }
-            Ok((column, change.value.clone()))
+            Ok((column, value.value.clone()))
         })
         .collect()
 }
@@ -349,6 +431,15 @@ fn ensure_editable(metadata: &TableMetadata) -> Result<(), String> {
         Ok(())
     } else {
         Err(reason.unwrap_or_else(|| "This relation is read-only.".into()))
+    }
+}
+
+fn ensure_insertable(metadata: &TableMetadata) -> Result<(), String> {
+    let (insertable, reason) = metadata.insertability();
+    if insertable {
+        Ok(())
+    } else {
+        Err(reason.unwrap_or_else(|| "This relation does not accept new rows.".into()))
     }
 }
 
@@ -384,6 +475,10 @@ fn sql_parameters(values: &[Option<String>]) -> Vec<&(dyn ToSql + Sync)> {
         .iter()
         .map(|value| value as &(dyn ToSql + Sync))
         .collect()
+}
+
+fn typed_parameter(index: usize, column: &ColumnInfo) -> String {
+    format!("${index}::text::{}", column.data_type)
 }
 
 fn validate_relation_name(schema: &str, table: &str) -> Result<(), String> {
@@ -455,7 +550,12 @@ mod tests {
                  CREATE TEMP TABLE opaline_without_key (value text); \
                  INSERT INTO opaline_without_key VALUES ('read only'); \
                  CREATE TEMP VIEW opaline_stage_two_view AS \
-                 SELECT id, name FROM opaline_stage_two;",
+                 SELECT id, name FROM opaline_stage_two; \
+                 CREATE TEMP TABLE opaline_insert_target (\
+                    id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, \
+                    label text NOT NULL, \
+                    note text NOT NULL DEFAULT 'database default'\
+                 );",
             )
             .await
             .expect("test data should be created");
@@ -606,6 +706,50 @@ mod tests {
             .editability_reason
             .as_deref()
             .is_some_and(|reason| reason.contains("read-only")));
+
+        let inserted = insert_row(
+            &client,
+            &InsertTableRowRequest {
+                schema: schema.clone(),
+                table: "opaline_insert_target".into(),
+                values: vec![TableCellValue {
+                    column: "label".into(),
+                    value: Some("created in Opaline".into()),
+                }],
+            },
+        )
+        .await
+        .expect("identity and default columns should be generated by PostgreSQL");
+        assert_eq!(inserted.values[0].as_deref(), Some("1"));
+        assert_eq!(inserted.values[1].as_deref(), Some("created in Opaline"));
+        assert_eq!(inserted.values[2].as_deref(), Some("database default"));
+
+        let missing_required_value = insert_row(
+            &client,
+            &InsertTableRowRequest {
+                schema: schema.clone(),
+                table: "opaline_insert_target".into(),
+                values: Vec::new(),
+            },
+        )
+        .await
+        .expect_err("required values should be validated before insertion");
+        assert!(missing_required_value.contains("label requires a value"));
+
+        let managed_identity = insert_row(
+            &client,
+            &InsertTableRowRequest {
+                schema: schema.clone(),
+                table: "opaline_insert_target".into(),
+                values: vec![TableCellValue {
+                    column: "id".into(),
+                    value: Some("99".into()),
+                }],
+            },
+        )
+        .await
+        .expect_err("managed identity values must not be submitted");
+        assert!(managed_identity.contains("managed by PostgreSQL"));
 
         delete_row(
             &client,

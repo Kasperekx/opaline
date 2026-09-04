@@ -6,86 +6,34 @@ import {
   ArrowUp,
   ArrowUpDown,
   Check,
+  CheckCircle2,
+  CheckSquare2,
   Code2,
+  FileJson2,
+  FileSpreadsheet,
   KeyRound,
   Loader2,
   LockKeyhole,
   Pencil,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { qualifiedRelationName } from "../../shared/lib/database-object";
-import type { ColumnInfo } from "../../shared/types/database";
 import type { TableTab } from "../query/query-types";
+import { CellValue, EditableCell, InsertCell, SelectionCheckbox } from "./TableCells";
+import { TableExportMenu } from "./TableExportMenu";
 import { useTableData } from "./useTableData";
+import { useTableExport } from "./useTableExport";
 
 type TableDataViewProps = {
   tab: TableTab;
   onOpenQuery: (sql: string, title: string) => void;
 };
-
-type CellEditorProps = {
-  column: ColumnInfo;
-  value: string | null;
-  onChange: (value: string | null) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-};
-
-function CellEditor({
-  column,
-  value,
-  onChange,
-  onCommit,
-  onCancel,
-}: CellEditorProps) {
-  const managed = column.identity || column.generated;
-  if (managed) return <CellValue value={value} />;
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") onCancel();
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      onCommit();
-    }
-  };
-
-  return (
-    <div className={`cell-editor ${value === null ? "is-null" : ""}`}>
-      <input
-        value={value ?? ""}
-        disabled={value === null}
-        aria-label={`Value for ${column.name}`}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      {column.nullable && (
-        <button
-          type="button"
-          aria-label={value === null ? `Set a value for ${column.name}` : `Set ${column.name} to NULL`}
-          aria-pressed={value === null}
-          onClick={() => onChange(value === null ? "" : null)}
-        >
-          NULL
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CellValue({ value }: { value: string | null }) {
-  return value === null ? (
-    <span className="table-null">NULL</span>
-  ) : (
-    <span className="table-cell-value" title={value}>
-      {value}
-    </span>
-  );
-}
 
 export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
   const table = useTableData(tab);
@@ -94,6 +42,19 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
   const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
   const qualifiedName = qualifiedRelationName(tab.schema, tab.table);
   const data = table.data;
+  const tableExport = useTableExport({
+    schema: tab.schema,
+    table: tab.table,
+    columns: data?.columns ?? [],
+    visibleRows: data?.rows ?? [],
+    selectedRows: table.selectedRows,
+  });
+  const draftLocked = table.hasDraft || table.mutationBusy;
+  const interactionLocked = table.busy || draftLocked;
+  const visibleRowCount = data?.rows.length ?? 0;
+  const firstInsertInput = table.insertDraft?.values.findIndex(
+    (value) => typeof value === "string",
+  );
 
   const openQuery = () => {
     onOpenQuery(`select *\nfrom ${qualifiedName}\nlimit 100;`, `${tab.table} query`);
@@ -101,7 +62,14 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
 
   useEffect(() => {
     dataViewportRef.current?.scrollTo({ top: 0, left: 0 });
-  }, [tab.id, table.filter, table.page, table.pageSize, table.sort]);
+  }, [data?.page, tab.id, table.filter, table.page, table.pageSize, table.sort]);
+
+  const capabilityLabel = data?.editable
+    ? "Safe editing"
+    : data?.insertable
+      ? "Insert only"
+      : "Read only";
+  const capabilityReason = data?.editabilityReason ?? data?.insertabilityReason;
 
   return (
     <section className="table-data-view" aria-label={`Data in ${qualifiedName}`}>
@@ -110,9 +78,19 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
           <span>{tab.schema}</span>
           <strong>{tab.table}</strong>
           {data && (
-            <span className={`editability-badge ${data.editable ? "editable" : "readonly"}`}>
-              {data.editable ? <ShieldCheck size={13} /> : <LockKeyhole size={13} />}
-              {data.editable ? "Safe editing" : "Read only"}
+            <span
+              className={`editability-badge ${
+                data.editable ? "editable" : data.insertable ? "insertable" : "readonly"
+              }`}
+            >
+              {data.editable ? (
+                <ShieldCheck size={13} />
+              ) : data.insertable ? (
+                <Plus size={13} />
+              ) : (
+                <LockKeyhole size={13} />
+              )}
+              {capabilityLabel}
             </span>
           )}
         </div>
@@ -136,7 +114,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             <button
               type="button"
               aria-label="Clear row filter"
-              disabled={table.busy || table.mutationBusy}
+              disabled={interactionLocked}
               onClick={table.clearFilter}
             >
               <X size={13} />
@@ -147,16 +125,29 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             className="apply-filter"
             aria-label="Apply row filter"
             title="Apply filter"
-            disabled={
-              table.busy ||
-              table.mutationBusy ||
-              table.filterDraft.trim() === table.filter
-            }
+            disabled={interactionLocked || table.filterDraft.trim() === table.filter}
           >
             <ArrowRight size={13} />
           </button>
         </form>
         <div className="table-toolbar-actions">
+          <button
+            type="button"
+            title={data?.insertable ? "Add row" : data?.insertabilityReason ?? "Read only"}
+            disabled={!data?.insertable || interactionLocked}
+            onClick={table.startInserting}
+          >
+            <Plus size={15} /> <span>Add row</span>
+          </button>
+          <TableExportMenu
+            busy={tableExport.busy}
+            disabled={
+              (visibleRowCount === 0 && table.selectedCount === 0) || draftLocked
+            }
+            rowCount={visibleRowCount}
+            selectedCount={table.selectedCount}
+            onExport={(format) => void tableExport.exportRows(format)}
+          />
           <button type="button" onClick={openQuery}>
             <Code2 size={15} /> <span>Open SQL</span>
           </button>
@@ -164,7 +155,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             type="button"
             aria-label="Refresh table data"
             title="Refresh table data"
-            disabled={table.busy || table.mutationBusy}
+            disabled={interactionLocked}
             onClick={table.refresh}
           >
             <RefreshCw className={table.busy ? "spin" : ""} size={15} />
@@ -172,24 +163,79 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
         </div>
       </header>
 
-      {(table.error || table.mutationError || data?.editabilityReason) && (
-        <div
-          className={`table-notice ${table.error || table.mutationError ? "error" : ""}`}
-          role={table.error || table.mutationError ? "alert" : "status"}
-        >
-          {table.error || table.mutationError ? (
-            <AlertTriangle size={15} />
-          ) : (
-            <LockKeyhole size={14} />
-          )}
-          <span>{table.error || table.mutationError || data?.editabilityReason}</span>
-          {table.error && (
-            <button type="button" onClick={table.refresh}>
-              Retry
+      <div className="table-context-stack">
+        {(table.error || table.mutationError || capabilityReason) && (
+          <div
+            className={`table-notice ${table.error || table.mutationError ? "error" : ""}`}
+            role={table.error || table.mutationError ? "alert" : "status"}
+          >
+            {table.error || table.mutationError ? (
+              <AlertTriangle size={15} />
+            ) : (
+              <LockKeyhole size={14} />
+            )}
+            <span>{table.error || table.mutationError || capabilityReason}</span>
+            {table.error && (
+              <button type="button" onClick={table.refresh}>
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+        {table.mutationMessage && (
+          <div className="table-notice success" role="status">
+            <CheckCircle2 size={15} />
+            <span>{table.mutationMessage}</span>
+            <button type="button" onClick={table.dismissMutationMessage}>
+              Dismiss
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+        {tableExport.error && (
+          <div className="table-notice error" role="alert">
+            <AlertTriangle size={15} />
+            <span>Could not export rows: {tableExport.error}</span>
+            <button type="button" onClick={tableExport.clearStatus}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {tableExport.savedFilename && (
+          <div className="table-notice success" role="status">
+            <CheckCircle2 size={15} />
+            <span>Saved {tableExport.savedFilename}</span>
+            <button type="button" onClick={tableExport.clearStatus}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {table.selectedCount > 0 && (
+          <div className="table-selection-bar" role="status">
+            <CheckSquare2 size={15} />
+            <strong>{table.selectedCount} selected</strong>
+            <span>Selection is kept while you move between pages.</span>
+            <div>
+              <button
+                type="button"
+                disabled={tableExport.busy}
+                onClick={() => void tableExport.exportRows("csv")}
+              >
+                <FileSpreadsheet size={14} /> CSV
+              </button>
+              <button
+                type="button"
+                disabled={tableExport.busy}
+                onClick={() => void tableExport.exportRows("json")}
+              >
+                <FileJson2 size={14} /> JSON
+              </button>
+              <button type="button" onClick={table.clearSelection}>
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div ref={dataViewportRef} className="table-data-grid-wrap">
         {table.busy && !data ? (
@@ -197,10 +243,19 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             <Loader2 className="spin" size={21} />
             <span>Loading table data…</span>
           </div>
-        ) : data && data.rows.length > 0 ? (
+        ) : data && (data.rows.length > 0 || table.insertDraft) ? (
           <table className="table-data-grid">
             <thead>
               <tr>
+                <th className="table-row-selection">
+                  <SelectionCheckbox
+                    checked={table.allPageRowsSelected}
+                    indeterminate={table.somePageRowsSelected}
+                    disabled={visibleRowCount === 0 || interactionLocked}
+                    label="Select all rows on this page"
+                    onChange={table.togglePageSelection}
+                  />
+                </th>
                 <th className="table-row-actions" aria-label="Row actions" />
                 {data.columns.map((column) => {
                   const activeSort = table.sort?.column === column.name;
@@ -215,7 +270,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
                         type="button"
                         className={activeSort ? "active" : ""}
                         aria-label={`Sort by ${column.name}`}
-                        disabled={table.busy || table.mutationBusy}
+                        disabled={interactionLocked}
                         onClick={() => table.toggleSort(column.name)}
                       >
                         <span className="column-heading">
@@ -236,10 +291,67 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
               </tr>
             </thead>
             <tbody>
+              {table.insertDraft && (
+                <tr className="inserting">
+                  <td className="table-row-selection">
+                    <Plus size={14} aria-label="New row" />
+                  </td>
+                  <td className="table-row-actions">
+                    <button
+                      type="button"
+                      className="save-row"
+                      aria-label="Insert row"
+                      title="Insert row"
+                      disabled={table.mutationBusy}
+                      onClick={() => void table.saveInsert()}
+                    >
+                      {table.mutationBusy ? (
+                        <Loader2 className="spin" size={14} />
+                      ) : (
+                        <Check size={15} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Discard new row"
+                      title="Discard new row"
+                      disabled={table.mutationBusy}
+                      onClick={table.discardInsert}
+                    >
+                      <X size={15} />
+                    </button>
+                  </td>
+                  {data.columns.map((column, columnIndex) => (
+                    <td key={column.name}>
+                      <InsertCell
+                        column={column}
+                        value={table.insertDraft?.values[columnIndex]}
+                        autoFocus={firstInsertInput === columnIndex}
+                        onChange={(value) => table.updateInsertValue(columnIndex, value)}
+                        onCommit={() => void table.saveInsert()}
+                        onCancel={table.discardInsert}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              )}
               {data.rows.map((row, rowIndex) => {
                 const editing = table.draft?.rowIndex === rowIndex;
+                const rowKey = table.rowSelectionKey(rowIndex) ?? String(rowIndex);
+                const selected = table.isRowSelected(rowIndex);
                 return (
-                  <tr className={editing ? "editing" : ""} key={rowIndex}>
+                  <tr
+                    className={`${editing ? "editing" : ""} ${selected ? "selected" : ""}`}
+                    key={rowKey}
+                  >
+                    <td className="table-row-selection">
+                      <SelectionCheckbox
+                        checked={selected}
+                        disabled={draftLocked}
+                        label={`Select row ${rowIndex + 1}`}
+                        onChange={() => table.toggleRowSelection(rowIndex)}
+                      />
+                    </td>
                     <td className="table-row-actions">
                       {editing ? (
                         <>
@@ -272,8 +384,10 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
                           <button
                             type="button"
                             aria-label="Edit row"
-                            title={data.editable ? "Edit row" : data.editabilityReason ?? "Read only"}
-                            disabled={!data.editable || table.mutationBusy}
+                            title={
+                              data.editable ? "Edit row" : data.editabilityReason ?? "Read only"
+                            }
+                            disabled={!data.editable || draftLocked}
                             onClick={() => table.startEditing(rowIndex)}
                           >
                             <Pencil size={14} />
@@ -282,8 +396,10 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
                             type="button"
                             className="delete-row"
                             aria-label="Delete row"
-                            title={data.editable ? "Delete row" : data.editabilityReason ?? "Read only"}
-                            disabled={!data.editable || table.mutationBusy}
+                            title={
+                              data.editable ? "Delete row" : data.editabilityReason ?? "Read only"
+                            }
+                            disabled={!data.editable || draftLocked}
                             onClick={() => setDeleteCandidate(rowIndex)}
                           >
                             <Trash2 size={14} />
@@ -297,7 +413,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
                         key={column.name}
                       >
                         {editing && table.draft ? (
-                          <CellEditor
+                          <EditableCell
                             column={column}
                             value={table.draft.values[columnIndex]}
                             onChange={(value) => table.updateValue(columnIndex, value)}
@@ -321,12 +437,20 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             <span>
               {table.filter
                 ? "Clear the filter or try a broader search."
-                : "There is no data to display yet."}
+                : data.insertable
+                  ? "Add the first row to start working with this table."
+                  : "There is no data to display yet."}
             </span>
-            {table.filter && (
+            {table.filter ? (
               <button type="button" onClick={table.clearFilter}>
                 Clear filter
               </button>
+            ) : (
+              data.insertable && (
+                <button type="button" onClick={table.startInserting}>
+                  <Plus size={14} /> Add first row
+                </button>
+              )
             )}
           </div>
         ) : null}
@@ -344,12 +468,15 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
             {data && ` · ${data.rows.length} rows`}
           </span>
           {table.filter && <span className="filter-active">Filtered</span>}
+          {table.selectedCount > 0 && (
+            <span className="selection-count">{table.selectedCount} selected</span>
+          )}
         </div>
         <label>
           Rows per page
           <select
             value={table.pageSize}
-            disabled={table.busy || table.mutationBusy}
+            disabled={interactionLocked}
             onChange={(event) => table.setPageSize(Number(event.target.value))}
           >
             {[25, 50, 100].map((size) => (
@@ -363,7 +490,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
           <button
             type="button"
             aria-label="Previous page"
-            disabled={table.page === 0 || table.busy || table.mutationBusy}
+            disabled={table.page === 0 || interactionLocked}
             onClick={() => table.setPage(table.page - 1)}
           >
             <ArrowLeft size={15} />
@@ -371,7 +498,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
           <button
             type="button"
             aria-label="Next page"
-            disabled={!data?.hasMore || table.busy || table.mutationBusy}
+            disabled={!data?.hasMore || interactionLocked}
             onClick={() => table.setPage(table.page + 1)}
           >
             <ArrowRight size={15} />
@@ -423,11 +550,7 @@ export function TableDataView({ tab, onOpenQuery }: TableDataViewProps) {
               </span>
             </div>
             <div>
-              <button
-                type="button"
-                autoFocus
-                onClick={() => setDeleteCandidate(null)}
-              >
+              <button type="button" autoFocus onClick={() => setDeleteCandidate(null)}>
                 Cancel
               </button>
               <button

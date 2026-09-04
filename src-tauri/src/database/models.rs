@@ -94,6 +94,8 @@ pub(crate) struct TableDataPage {
     pub(crate) has_more: bool,
     pub(crate) editable: bool,
     pub(crate) editability_reason: Option<String>,
+    pub(crate) insertable: bool,
+    pub(crate) insertability_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -111,6 +113,14 @@ pub(crate) struct UpdateTableRowRequest {
     pub(crate) key: Vec<TableCellValue>,
     pub(crate) changes: Vec<TableCellValue>,
     pub(crate) row_version: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InsertTableRowRequest {
+    pub(crate) schema: String,
+    pub(crate) table: String,
+    pub(crate) values: Vec<TableCellValue>,
 }
 
 #[derive(Debug, Deserialize)]

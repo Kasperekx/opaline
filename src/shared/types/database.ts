@@ -60,6 +60,8 @@ export type TableDataPage = {
   hasMore: boolean;
   editable: boolean;
   editabilityReason: string | null;
+  insertable: boolean;
+  insertabilityReason: string | null;
 };
 
 export type TableCellValue = {
@@ -73,6 +75,12 @@ export type UpdateTableRowRequest = {
   key: TableCellValue[];
   changes: TableCellValue[];
   rowVersion: string;
+};
+
+export type InsertTableRowRequest = {
+  schema: string;
+  table: string;
+  values: TableCellValue[];
 };
 
 export type DeleteTableRowRequest = Omit<UpdateTableRowRequest, "changes">;

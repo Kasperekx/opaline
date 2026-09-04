@@ -1,8 +1,8 @@
 use crate::{
     database::{
         models::{
-            DeleteTableRowRequest, TableDataPage, TableDataRow, TablePageRequest,
-            UpdateTableRowRequest,
+            DeleteTableRowRequest, InsertTableRowRequest, TableDataPage, TableDataRow,
+            TablePageRequest, UpdateTableRowRequest,
         },
         table_data,
     },
@@ -16,6 +16,18 @@ pub(crate) async fn load_table_page(
 ) -> Result<TableDataPage, String> {
     let client = state.client().await?;
     table_data::fetch_page(&client, &input).await
+}
+
+#[tauri::command]
+pub(crate) async fn insert_table_row(
+    input: InsertTableRowRequest,
+    state: tauri::State<'_, AppState>,
+) -> Result<TableDataRow, String> {
+    let (client, _ssl_mode, _lease) = state
+        .begin_operation()
+        .await
+        .map_err(|error| error.message)?;
+    table_data::insert_row(&client, &input).await
 }
 
 #[tauri::command]

@@ -21,6 +21,9 @@ local-first database client with a precise interface and no required account.
 - dedicated table tabs opened directly from the database explorer
 - paginated table browsing with per-column sorting and all-column filtering
 - guarded inline row editing and deletion for tables with a primary key
+- row creation with PostgreSQL defaults, identity columns, and `NULL` handling
+- multi-row selection that can be carried across table pages
+- CSV and JSON export of the current page or selected rows through a native save dialog
 - optimistic concurrency checks that prevent silent overwrites of changed rows
 - automatic read-only mode for views, foreign tables, and tables without a primary key
 - local query history with duration, row count, and execution status
@@ -74,6 +77,10 @@ least-privileged database role when connecting to important data.
 The desktop webview uses an explicit Content Security Policy and only exposes
 the Tauri window capabilities needed by the custom title bar.
 
+Exports use Tauri's scoped dialog and filesystem plugins. The webview can write
+text only to a path explicitly selected in the native save dialog; it does not
+receive broad filesystem access.
+
 TLS `prefer` and `require` modes validate the server using the operating
 system's certificate verifier. `disable` is intended for trusted local
 development only.
@@ -83,7 +90,7 @@ development only.
 1. read-only connection safeguards and explicit transaction controls
 2. encrypted connection profiles backed by the operating system keychain
 3. saved queries, SQL autocomplete, and keyboard command palette
-4. row creation, multi-row selection, and CSV/JSON export
+4. typed cell editors, bulk row operations, and full-table background export
 5. table structure, indexes, constraints, and object DDL views
 6. SSH tunnels and custom CA certificates
 7. signed release builds for macOS, Windows, and Linux

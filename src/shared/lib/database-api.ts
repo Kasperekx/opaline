@@ -5,6 +5,7 @@ import type {
   ConnectionInfo,
   DatabaseObject,
   DeleteTableRowRequest,
+  InsertTableRowRequest,
   QueryExecutionError,
   QueryResult,
   RunQueryOptions,
@@ -47,6 +48,8 @@ export const databaseApi = {
   cancelQuery: () => invoke<boolean>("cancel_query"),
   loadTablePage: (input: TablePageRequest) =>
     invoke<TableDataPage>("load_table_page", { input }),
+  insertTableRow: (input: InsertTableRowRequest) =>
+    invoke<TableDataRow>("insert_table_row", { input }),
   updateTableRow: (input: UpdateTableRowRequest) =>
     invoke<TableDataRow>("update_table_row", { input }),
   deleteTableRow: (input: DeleteTableRowRequest) =>
