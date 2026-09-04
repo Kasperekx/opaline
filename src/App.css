@@ -72,7 +72,7 @@ select:focus-visible {
 }
 
 .workspace-shell {
-  grid-template-columns: 58px 258px minmax(0, 1fr);
+  grid-template-columns: 60px 276px minmax(0, 1fr);
 }
 
 .app-rail {
@@ -82,7 +82,7 @@ select:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  padding: 17px 0 12px;
+  padding: 18px 0 13px;
   background: rgba(8, 10, 11, 0.96);
   border-right: 1px solid var(--line);
 }
@@ -150,8 +150,8 @@ select:focus-visible {
   position: relative;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 9px;
   color: #626b65;
@@ -415,6 +415,12 @@ select:focus-visible {
   color: var(--text-soft);
   background: rgba(255, 255, 255, 0.045);
   border-color: var(--line);
+}
+
+.icon-button:disabled,
+.new-tab:disabled {
+  opacity: 0.34;
+  cursor: not-allowed;
 }
 
 .icon-button.subtle {
@@ -696,13 +702,13 @@ select:focus-visible {
 }
 
 .explorer-connection strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .explorer-connection span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .explorer-connection > svg {
@@ -730,7 +736,7 @@ select:focus-visible {
   outline: 0;
   color: #b8c0b9;
   background: transparent;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .search-box input::placeholder {
@@ -754,7 +760,7 @@ kbd {
   justify-content: space-between;
   padding: 0 12px 0 13px;
   color: #59625b;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 620;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -791,7 +797,7 @@ kbd {
   height: 28px;
   padding: 0 5px;
   color: #909a92;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 590;
 }
 
@@ -821,14 +827,14 @@ kbd {
 
 .tree-item {
   width: 100%;
-  height: 27px;
+  height: 29px;
   gap: 6px;
   padding: 0 7px;
   border: 0;
   border-radius: 6px;
   color: #7e8880;
   background: transparent;
-  font-size: 10px;
+  font-size: 11px;
   text-align: left;
   cursor: pointer;
 }
@@ -872,10 +878,10 @@ kbd {
 .column-item {
   gap: 6px;
   min-width: 0;
-  height: 24px;
+  height: 26px;
   padding: 0 4px;
   color: #687169;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .column-item svg {
@@ -894,7 +900,7 @@ kbd {
   margin-left: auto;
   overflow: hidden;
   color: #4f5751;
-  font-size: 8px;
+  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -902,9 +908,33 @@ kbd {
 .tree-empty {
   margin: 20px 10px;
   color: #59615b;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
   text-align: center;
+}
+
+.tree-empty.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tree-empty.tree-error {
+  display: grid;
+  gap: 9px;
+  color: #a97973;
+}
+
+.tree-empty.tree-error button {
+  justify-self: center;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 139, 125, 0.18);
+  border-radius: 6px;
+  color: #c99b95;
+  background: rgba(255, 139, 125, 0.045);
+  font-size: 10px;
+  cursor: pointer;
 }
 
 .explorer-footer {
@@ -915,7 +945,7 @@ kbd {
   border-top: 1px solid var(--line);
   color: #555e57;
   font-family: ui-monospace, monospace;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .online-dot {
@@ -946,7 +976,7 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 6px;
   color: #69716b;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .tab-bar {
@@ -967,7 +997,7 @@ kbd {
   padding: 0 11px;
   border-right: 1px solid var(--line);
   color: #7d867f;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .editor-tab.active {
@@ -1053,7 +1083,7 @@ kbd {
 .query-path {
   gap: 7px;
   color: #6e7770;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .query-path svg {
@@ -1078,7 +1108,7 @@ kbd {
   gap: 6px;
   padding: 0 9px;
   border-radius: 6px;
-  font-size: 9px;
+  font-size: 10px;
   cursor: pointer;
 }
 
@@ -1153,7 +1183,7 @@ kbd {
   gap: 6px;
   padding: 0 14px;
   color: #626b64;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .results-tabs button.active {
@@ -1185,11 +1215,38 @@ kbd {
   background: var(--danger);
 }
 
+.result-set-switcher {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.result-set-switcher button {
+  display: grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: #69736b;
+  background: transparent;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.result-set-switcher button.active {
+  color: #c9e797;
+  border-color: rgba(200, 242, 106, 0.22);
+  background: rgba(200, 242, 106, 0.07);
+}
+
 .result-meta {
   gap: 13px;
   padding-right: 8px;
   color: #59625b;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .result-meta .truncated {
@@ -1208,7 +1265,7 @@ kbd {
   border-collapse: separate;
   border-spacing: 0;
   font-family: "SFMono-Regular", "Cascadia Code", ui-monospace, monospace;
-  font-size: 9px;
+  font-size: 10px;
   user-select: text;
 }
 
@@ -1234,7 +1291,7 @@ kbd {
   color: #727c74;
   background: #121618;
   font-family: Inter, ui-sans-serif, sans-serif;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 620;
   letter-spacing: 0.03em;
 }
@@ -1272,7 +1329,7 @@ kbd {
   justify-content: center;
   gap: 8px;
   color: #515a53;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .results-state svg {
@@ -1308,7 +1365,7 @@ kbd {
   border-top: 1px solid var(--line);
   color: #4f5751;
   background: #0a0d0e;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .status-bar > span {
@@ -1356,7 +1413,7 @@ kbd {
   }
 
   .workspace-shell {
-    grid-template-columns: 52px 224px minmax(0, 1fr);
+    grid-template-columns: 52px 240px minmax(0, 1fr);
   }
 
   .app-rail {
