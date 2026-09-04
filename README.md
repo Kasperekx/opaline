@@ -20,10 +20,15 @@ local-first database client with a precise interface and no required account.
 - multiple renamable query tabs with local session restore
 - dedicated table tabs opened directly from the database explorer
 - paginated table browsing with per-column sorting and all-column filtering
-- guarded inline row editing and deletion for tables with a primary key
+- guarded inline row editing with type-aware controls for booleans, numbers,
+  dates, times, JSON, UUIDs, and PostgreSQL enums
+- safe single-row editing and deletion for tables with a primary key
 - row creation with PostgreSQL defaults, identity columns, and `NULL` handling
 - multi-row selection that can be carried across table pages
+- atomic bulk update and deletion of up to 500 selected rows
 - CSV and JSON export of the current page or selected rows through a native save dialog
+- streamed CSV and JSON export of every row matching the active filter and sort,
+  with live progress and cancellation
 - optimistic concurrency checks that prevent silent overwrites of changed rows
 - automatic read-only mode for views, foreign tables, and tables without a primary key
 - local query history with duration, row count, and execution status
@@ -77,9 +82,10 @@ least-privileged database role when connecting to important data.
 The desktop webview uses an explicit Content Security Policy and only exposes
 the Tauri window capabilities needed by the custom title bar.
 
-Exports use Tauri's scoped dialog and filesystem plugins. The webview can write
-text only to a path explicitly selected in the native save dialog; it does not
-receive broad filesystem access.
+Exports begin only after the user chooses a destination in the native save
+dialog. Full-table exports are streamed by Rust into a temporary sibling file,
+then safely published at the selected path. Cancelling or failing an export
+removes its incomplete file.
 
 TLS `prefer` and `require` modes validate the server using the operating
 system's certificate verifier. `disable` is intended for trusted local
@@ -90,10 +96,9 @@ development only.
 1. read-only connection safeguards and explicit transaction controls
 2. encrypted connection profiles backed by the operating system keychain
 3. saved queries, SQL autocomplete, and keyboard command palette
-4. typed cell editors, bulk row operations, and full-table background export
-5. table structure, indexes, constraints, and object DDL views
-6. SSH tunnels and custom CA certificates
-7. signed release builds for macOS, Windows, and Linux
+4. table structure, indexes, constraints, and object DDL views
+5. SSH tunnels and custom CA certificates
+6. signed release builds for macOS, Windows, and Linux
 
 ## Contributing
 

@@ -104,7 +104,13 @@ pub(crate) async fn list_columns(
                       AND a.attnum = ANY(i.indkey)
                 ),
                 a.attidentity <> '',
-                a.attgenerated <> ''
+                a.attgenerated <> '',
+                ARRAY(
+                    SELECT e.enumlabel::text
+                    FROM pg_catalog.pg_enum e
+                    WHERE e.enumtypid = a.atttypid
+                    ORDER BY e.enumsortorder
+                )
             FROM pg_catalog.pg_attribute a
             JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -131,6 +137,7 @@ pub(crate) async fn list_columns(
             primary_key: row.get(4),
             identity: row.get(5),
             generated: row.get(6),
+            enum_values: row.get(7),
         })
         .collect())
 }

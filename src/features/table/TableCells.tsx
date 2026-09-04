@@ -1,5 +1,11 @@
+import { AlertCircle } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ColumnInfo } from "../../shared/types/database";
+import {
+  columnEditorKind,
+  databaseValue,
+  inputValue,
+} from "./column-editor";
 import type { InsertCellValue } from "./table-types";
 
 type EditableCellProps = {
@@ -10,6 +16,7 @@ type EditableCellProps = {
   onCommit: () => void;
   onCancel: () => void;
   onUseDefault?: () => void;
+  error?: string | null;
 };
 
 export function EditableCell({
@@ -20,10 +27,11 @@ export function EditableCell({
   onCommit,
   onCancel,
   onUseDefault,
+  error,
 }: EditableCellProps) {
   if (column.identity || column.generated) return <CellValue value={value} />;
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape") onCancel();
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
@@ -32,15 +40,23 @@ export function EditableCell({
   };
 
   return (
-    <div className={`cell-editor ${value === null ? "is-null" : ""}`}>
-      <input
-        autoFocus={autoFocus}
+    <div
+      className={`cell-editor ${value === null ? "is-null" : ""} ${error ? "invalid" : ""}`}
+    >
+      <TypedValueControl
+        column={column}
         value={value ?? ""}
         disabled={value === null}
-        aria-label={`Value for ${column.name}`}
-        onChange={(event) => onChange(event.target.value)}
+        autoFocus={autoFocus}
+        invalid={Boolean(error)}
+        onChange={(nextValue) => onChange(nextValue)}
         onKeyDown={handleKeyDown}
       />
+      {error && (
+        <span className="cell-editor-error" role="alert" title={error} aria-label={error}>
+          <AlertCircle size={13} />
+        </span>
+      )}
       <div className="cell-editor-options">
         {column.nullable && (
           <button
@@ -68,6 +84,96 @@ export function EditableCell({
   );
 }
 
+type TypedValueControlProps = {
+  column: ColumnInfo;
+  value: string;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  invalid?: boolean;
+  onChange: (value: string) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+};
+
+export function TypedValueControl({
+  column,
+  value,
+  disabled,
+  autoFocus,
+  invalid,
+  onChange,
+  onKeyDown,
+}: TypedValueControlProps) {
+  const kind = columnEditorKind(column);
+  const common = {
+    autoFocus,
+    disabled,
+    "aria-invalid": invalid || undefined,
+    "aria-label": `Value for ${column.name}`,
+    onKeyDown,
+  };
+
+  if (kind === "boolean") {
+    return (
+      <select
+        {...common}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+  if (kind === "enum") {
+    return (
+      <select
+        {...common}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {column.enumValues.map((option) => (
+          <option value={option} key={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (kind === "json") {
+    return (
+      <textarea
+        {...common}
+        rows={1}
+        spellCheck={false}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  const inputType =
+    kind === "date"
+      ? "date"
+      : kind === "datetime"
+        ? "datetime-local"
+        : kind === "time"
+          ? "time"
+          : kind === "integer" || kind === "number"
+            ? "number"
+            : "text";
+  return (
+    <input
+      {...common}
+      type={inputType}
+      step={kind === "integer" ? "1" : kind === "number" || kind === "time" ? "any" : undefined}
+      inputMode={kind === "integer" || kind === "number" ? "decimal" : undefined}
+      spellCheck={kind === "text"}
+      value={inputValue(column, value)}
+      onChange={(event) => onChange(databaseValue(column, event.target.value))}
+    />
+  );
+}
+
 type InsertCellProps = {
   column: ColumnInfo;
   value: InsertCellValue;
@@ -75,6 +181,7 @@ type InsertCellProps = {
   onChange: (value: InsertCellValue) => void;
   onCommit: () => void;
   onCancel: () => void;
+  error?: string | null;
 };
 
 export function InsertCell({
@@ -84,6 +191,7 @@ export function InsertCell({
   onChange,
   onCommit,
   onCancel,
+  error,
 }: InsertCellProps) {
   if (column.identity || column.generated) {
     return (
@@ -116,6 +224,7 @@ export function InsertCell({
       onChange={onChange}
       onCommit={onCommit}
       onCancel={onCancel}
+      error={error}
       onUseDefault={column.defaultValue !== null ? () => onChange(undefined) : undefined}
     />
   );

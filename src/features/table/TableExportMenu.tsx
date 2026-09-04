@@ -14,6 +14,7 @@ type TableExportMenuProps = {
   rowCount: number;
   selectedCount: number;
   onExport: (format: TableExportFormat) => void;
+  onExportAll: (format: TableExportFormat) => void;
 };
 
 const formats = [
@@ -27,6 +28,7 @@ export function TableExportMenu({
   rowCount,
   selectedCount,
   onExport,
+  onExportAll,
 }: TableExportMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,7 +96,7 @@ export function TableExportMenu({
           }}
         >
           <div>
-            <strong>Export rows</strong>
+            <strong>Quick export</strong>
             <span>{scope}</span>
           </div>
           {formats.map(({ id, label, description, Icon }) => (
@@ -111,6 +113,28 @@ export function TableExportMenu({
               <span>
                 <strong>{label}</strong>
                 <small>{description}</small>
+              </span>
+            </button>
+          ))}
+          <div className="table-export-section">
+            <strong>Full result</strong>
+            <span>Runs in background</span>
+          </div>
+          {formats.map(({ id, label, Icon }) => (
+            <button
+              type="button"
+              role="menuitem"
+              className="full-export-option"
+              key={`all-${id}`}
+              onClick={() => {
+                setOpen(false);
+                onExportAll(id);
+              }}
+            >
+              <Icon size={16} />
+              <span>
+                <strong>All rows · {label}</strong>
+                <small>Streams every matching row</small>
               </span>
             </button>
           ))}

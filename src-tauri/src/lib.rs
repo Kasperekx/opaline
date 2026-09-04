@@ -6,7 +6,10 @@ use commands::{
     connection::{connect_postgres, connection_info, disconnect_postgres},
     query::{cancel_query, run_query},
     schema::{list_columns, list_database_objects},
-    table::{delete_table_row, insert_table_row, load_table_page, update_table_row},
+    table::{
+        delete_table_row, delete_table_rows, export_table_data, insert_table_row, load_table_page,
+        update_table_row, update_table_rows,
+    },
 };
 use state::AppState;
 
@@ -26,6 +29,9 @@ pub fn run() {
             insert_table_row,
             update_table_row,
             delete_table_row,
+            update_table_rows,
+            delete_table_rows,
+            export_table_data,
             run_query,
             cancel_query
         ])

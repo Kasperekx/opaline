@@ -29,6 +29,7 @@ export type ColumnInfo = {
   primaryKey: boolean;
   identity: boolean;
   generated: boolean;
+  enumValues: string[];
 };
 
 export type SortDirection = "asc" | "desc";
@@ -84,6 +85,39 @@ export type InsertTableRowRequest = {
 };
 
 export type DeleteTableRowRequest = Omit<UpdateTableRowRequest, "changes">;
+
+export type TableRowIdentity = Pick<DeleteTableRowRequest, "key" | "rowVersion">;
+
+export type DeleteTableRowsRequest = {
+  schema: string;
+  table: string;
+  rows: TableRowIdentity[];
+};
+
+export type UpdateTableRowsRequest = DeleteTableRowsRequest & {
+  change: TableCellValue;
+};
+
+export type TableMutationResult = {
+  affectedRows: number;
+};
+
+export type TableExportFormat = "csv" | "json";
+
+export type ExportTableDataRequest = Pick<
+  TablePageRequest,
+  "schema" | "table" | "filter" | "sort"
+> & {
+  format: TableExportFormat;
+  path: string;
+};
+
+export type TableExportProgress = {
+  rowsExported: number;
+  bytesWritten: number;
+};
+
+export type TableExportResult = TableExportProgress;
 
 export type QueryResultSet = {
   columns: string[];

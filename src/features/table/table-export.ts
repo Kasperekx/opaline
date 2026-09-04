@@ -1,8 +1,12 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import type { ColumnInfo, TableDataRow } from "../../shared/types/database";
+import type {
+  ColumnInfo,
+  TableDataRow,
+  TableExportFormat as DatabaseTableExportFormat,
+} from "../../shared/types/database";
 
-export type TableExportFormat = "csv" | "json";
+export type TableExportFormat = DatabaseTableExportFormat;
 
 type TableExport = {
   schema: string;
@@ -37,17 +41,28 @@ const serializeJson = (columns: ColumnInfo[], rows: TableDataRow[]) =>
 const safeFilenamePart = (value: string) =>
   value.trim().replace(/[^a-z0-9._-]+/gi, "_").replace(/^_+|_+$/g, "") || "table";
 
-export async function saveTableExport({
-  schema,
-  table,
-  columns,
-  rows,
-  format,
-}: TableExport) {
+export const tableExportFilename = (
+  schema: string,
+  table: string,
+  format: TableExportFormat,
+) => {
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `${safeFilenamePart(schema)}-${safeFilenamePart(table)}-${date}.${format}`;
-  const path = await save({
-    defaultPath: filename,
+  return `${safeFilenamePart(schema)}-${safeFilenamePart(table)}-${date}.${format}`;
+};
+
+export const formatExportSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+export const chooseTableExportPath = (
+  schema: string,
+  table: string,
+  format: TableExportFormat,
+) =>
+  save({
+    defaultPath: tableExportFilename(schema, table, format),
     filters: [
       {
         name: format === "csv" ? "CSV data" : "JSON data",
@@ -55,6 +70,15 @@ export async function saveTableExport({
       },
     ],
   });
+
+export async function saveTableExport({
+  schema,
+  table,
+  columns,
+  rows,
+  format,
+}: TableExport) {
+  const path = await chooseTableExportPath(schema, table, format);
   if (!path) return null;
 
   const contents =
@@ -62,4 +86,3 @@ export async function saveTableExport({
   await writeTextFile(path, contents);
   return path;
 }
-

@@ -50,6 +50,7 @@ pub(crate) struct ColumnInfo {
     pub(crate) primary_key: bool,
     pub(crate) identity: bool,
     pub(crate) generated: bool,
+    pub(crate) enum_values: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -130,6 +131,68 @@ pub(crate) struct DeleteTableRowRequest {
     pub(crate) table: String,
     pub(crate) key: Vec<TableCellValue>,
     pub(crate) row_version: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableRowIdentity {
+    pub(crate) key: Vec<TableCellValue>,
+    pub(crate) row_version: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DeleteTableRowsRequest {
+    pub(crate) schema: String,
+    pub(crate) table: String,
+    pub(crate) rows: Vec<TableRowIdentity>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UpdateTableRowsRequest {
+    pub(crate) schema: String,
+    pub(crate) table: String,
+    pub(crate) rows: Vec<TableRowIdentity>,
+    pub(crate) change: TableCellValue,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableMutationResult {
+    pub(crate) affected_rows: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TableExportFormat {
+    Csv,
+    Json,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ExportTableDataRequest {
+    pub(crate) schema: String,
+    pub(crate) table: String,
+    pub(crate) filter: Option<String>,
+    pub(crate) sort: Option<TableSort>,
+    pub(crate) format: TableExportFormat,
+    pub(crate) path: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableExportProgress {
+    pub(crate) rows_exported: u64,
+    pub(crate) bytes_written: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableExportResult {
+    pub(crate) rows_exported: u64,
+    pub(crate) bytes_written: u64,
 }
 
 #[derive(Debug, Serialize)]

@@ -1,10 +1,12 @@
 use crate::{
     database::{
         models::{
-            DeleteTableRowRequest, InsertTableRowRequest, TableDataPage, TableDataRow,
-            TablePageRequest, UpdateTableRowRequest,
+            DeleteTableRowRequest, DeleteTableRowsRequest, ExportTableDataRequest,
+            InsertTableRowRequest, TableDataPage, TableDataRow, TableExportProgress,
+            TableExportResult, TableMutationResult, TablePageRequest, UpdateTableRowRequest,
+            UpdateTableRowsRequest,
         },
-        table_data,
+        table_data, table_export, table_mutation,
     },
     state::AppState,
 };
@@ -52,4 +54,44 @@ pub(crate) async fn delete_table_row(
         .await
         .map_err(|error| error.message)?;
     table_data::delete_row(&client, &input).await
+}
+
+#[tauri::command]
+pub(crate) async fn delete_table_rows(
+    input: DeleteTableRowsRequest,
+    state: tauri::State<'_, AppState>,
+) -> Result<TableMutationResult, String> {
+    let (client, _ssl_mode, _lease) = state
+        .begin_operation()
+        .await
+        .map_err(|error| error.message)?;
+    table_mutation::delete_rows(&client, &input).await
+}
+
+#[tauri::command]
+pub(crate) async fn update_table_rows(
+    input: UpdateTableRowsRequest,
+    state: tauri::State<'_, AppState>,
+) -> Result<TableMutationResult, String> {
+    let (client, _ssl_mode, _lease) = state
+        .begin_operation()
+        .await
+        .map_err(|error| error.message)?;
+    table_mutation::update_rows(&client, &input).await
+}
+
+#[tauri::command]
+pub(crate) async fn export_table_data(
+    input: ExportTableDataRequest,
+    on_progress: tauri::ipc::Channel<TableExportProgress>,
+    state: tauri::State<'_, AppState>,
+) -> Result<TableExportResult, String> {
+    let (client, _ssl_mode, _lease) = state
+        .begin_operation()
+        .await
+        .map_err(|error| error.message)?;
+    table_export::export_table(&client, &input, |progress| {
+        let _ = on_progress.send(progress);
+    })
+    .await
 }

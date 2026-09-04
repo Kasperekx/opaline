@@ -5,7 +5,7 @@ use tokio_postgres::{types::ToSql, Client, Row};
 use super::{
     models::{
         ColumnInfo, DeleteTableRowRequest, InsertTableRowRequest, SortDirection, TableCellValue,
-        TableDataPage, TableDataRow, TablePageRequest, UpdateTableRowRequest,
+        TableDataPage, TableDataRow, TablePageRequest, TableSort, UpdateTableRowRequest,
     },
     postgres,
 };
@@ -14,8 +14,8 @@ const MIN_PAGE_SIZE: u16 = 10;
 const MAX_PAGE_SIZE: u16 = 200;
 const MAX_FILTER_CHARACTERS: usize = 500;
 
-struct TableMetadata {
-    columns: Vec<ColumnInfo>,
+pub(crate) struct TableMetadata {
+    pub(crate) columns: Vec<ColumnInfo>,
     relation_kind: String,
 }
 
@@ -24,7 +24,7 @@ impl TableMetadata {
         matches!(self.relation_kind.as_str(), "r" | "p")
     }
 
-    fn primary_key(&self) -> Vec<&ColumnInfo> {
+    pub(crate) fn primary_key(&self) -> Vec<&ColumnInfo> {
         self.columns
             .iter()
             .filter(|column| column.primary_key)
@@ -78,23 +78,13 @@ pub(crate) async fn fetch_page(
         .ok_or_else(|| "The requested page is too far from the start of the table.".to_string())?;
     let filter = normalize_filter(request.filter.as_deref())?;
     let qualified_table = qualified_name(&request.schema, &request.table);
-    let selected_columns = metadata
-        .columns
-        .iter()
-        .map(|column| format!("{}::text", quote_identifier(&column.name)))
-        .collect::<Vec<_>>()
-        .join(", ");
+    let selected_columns = text_projection(&metadata.columns);
     let row_version = metadata
         .supports_row_versions()
         .then_some(", xmin::text AS __opaline_row_version")
         .unwrap_or_default();
-    let searchable_columns = metadata
-        .columns
-        .iter()
-        .map(|column| format!("COALESCE({}::text, '')", quote_identifier(&column.name)))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let order_clause = order_clause(&metadata, request)?;
+    let searchable_columns = searchable_projection(&metadata.columns);
+    let order_clause = order_clause(&metadata, request.sort.as_ref())?;
     let sql = format!(
         "SELECT {selected_columns}{row_version} \
          FROM {qualified_table} \
@@ -268,7 +258,7 @@ pub(crate) async fn delete_row(
     Ok(())
 }
 
-async fn table_metadata(
+pub(crate) async fn table_metadata(
     client: &Client,
     schema: &str,
     table: &str,
@@ -292,7 +282,7 @@ async fn table_metadata(
     })
 }
 
-fn normalize_filter(filter: Option<&str>) -> Result<Option<String>, String> {
+pub(crate) fn normalize_filter(filter: Option<&str>) -> Result<Option<String>, String> {
     let Some(filter) = filter.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
     };
@@ -304,10 +294,13 @@ fn normalize_filter(filter: Option<&str>) -> Result<Option<String>, String> {
     Ok(Some(filter.to_string()))
 }
 
-fn order_clause(metadata: &TableMetadata, request: &TablePageRequest) -> Result<String, String> {
+pub(crate) fn order_clause(
+    metadata: &TableMetadata,
+    sort: Option<&TableSort>,
+) -> Result<String, String> {
     let primary_key = metadata.primary_key();
     let mut terms = Vec::new();
-    if let Some(sort) = &request.sort {
+    if let Some(sort) = sort {
         let column = metadata
             .columns
             .iter()
@@ -323,11 +316,7 @@ fn order_clause(metadata: &TableMetadata, request: &TablePageRequest) -> Result<
         ));
     }
     for column in primary_key {
-        if request
-            .sort
-            .as_ref()
-            .is_some_and(|sort| sort.column == column.name)
-        {
+        if sort.is_some_and(|sort| sort.column == column.name) {
             continue;
         }
         terms.push(format!("{} ASC", quote_identifier(&column.name)));
@@ -342,7 +331,7 @@ fn order_clause(metadata: &TableMetadata, request: &TablePageRequest) -> Result<
     })
 }
 
-fn validated_key<'a>(
+pub(crate) fn validated_key<'a>(
     metadata: &'a TableMetadata,
     values: &'a [TableCellValue],
 ) -> Result<Vec<(&'a ColumnInfo, Option<String>)>, String> {
@@ -364,7 +353,7 @@ fn validated_key<'a>(
         .collect()
 }
 
-fn validated_changes<'a>(
+pub(crate) fn validated_changes<'a>(
     metadata: &'a TableMetadata,
     changes: &'a [TableCellValue],
 ) -> Result<Vec<(&'a ColumnInfo, Option<String>)>, String> {
@@ -425,7 +414,7 @@ fn validated_writable_values<'a>(
         .collect()
 }
 
-fn ensure_editable(metadata: &TableMetadata) -> Result<(), String> {
+pub(crate) fn ensure_editable(metadata: &TableMetadata) -> Result<(), String> {
     let (editable, reason) = metadata.editability();
     if editable {
         Ok(())
@@ -470,29 +459,45 @@ fn returning_clause(metadata: &TableMetadata) -> String {
     format!("{columns}, xmin::text AS __opaline_row_version")
 }
 
-fn sql_parameters(values: &[Option<String>]) -> Vec<&(dyn ToSql + Sync)> {
+pub(crate) fn sql_parameters(values: &[Option<String>]) -> Vec<&(dyn ToSql + Sync)> {
     values
         .iter()
         .map(|value| value as &(dyn ToSql + Sync))
         .collect()
 }
 
-fn typed_parameter(index: usize, column: &ColumnInfo) -> String {
+pub(crate) fn typed_parameter(index: usize, column: &ColumnInfo) -> String {
     format!("${index}::text::{}", column.data_type)
 }
 
-fn validate_relation_name(schema: &str, table: &str) -> Result<(), String> {
+pub(crate) fn text_projection(columns: &[ColumnInfo]) -> String {
+    columns
+        .iter()
+        .map(|column| format!("{}::text", quote_identifier(&column.name)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub(crate) fn searchable_projection(columns: &[ColumnInfo]) -> String {
+    columns
+        .iter()
+        .map(|column| format!("COALESCE({}::text, '')", quote_identifier(&column.name)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub(crate) fn validate_relation_name(schema: &str, table: &str) -> Result<(), String> {
     if schema.trim().is_empty() || table.trim().is_empty() {
         return Err("Schema and table are required.".into());
     }
     Ok(())
 }
 
-fn qualified_name(schema: &str, table: &str) -> String {
+pub(crate) fn qualified_name(schema: &str, table: &str) -> String {
     format!("{}.{}", quote_identifier(schema), quote_identifier(table))
 }
 
-fn quote_identifier(identifier: &str) -> String {
+pub(crate) fn quote_identifier(identifier: &str) -> String {
     format!("\"{}\"", identifier.replace('"', "\"\""))
 }
 
@@ -503,7 +508,13 @@ fn stale_row_error() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::models::{ConnectionConfig, SslMode, TableSort};
+    use crate::database::{
+        models::{
+            ConnectionConfig, DeleteTableRowsRequest, SslMode, TableRowIdentity, TableSort,
+            UpdateTableRowsRequest,
+        },
+        table_mutation::{delete_rows, update_rows},
+    };
 
     #[test]
     fn quotes_postgres_identifiers() {
@@ -555,6 +566,13 @@ mod tests {
                     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, \
                     label text NOT NULL, \
                     note text NOT NULL DEFAULT 'database default'\
+                 ); \
+                 CREATE TYPE pg_temp.opaline_status AS ENUM ('draft', 'ready', 'archived'); \
+                 CREATE TEMP TABLE opaline_typed_target (\
+                    id integer PRIMARY KEY, \
+                    status pg_temp.opaline_status NOT NULL\
+                 ); \
+                 INSERT INTO opaline_typed_target VALUES (1, 'draft'\
                  );",
             )
             .await
@@ -591,6 +609,24 @@ mod tests {
         assert_eq!(first_page.rows.len(), 10);
         assert!(first_page.has_more);
         assert_eq!(first_page.rows[0].values[0].as_deref(), Some("1"));
+
+        let typed_page = fetch_page(
+            &client,
+            &TablePageRequest {
+                schema: schema.clone(),
+                table: "opaline_typed_target".into(),
+                page: 0,
+                page_size: 10,
+                filter: None,
+                sort: None,
+            },
+        )
+        .await
+        .expect("typed column metadata should load");
+        assert_eq!(
+            typed_page.columns[1].enum_values,
+            ["draft", "ready", "archived"]
+        );
 
         let original = first_page.rows[0].clone();
         let updated = update_row(
@@ -637,6 +673,146 @@ mod tests {
         .await
         .expect_err("a stale row version must not overwrite newer data");
         assert!(stale_update.contains("changed or was deleted"));
+
+        let stale_bulk_rows = [1_usize, 2_usize]
+            .into_iter()
+            .map(|index| TableRowIdentity {
+                key: vec![TableCellValue {
+                    column: "id".into(),
+                    value: first_page.rows[index].values[0].clone(),
+                }],
+                row_version: first_page.rows[index]
+                    .row_version
+                    .clone()
+                    .expect("editable rows have versions"),
+            })
+            .collect::<Vec<_>>();
+        update_row(
+            &client,
+            &UpdateTableRowRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                key: stale_bulk_rows[0].key.clone(),
+                changes: vec![TableCellValue {
+                    column: "name".into(),
+                    value: Some("concurrent-change".into()),
+                }],
+                row_version: stale_bulk_rows[0].row_version.clone(),
+            },
+        )
+        .await
+        .expect("one selected row should change concurrently");
+        let stale_bulk_update = update_rows(
+            &client,
+            &UpdateTableRowsRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                rows: stale_bulk_rows,
+                change: TableCellValue {
+                    column: "name".into(),
+                    value: Some("must-not-be-written".into()),
+                },
+            },
+        )
+        .await
+        .expect_err("one stale row should reject the complete bulk update");
+        assert!(stale_bulk_update.contains("Nothing was written"));
+        let rejected_bulk_rows = fetch_page(
+            &client,
+            &TablePageRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                page: 0,
+                page_size: 10,
+                filter: Some("must-not-be-written".into()),
+                sort: None,
+            },
+        )
+        .await
+        .expect("the rejected bulk update should be verifiable");
+        assert!(rejected_bulk_rows.rows.is_empty());
+
+        let refreshed_page = fetch_page(
+            &client,
+            &TablePageRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                page: 0,
+                page_size: 10,
+                filter: None,
+                sort: None,
+            },
+        )
+        .await
+        .expect("rows should refresh after the concurrency conflict");
+        let bulk_rows = [1_usize, 2_usize]
+            .into_iter()
+            .map(|index| TableRowIdentity {
+                key: vec![TableCellValue {
+                    column: "id".into(),
+                    value: refreshed_page.rows[index].values[0].clone(),
+                }],
+                row_version: refreshed_page.rows[index]
+                    .row_version
+                    .clone()
+                    .expect("editable rows have versions"),
+            })
+            .collect::<Vec<_>>();
+        let bulk_updated = update_rows(
+            &client,
+            &UpdateTableRowsRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                rows: bulk_rows,
+                change: TableCellValue {
+                    column: "name".into(),
+                    value: Some("bulk-updated".into()),
+                },
+            },
+        )
+        .await
+        .expect("selected rows should update atomically");
+        assert_eq!(bulk_updated.affected_rows, 2);
+
+        let refreshed_bulk_rows = fetch_page(
+            &client,
+            &TablePageRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                page: 0,
+                page_size: 10,
+                filter: Some("bulk-updated".into()),
+                sort: None,
+            },
+        )
+        .await
+        .expect("bulk-updated rows should reload");
+        assert_eq!(refreshed_bulk_rows.rows.len(), 2);
+        let delete_targets = refreshed_bulk_rows
+            .rows
+            .iter()
+            .map(|row| TableRowIdentity {
+                key: vec![TableCellValue {
+                    column: "id".into(),
+                    value: row.values[0].clone(),
+                }],
+                row_version: row
+                    .row_version
+                    .clone()
+                    .expect("editable rows have versions"),
+            })
+            .collect::<Vec<_>>();
+        let bulk_deleted = delete_rows(
+            &client,
+            &DeleteTableRowsRequest {
+                schema: schema.clone(),
+                table: "opaline_stage_two".into(),
+                rows: delete_targets,
+            },
+        )
+        .await
+        .expect("selected rows should delete atomically");
+        assert_eq!(bulk_deleted.affected_rows, 2);
 
         let filtered = fetch_page(
             &client,

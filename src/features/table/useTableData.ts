@@ -4,9 +4,15 @@ import type {
   TableCellValue,
   TableDataPage,
   TableDataRow,
+  TableRowIdentity,
   TableSort,
 } from "../../shared/types/database";
 import type { TableTab } from "../query/query-types";
+import {
+  initialColumnValue,
+  validateColumnValue,
+  writableColumns,
+} from "./column-editor";
 import type { InsertCellValue } from "./table-types";
 
 type RowDraft = {
@@ -18,6 +24,13 @@ type RowDraft = {
 type InsertDraft = {
   values: InsertCellValue[];
 };
+
+type BulkUpdateDraft = {
+  columnIndex: number;
+  value: string | null;
+};
+
+export const MAX_BULK_MUTATION_ROWS = 500;
 
 const buildRowKey = (
   page: TableDataPage,
@@ -38,6 +51,14 @@ const selectionKey = (
     : `row:${page.page}:${rowIndex}:${JSON.stringify(row.values)}`;
 };
 
+const rowIdentity = (
+  page: TableDataPage,
+  row: TableDataRow,
+): TableRowIdentity | null =>
+  row.rowVersion
+    ? { key: buildRowKey(page, row), rowVersion: row.rowVersion }
+    : null;
+
 export function useTableData(tab: TableTab) {
   const requestId = useRef(0);
   const [data, setData] = useState<TableDataPage | null>(null);
@@ -51,6 +72,7 @@ export function useTableData(tab: TableTab) {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<RowDraft | null>(null);
   const [insertDraft, setInsertDraft] = useState<InsertDraft | null>(null);
+  const [bulkUpdateDraft, setBulkUpdateDraft] = useState<BulkUpdateDraft | null>(null);
   const [selectedRowsByKey, setSelectedRowsByKey] = useState(
     () => new Map<string, TableDataRow>(),
   );
@@ -88,6 +110,7 @@ export function useTableData(tab: TableTab) {
   const refresh = useCallback(() => {
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setMutationError(null);
     setMutationMessage(null);
@@ -98,6 +121,7 @@ export function useTableData(tab: TableTab) {
     const nextFilter = filterDraft.trim();
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setMutationError(null);
     setMutationMessage(null);
@@ -114,6 +138,7 @@ export function useTableData(tab: TableTab) {
     setPageState(0);
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setMutationError(null);
     setMutationMessage(null);
@@ -122,6 +147,7 @@ export function useTableData(tab: TableTab) {
   const setPage = useCallback((nextPage: number) => {
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setMutationError(null);
     setMutationMessage(null);
     setPageState(Math.max(0, nextPage));
@@ -130,6 +156,7 @@ export function useTableData(tab: TableTab) {
   const setPageSize = useCallback((nextPageSize: number) => {
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setMutationError(null);
     setMutationMessage(null);
@@ -140,6 +167,7 @@ export function useTableData(tab: TableTab) {
   const toggleSort = useCallback((column: string) => {
     setDraft(null);
     setInsertDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setMutationError(null);
     setMutationMessage(null);
@@ -160,6 +188,7 @@ export function useTableData(tab: TableTab) {
       setMutationError(null);
       setMutationMessage(null);
       setInsertDraft(null);
+      setBulkUpdateDraft(null);
       setSelectedRowsByKey(new Map());
       setDraft({ rowIndex, original: row, values: [...row.values] });
     },
@@ -168,6 +197,7 @@ export function useTableData(tab: TableTab) {
 
   const discardChanges = useCallback(() => {
     setDraft(null);
+    setBulkUpdateDraft(null);
     setMutationError(null);
     setMutationMessage(null);
   }, []);
@@ -177,13 +207,14 @@ export function useTableData(tab: TableTab) {
     setMutationError(null);
     setMutationMessage(null);
     setDraft(null);
+    setBulkUpdateDraft(null);
     setSelectedRowsByKey(new Map());
     setInsertDraft({
       values: data.columns.map((column) => {
         if (column.identity || column.generated || column.defaultValue !== null) {
           return undefined;
         }
-        return column.nullable ? null : "";
+        return initialColumnValue(column);
       }),
     });
   }, [data]);
@@ -228,6 +259,30 @@ export function useTableData(tab: TableTab) {
         : [],
     [data, draft],
   );
+  const draftErrors = useMemo(
+    () =>
+      data?.columns.map((column, index) => {
+        if (
+          !draft ||
+          column.identity ||
+          column.generated ||
+          draft.values[index] === draft.original.values[index]
+        ) {
+          return null;
+        }
+        return validateColumnValue(column, draft.values[index]);
+      }) ?? [],
+    [data, draft],
+  );
+  const insertErrors = useMemo(
+    () =>
+      data?.columns.map((column, index) =>
+        !insertDraft || column.identity || column.generated
+          ? null
+          : validateColumnValue(column, insertDraft.values[index]),
+      ) ?? [],
+    [data, insertDraft],
+  );
 
   const currentPageRows = useMemo(
     () =>
@@ -240,6 +295,10 @@ export function useTableData(tab: TableTab) {
   const selectedRows = useMemo(
     () => [...selectedRowsByKey.values()],
     [selectedRowsByKey],
+  );
+  const selectedIdentities = useMemo(
+    () => (data ? selectedRows.flatMap((row) => rowIdentity(data, row) ?? []) : []),
+    [data, selectedRows],
   );
   const selectedOnPage = currentPageRows.filter(({ key }) =>
     selectedRowsByKey.has(key),
@@ -276,10 +335,62 @@ export function useTableData(tab: TableTab) {
 
   const clearSelection = useCallback(() => {
     setSelectedRowsByKey(new Map());
+    setBulkUpdateDraft(null);
   }, []);
+
+  const startBulkUpdate = useCallback(() => {
+    if (!data?.editable || selectedRows.length === 0) return;
+    if (selectedRows.length > MAX_BULK_MUTATION_ROWS) {
+      setMutationError(
+        `Bulk changes are limited to ${MAX_BULK_MUTATION_ROWS} rows at a time.`,
+      );
+      return;
+    }
+    const column = writableColumns(data.columns)[0];
+    if (!column) {
+      setMutationError("This table has no columns that can be updated in bulk.");
+      return;
+    }
+    setMutationError(null);
+    setMutationMessage(null);
+    setBulkUpdateDraft({
+      columnIndex: data.columns.indexOf(column),
+      value: initialColumnValue(column),
+    });
+  }, [data, selectedRows.length]);
+
+  const setBulkUpdateColumn = useCallback(
+    (columnIndex: number) => {
+      const column = data?.columns[columnIndex];
+      if (!column || !writableColumns(data.columns).includes(column)) return;
+      setMutationError(null);
+      setBulkUpdateDraft({ columnIndex, value: initialColumnValue(column) });
+    },
+    [data],
+  );
+
+  const updateBulkValue = useCallback((value: string | null) => {
+    setMutationError(null);
+    setBulkUpdateDraft((current) => (current ? { ...current, value } : current));
+  }, []);
+
+  const discardBulkUpdate = useCallback(() => {
+    setBulkUpdateDraft(null);
+    setMutationError(null);
+  }, []);
+
+  const bulkUpdateColumn =
+    data && bulkUpdateDraft ? data.columns[bulkUpdateDraft.columnIndex] : undefined;
+  const bulkUpdateError = bulkUpdateColumn
+    ? validateColumnValue(bulkUpdateColumn, bulkUpdateDraft?.value)
+    : null;
 
   const saveInsert = useCallback(async () => {
     if (!data || !insertDraft) return;
+    if (insertErrors.some(Boolean)) {
+      setMutationError("Fix the invalid values before inserting this row.");
+      return;
+    }
     const values = data.columns.flatMap((column, index) => {
       const value = insertDraft.values[index];
       return column.identity || column.generated || value === undefined
@@ -307,11 +418,15 @@ export function useTableData(tab: TableTab) {
     } finally {
       setMutationBusy(false);
     }
-  }, [data, filter, insertDraft, page, tab.schema, tab.table]);
+  }, [data, filter, insertDraft, insertErrors, page, tab.schema, tab.table]);
 
   const saveChanges = useCallback(async () => {
     if (!data || !draft || !draft.original.rowVersion || changedCells.length === 0) {
       setDraft(null);
+      return;
+    }
+    if (draftErrors.some(Boolean)) {
+      setMutationError("Fix the invalid values before saving this row.");
       return;
     }
     setMutationBusy(true);
@@ -334,7 +449,78 @@ export function useTableData(tab: TableTab) {
     } finally {
       setMutationBusy(false);
     }
-  }, [changedCells, data, draft, tab.schema, tab.table]);
+  }, [changedCells, data, draft, draftErrors, tab.schema, tab.table]);
+
+  const saveBulkUpdate = useCallback(async () => {
+    if (!data || !bulkUpdateDraft || !bulkUpdateColumn || bulkUpdateError) return false;
+    if (selectedIdentities.length !== selectedRows.length) {
+      setMutationError("Some selected rows cannot be updated safely. Refresh and try again.");
+      return false;
+    }
+    setMutationBusy(true);
+    setMutationError(null);
+    setMutationMessage(null);
+    try {
+      const result = await databaseApi.updateTableRows({
+        schema: tab.schema,
+        table: tab.table,
+        rows: selectedIdentities,
+        change: { column: bulkUpdateColumn.name, value: bulkUpdateDraft.value },
+      });
+      setBulkUpdateDraft(null);
+      setSelectedRowsByKey(new Map());
+      setMutationMessage(`${result.affectedRows} rows updated.`);
+      setRevision((current) => current + 1);
+      return true;
+    } catch (caughtError) {
+      setMutationError(errorMessage(caughtError));
+      return false;
+    } finally {
+      setMutationBusy(false);
+    }
+  }, [
+    bulkUpdateColumn,
+    bulkUpdateDraft,
+    bulkUpdateError,
+    data,
+    selectedIdentities,
+    selectedRows.length,
+    tab.schema,
+    tab.table,
+  ]);
+
+  const deleteSelected = useCallback(async () => {
+    if (!data?.editable || selectedRows.length === 0) return false;
+    if (selectedRows.length > MAX_BULK_MUTATION_ROWS) {
+      setMutationError(
+        `Bulk changes are limited to ${MAX_BULK_MUTATION_ROWS} rows at a time.`,
+      );
+      return false;
+    }
+    if (selectedIdentities.length !== selectedRows.length) {
+      setMutationError("Some selected rows cannot be deleted safely. Refresh and try again.");
+      return false;
+    }
+    setMutationBusy(true);
+    setMutationError(null);
+    setMutationMessage(null);
+    try {
+      const result = await databaseApi.deleteTableRows({
+        schema: tab.schema,
+        table: tab.table,
+        rows: selectedIdentities,
+      });
+      setSelectedRowsByKey(new Map());
+      setMutationMessage(`${result.affectedRows} rows deleted.`);
+      setRevision((current) => current + 1);
+      return true;
+    } catch (caughtError) {
+      setMutationError(errorMessage(caughtError));
+      return false;
+    } finally {
+      setMutationBusy(false);
+    }
+  }, [data, selectedIdentities, selectedRows.length, tab.schema, tab.table]);
 
   const deleteRow = useCallback(
     async (rowIndex: number) => {
@@ -379,7 +565,12 @@ export function useTableData(tab: TableTab) {
     busy,
     error,
     draft,
+    draftErrors,
     insertDraft,
+    insertErrors,
+    bulkUpdateDraft,
+    bulkUpdateColumn,
+    bulkUpdateError,
     mutationBusy,
     mutationError,
     mutationMessage,
@@ -389,7 +580,7 @@ export function useTableData(tab: TableTab) {
     selectedOnPage,
     allPageRowsSelected,
     somePageRowsSelected,
-    hasDraft: draft !== null || insertDraft !== null,
+    hasDraft: draft !== null || insertDraft !== null || bulkUpdateDraft !== null,
     setFilterDraft,
     applyFilter,
     clearFilter,
@@ -401,12 +592,17 @@ export function useTableData(tab: TableTab) {
     startInserting,
     discardChanges,
     discardInsert,
+    discardBulkUpdate,
     updateValue,
     updateInsertValue,
+    updateBulkValue,
+    setBulkUpdateColumn,
     toggleRowSelection,
     togglePageSelection,
     clearSelection,
+    startBulkUpdate,
     dismissMutationMessage: () => setMutationMessage(null),
+    dismissMutationError: () => setMutationError(null),
     rowSelectionKey: (rowIndex: number) => currentPageRows[rowIndex]?.key,
     isRowSelected: (rowIndex: number) => {
       const key = currentPageRows[rowIndex]?.key;
@@ -414,6 +610,10 @@ export function useTableData(tab: TableTab) {
     },
     saveInsert,
     saveChanges,
+    saveBulkUpdate,
     deleteRow,
+    deleteSelected,
   };
 }
+
+export type TableDataController = ReturnType<typeof useTableData>;

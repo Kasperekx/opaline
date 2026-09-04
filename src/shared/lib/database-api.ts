@@ -1,18 +1,24 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   ColumnInfo,
   ConnectionConfig,
   ConnectionInfo,
   DatabaseObject,
   DeleteTableRowRequest,
+  DeleteTableRowsRequest,
+  ExportTableDataRequest,
   InsertTableRowRequest,
   QueryExecutionError,
   QueryResult,
   RunQueryOptions,
   TableDataPage,
   TableDataRow,
+  TableExportProgress,
+  TableExportResult,
+  TableMutationResult,
   TablePageRequest,
   UpdateTableRowRequest,
+  UpdateTableRowsRequest,
 } from "../types/database";
 
 export const isDesktopRuntime = () => "__TAURI_INTERNALS__" in window;
@@ -54,4 +60,18 @@ export const databaseApi = {
     invoke<TableDataRow>("update_table_row", { input }),
   deleteTableRow: (input: DeleteTableRowRequest) =>
     invoke<void>("delete_table_row", { input }),
+  deleteTableRows: (input: DeleteTableRowsRequest) =>
+    invoke<TableMutationResult>("delete_table_rows", { input }),
+  updateTableRows: (input: UpdateTableRowsRequest) =>
+    invoke<TableMutationResult>("update_table_rows", { input }),
+  exportTableData: (
+    input: ExportTableDataRequest,
+    onProgress: (progress: TableExportProgress) => void,
+  ) => {
+    const progressChannel = new Channel<TableExportProgress>(onProgress);
+    return invoke<TableExportResult>("export_table_data", {
+      input,
+      onProgress: progressChannel,
+    });
+  },
 };
