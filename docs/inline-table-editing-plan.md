@@ -1,6 +1,6 @@
 # Plan UX: edycja danych bezpośrednio w tabeli
 
-Data: 2026-09-05  
+Data: 2026-09-05
 Status: **wdrożono wariant A po akceptacji „implementuj”**. Wyniki kontroli i ograniczenia: [raport wdrożenia](inline-table-editing-verification.md).
 
 ## Cel

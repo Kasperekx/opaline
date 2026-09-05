@@ -170,7 +170,7 @@ try {
       OPALINE_TEST_BUNDLED_ROOT: bundle,
       OPALINE_TEST_CA_PATH: ca,
     };
-    for (const filter of ["backup::tests", "tls_tests", "session_tests"]) {
+    for (const filter of ["backup::tests", "tls_tests", "session_tests", "database::table_changes", "database::table_data"]) {
       const output = await run(
         "cargo",
         [
@@ -199,7 +199,7 @@ try {
     containerIds.splice(containerIds.indexOf(id), 1);
   }
   console.log(
-    "All 5 majors passed with relocated bundled clients, real backup/restore, TLS and session isolation.",
+    "All 5 majors passed with relocated bundled clients, real backup/restore, TLS, session isolation and table editing.",
   );
 } finally {
   for (const id of containerIds) await run("docker", ["rm", "--force", id]);

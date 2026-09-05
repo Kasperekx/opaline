@@ -84,14 +84,19 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
-    env:
-      OPALINE_TEST_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.88.0
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+        env:
+          OPALINE_TEST_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib session_tests -- --ignored --test-threads=1
+        env:
+          OPALINE_TEST_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib database::table_changes -- --ignored --test-threads=1
+        env:
+          OPALINE_TEST_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
   bundled-backup:
     runs-on: ubuntu-22.04
     steps:
