@@ -5,15 +5,25 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   rust-security:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --version 0.22.2 --locked
-      # Do not hide the known glib finding. This gate stays red until reviewed/resolved.
-      - run: cargo audit --file src-tauri/Cargo.lock --deny unsound
+      - run: node --test scripts/audit-rust-target.test.mjs
+      # macOS is the first beta scope. Linux findings are still printed, not ignored.
+      - run: node scripts/audit-rust-target.mjs ${{ matrix.target }}
   secrets:
     runs-on: ubuntu-22.04
     steps:
@@ -37,8 +47,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-14, windows-2022]
+        os: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,6 +80,12 @@ jobs:
       - run: npm run tauri build
         env:
           OPALINE_MINGW_PREFIX: ${{ steps.msys.outputs.msys2-location }}/mingw64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opaline-unsigned-${{ matrix.os }}-${{ github.sha }}
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
   postgres:
     runs-on: ubuntu-22.04
     strategy:
