@@ -20,6 +20,8 @@ async fn inspects_structure_and_replays_ddl_when_postgres_is_configured() {
         username: "postgres".into(),
         password: "opaline_test".into(),
         ssl_mode: SslMode::Disable,
+        ca_path: None,
+        read_only: false,
     })
     .await
     .expect("test database should connect");

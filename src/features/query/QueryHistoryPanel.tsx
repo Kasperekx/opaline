@@ -8,12 +8,14 @@ import {
   XCircle,
 } from "lucide-react";
 import type { QueryHistoryEntry } from "./query-types";
+import { LegacyQueries } from "./LegacyQueries";
 
 type QueryHistoryPanelProps = {
   entries: QueryHistoryEntry[];
   onClear: () => void;
   onClose: () => void;
   onOpen: (entry: QueryHistoryEntry) => void;
+  onOpenEarlierQuery: (sql: string, title: string) => void;
 };
 
 const statusIcon = {
@@ -35,6 +37,7 @@ export function QueryHistoryPanel({
   onClear,
   onClose,
   onOpen,
+  onOpenEarlierQuery,
 }: QueryHistoryPanelProps) {
   return (
     <aside className="workspace-drawer" aria-label="Query history">
@@ -43,7 +46,11 @@ export function QueryHistoryPanel({
           <span className="section-kicker">Workspace</span>
           <h2>Query history</h2>
         </div>
-        <button className="icon-button" aria-label="Close history" onClick={onClose}>
+        <button
+          className="icon-button"
+          aria-label="Close history"
+          onClick={onClose}
+        >
           <X size={18} />
         </button>
       </header>
@@ -56,6 +63,7 @@ export function QueryHistoryPanel({
       </div>
 
       <div className="history-list">
+        <LegacyQueries onOpen={onOpenEarlierQuery} />
         {entries.length === 0 ? (
           <div className="drawer-empty">
             <Clock3 size={24} />
@@ -76,7 +84,8 @@ export function QueryHistoryPanel({
                 <span className="history-entry-copy">
                   <strong>{summary}</strong>
                   <small>
-                    {entry.database} · {formatDate.format(new Date(entry.executedAt))}
+                    {entry.database} ·{" "}
+                    {formatDate.format(new Date(entry.executedAt))}
                   </small>
                 </span>
                 <span className="history-entry-meta">

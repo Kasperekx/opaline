@@ -28,7 +28,11 @@ export function QueryPreferencesPanel({
           <span className="section-kicker">Workspace</span>
           <h2>Preferences</h2>
         </div>
-        <button className="icon-button" aria-label="Close preferences" onClick={onClose}>
+        <button
+          className="icon-button"
+          aria-label="Close preferences"
+          onClick={onClose}
+        >
           <X size={18} />
         </button>
       </header>
@@ -38,6 +42,25 @@ export function QueryPreferencesPanel({
           <Settings2 size={20} />
           <p>Appearance and query safeguards are stored only on this device.</p>
         </div>
+
+        <fieldset className="preference-group">
+          <legend>Privacy</legend>
+          <label>
+            <input
+              type="checkbox"
+              checked={preferences.historyEnabled}
+              onChange={(event) =>
+                onUpdate("historyEnabled", event.target.checked)
+              }
+            />{" "}
+            Record query history on this device
+          </label>
+          <p>
+            SQL can contain sensitive values. Turning history off stops new
+            entries; clear existing entries in History. Open query drafts are
+            still saved locally.
+          </p>
+        </fieldset>
 
         <fieldset className="preference-group">
           <legend>Text size</legend>
@@ -73,7 +96,9 @@ export function QueryPreferencesPanel({
           <span>Maximum result rows</span>
           <select
             value={preferences.maxRows}
-            onChange={(event) => onUpdate("maxRows", Number(event.target.value))}
+            onChange={(event) =>
+              onUpdate("maxRows", Number(event.target.value))
+            }
           >
             {rowLimits.map((limit) => (
               <option key={limit} value={limit}>
@@ -87,7 +112,9 @@ export function QueryPreferencesPanel({
           <span>Query timeout</span>
           <select
             value={preferences.timeoutMs}
-            onChange={(event) => onUpdate("timeoutMs", Number(event.target.value))}
+            onChange={(event) =>
+              onUpdate("timeoutMs", Number(event.target.value))
+            }
           >
             {timeouts.map((timeout) => (
               <option key={timeout} value={timeout}>

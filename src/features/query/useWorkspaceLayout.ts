@@ -36,7 +36,9 @@ const loadLayout = (): WorkspaceLayout => {
 export function useWorkspaceLayout() {
   const [layout, setLayout] = useState(loadLayout);
 
-  useEffect(() => writeLocalJson(STORAGE_KEY, layout), [layout]);
+  useEffect(() => {
+    writeLocalJson(STORAGE_KEY, layout);
+  }, [layout]);
 
   const resizeExplorer = useCallback((delta: number) => {
     setLayout((current) => ({
@@ -53,11 +55,19 @@ export function useWorkspaceLayout() {
   }, []);
 
   const resetExplorer = useCallback(
-    () => setLayout((current) => ({ ...current, explorerWidth: DEFAULT_EXPLORER_WIDTH })),
+    () =>
+      setLayout((current) => ({
+        ...current,
+        explorerWidth: DEFAULT_EXPLORER_WIDTH,
+      })),
     [],
   );
   const resetEditor = useCallback(
-    () => setLayout((current) => ({ ...current, editorRatio: DEFAULT_EDITOR_RATIO })),
+    () =>
+      setLayout((current) => ({
+        ...current,
+        editorRatio: DEFAULT_EDITOR_RATIO,
+      })),
     [],
   );
 

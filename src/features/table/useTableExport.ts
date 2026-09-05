@@ -1,5 +1,8 @@
+import { useDatabaseSession } from "../connections/SessionContext";
 import { useCallback, useState } from "react";
-import { databaseApi, errorMessage } from "../../shared/lib/database-api";
+import { errorMessage } from "../../shared/lib/database-api";
+import { useWorkRisk } from "../../shared/safety/WorkSafety";
+import { databaseObjectKey } from "../../shared/lib/database-object";
 import type {
   ColumnInfo,
   TableDataRow,
@@ -36,11 +39,18 @@ export function useTableExport({
   filter,
   sort,
 }: UseTableExportOptions) {
+  const { session, api: databaseApi } = useDatabaseSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fullExport, setFullExport] = useState<FullTableExport | null>(null);
+  useWorkRisk({
+    sessionId: session.id,
+    tabId: `table:${databaseObjectKey({ schema, name: table })}`,
+    label: `${session.name}: exporting ${schema}.${table}`,
+    busy,
+  });
 
   const exportRows = useCallback(
     async (format: TableExportFormat) => {
@@ -51,7 +61,13 @@ export function useTableExport({
       setSavedFilename(null);
       setStatusMessage(null);
       try {
-        const path = await saveTableExport({ schema, table, columns, rows, format });
+        const path = await saveTableExport({
+          schema,
+          table,
+          columns,
+          rows,
+          format,
+        });
         if (!path) return false;
         setSavedFilename(path.split(/[\\/]/).pop() ?? path);
         return true;
@@ -91,7 +107,9 @@ export function useTableExport({
             path,
           },
           (progress) => {
-            setFullExport((current) => (current ? { ...current, ...progress } : current));
+            setFullExport((current) =>
+              current ? { ...current, ...progress } : current,
+            );
           },
         );
         setSavedFilename(path.split(/[\\/]/).pop() ?? path);
@@ -109,17 +127,19 @@ export function useTableExport({
         setBusy(false);
       }
     },
-    [busy, filter, schema, sort, table],
+    [databaseApi, busy, filter, schema, sort, table],
   );
 
   const cancelFullExport = useCallback(async () => {
-    setFullExport((current) => (current ? { ...current, cancelling: true } : current));
+    setFullExport((current) =>
+      current ? { ...current, cancelling: true } : current,
+    );
     try {
       await databaseApi.cancelQuery();
     } catch (caughtError) {
       setError(errorMessage(caughtError));
     }
-  }, []);
+  }, [databaseApi]);
 
   const clearStatus = useCallback(() => {
     setError(null);

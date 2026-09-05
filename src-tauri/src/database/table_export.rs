@@ -1,7 +1,5 @@
-use std::{
-    path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use super::export_file::AtomicExport;
+use std::path::{Path, PathBuf};
 
 use futures_util::{pin_mut, TryStreamExt};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
@@ -27,21 +25,9 @@ where
 {
     validate_relation_name(&request.schema, &request.table)?;
     let destination = validated_destination(&request.path)?;
-    let temporary = temporary_path(&destination)?;
-    let result = write_export(client, request, &temporary, &mut on_progress).await;
-
-    let export = match result {
-        Ok(export) => export,
-        Err(error) => {
-            let _ = tokio::fs::remove_file(&temporary).await;
-            return Err(error);
-        }
-    };
-
-    if let Err(error) = publish_export(&temporary, &destination).await {
-        let _ = tokio::fs::remove_file(&temporary).await;
-        return Err(error);
-    }
+    let output = AtomicExport::create(&destination).await?;
+    let export = write_export(client, request, output.path(), &mut on_progress).await?;
+    output.publish().await?;
 
     Ok(export)
 }
@@ -79,7 +65,7 @@ where
     pin_mut!(stream);
 
     let mut file = OpenOptions::new()
-        .create_new(true)
+        .truncate(true)
         .write(true)
         .open(temporary)
         .await
@@ -118,7 +104,7 @@ where
                 "{}\r\n",
                 values
                     .iter()
-                    .map(|value| csv_cell(value.as_deref().unwrap_or_default()))
+                    .map(|value| value.as_deref().map(csv_cell).unwrap_or_default())
                     .collect::<Vec<_>>()
                     .join(",")
             ),
@@ -185,7 +171,7 @@ fn json_row(
 }
 
 fn csv_cell(value: &str) -> String {
-    if value.contains([',', '"', '\r', '\n']) {
+    if value.is_empty() || value.contains([',', '"', '\r', '\n']) {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.into()
@@ -198,51 +184,6 @@ fn validated_destination(path: &str) -> Result<PathBuf, String> {
         return Err("Choose a valid export destination.".into());
     }
     Ok(destination)
-}
-
-fn temporary_path(destination: &Path) -> Result<PathBuf, String> {
-    let parent = destination
-        .parent()
-        .ok_or_else(|| "The export destination has no parent directory.".to_string())?;
-    let filename = destination
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| "The export filename is not valid Unicode.".to_string())?;
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| "The system clock cannot create an export filename.".to_string())?
-        .as_nanos();
-    Ok(parent.join(format!(
-        ".{filename}.opaline-{}-{nonce}.part",
-        std::process::id()
-    )))
-}
-
-async fn publish_export(temporary: &Path, destination: &Path) -> Result<(), String> {
-    if !tokio::fs::try_exists(destination)
-        .await
-        .map_err(|error| format!("Could not inspect the export destination: {error}"))?
-    {
-        return tokio::fs::rename(temporary, destination)
-            .await
-            .map_err(|error| format!("Could not publish the export file: {error}"));
-    }
-
-    let backup = temporary_path(destination)?.with_extension("opaline-backup");
-    tokio::fs::rename(destination, &backup)
-        .await
-        .map_err(|error| format!("Could not prepare the existing export file: {error}"))?;
-    if let Err(error) = tokio::fs::rename(temporary, destination).await {
-        let restore = tokio::fs::rename(&backup, destination).await;
-        return Err(match restore {
-            Ok(()) => format!("Could not replace the export file: {error}"),
-            Err(restore_error) => format!(
-                "Could not replace the export file ({error}) or restore the previous file ({restore_error})."
-            ),
-        });
-    }
-    let _ = tokio::fs::remove_file(&backup).await;
-    Ok(())
 }
 
 fn export_query_error(error: tokio_postgres::Error) -> String {
@@ -263,6 +204,7 @@ mod tests {
         models::{ConnectionConfig, SslMode},
         postgres,
     };
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn escapes_csv_cells() {
@@ -289,6 +231,8 @@ mod tests {
             username: "postgres".into(),
             password: "opaline_test".into(),
             ssl_mode: SslMode::Disable,
+            ca_path: None,
+            read_only: false,
         };
         let (client, _) = postgres::connect(&config)
             .await

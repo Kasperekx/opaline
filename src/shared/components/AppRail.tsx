@@ -1,11 +1,8 @@
-import {
-  Blocks,
-  CircleHelp,
-  Clock3,
-  Database,
-  Settings2,
-} from "lucide-react";
+import { CircleHelp, Clock3, Database, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { HelpDialog } from "./HelpDialog";
 import type { ReactNode } from "react";
+import { BrandMark } from "./BrandMark";
 
 type RailButtonProps = {
   label: string;
@@ -53,11 +50,10 @@ export function AppRail({
   onHistory,
   onSettings,
 }: AppRailProps) {
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <aside className="app-rail" aria-label="Primary navigation">
-      <div className="brand-mark" aria-label="Opaline">
-        <span />
-      </div>
+      <BrandMark />
       <nav>
         <RailButton
           label="Connections"
@@ -73,9 +69,6 @@ export function AppRail({
         >
           <Clock3 size={19} />
         </RailButton>
-        <RailButton label="Saved queries · coming soon" disabled>
-          <Blocks size={19} />
-        </RailButton>
       </nav>
       <div className="rail-bottom">
         <RailButton
@@ -85,7 +78,7 @@ export function AppRail({
         >
           <Settings2 size={19} />
         </RailButton>
-        <RailButton label="Help">
+        <RailButton label="Help" onClick={() => setHelpOpen(true)}>
           <CircleHelp size={19} />
         </RailButton>
         <span
@@ -93,6 +86,7 @@ export function AppRail({
           title={connected ? "Connected" : "Offline"}
         />
       </div>
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </aside>
   );
 }

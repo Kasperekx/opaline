@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { databaseObjectKey } from "../../shared/lib/database-object";
-import { readLocalJson, writeLocalJson } from "../../shared/lib/local-storage";
+import {
+  markUnreadableStorage,
+  readLocalJson,
+  writeLocalJson,
+} from "../../shared/lib/local-storage";
 import type {
   DatabaseObject,
   QueryExecutionError,
@@ -8,22 +12,40 @@ import type {
 } from "../../shared/types/database";
 import type { QueryTab, TableTab, WorkspaceTab } from "./query-types";
 
-const STORAGE_KEY = "opaline.query-session.v1";
+const storageKey = (profileId: string) =>
+  "opaline.query-session.v2." + profileId;
 const starterQuery = `select
   current_database() as database,
   current_user as connected_as,
   now() as connected_at;`;
 
-type StoredQueryTab = Pick<QueryTab, "id" | "title" | "sql" | "lastExecutedSql">;
+type StoredQueryTab = Pick<
+  QueryTab,
+  "id" | "title" | "sql" | "lastExecutedSql"
+>;
+
+type StoredTab = StoredQueryTab | TableTab;
+const serializeTab = (tab: WorkspaceTab): StoredTab =>
+  tab.kind === "table"
+    ? tab
+    : {
+        id: tab.id,
+        title: tab.title,
+        sql: tab.sql,
+        lastExecutedSql: tab.lastExecutedSql,
+      };
 
 type StoredQuerySession = {
+  version?: 2 | 3;
   activeTabId: string;
-  tabs: StoredQueryTab[];
+  tabs: StoredTab[];
+  closedTabs?: StoredQueryTab[];
 };
 
 type WorkspaceSession = {
   activeTabId: string;
   tabs: WorkspaceTab[];
+  closedTabs?: StoredQueryTab[];
 };
 
 const createId = () =>
@@ -55,11 +77,17 @@ const initialSession = (): WorkspaceSession => {
   return { activeTabId: tab.id, tabs: [tab] };
 };
 
-const loadSession = (): WorkspaceSession => {
-  const value = readLocalJson<unknown>(STORAGE_KEY, null);
+const loadSession = (key: string): WorkspaceSession => {
+  const value = readLocalJson<unknown>(key, null);
   if (!value || typeof value !== "object") return initialSession();
   const stored = value as Partial<StoredQuerySession>;
-  if (!Array.isArray(stored.tabs) || stored.tabs.length === 0) {
+  if (
+    !Array.isArray(stored.tabs) ||
+    (stored.version !== undefined &&
+      stored.version !== 2 &&
+      stored.version !== 3)
+  ) {
+    markUnreadableStorage(key);
     return initialSession();
   }
 
@@ -69,32 +97,61 @@ const loadSession = (): WorkspaceSession => {
         tab &&
         typeof tab.id === "string" &&
         typeof tab.title === "string" &&
-        typeof tab.sql === "string",
+        ("kind" in tab && tab.kind === "table"
+          ? typeof tab.schema === "string" &&
+            typeof tab.table === "string" &&
+            typeof tab.objectType === "string"
+          : "sql" in tab && typeof tab.sql === "string"),
     )
-    .map<QueryTab>((tab) => ({
-      kind: "query",
-      id: tab.id,
-      title: tab.title,
-      sql: tab.sql,
-      lastExecutedSql:
-        typeof tab.lastExecutedSql === "string" ? tab.lastExecutedSql : null,
-      result: null,
-      error: null,
-    }));
+    .map<WorkspaceTab>((storedTab) => {
+      if ("kind" in storedTab && storedTab.kind === "table")
+        return createTableTab({
+          schema: storedTab.schema,
+          name: storedTab.table,
+          objectType: storedTab.objectType,
+          estimatedRows: 0,
+        });
+      const tab = storedTab as StoredQueryTab;
+      return {
+        kind: "query",
+        id: tab.id,
+        title: tab.title,
+        sql: tab.sql,
+        lastExecutedSql:
+          typeof tab.lastExecutedSql === "string" ? tab.lastExecutedSql : null,
+        result: null,
+        error: null,
+      };
+    });
 
-  if (tabs.length === 0) return initialSession();
+  if (tabs.length !== stored.tabs.length) markUnreadableStorage(key);
+  const closedTabs = Array.isArray(stored.closedTabs)
+    ? stored.closedTabs
+        .filter(
+          (tab) =>
+            tab &&
+            typeof tab.id === "string" &&
+            typeof tab.title === "string" &&
+            typeof tab.sql === "string",
+        )
+        .slice(0, 20)
+    : [];
+  if (tabs.length === 0) return { ...initialSession(), closedTabs };
   const activeTabId =
     typeof stored.activeTabId === "string" &&
     tabs.some((tab) => tab.id === stored.activeTabId)
       ? stored.activeTabId
       : tabs[0].id;
-  return { tabs, activeTabId };
+  return { tabs, activeTabId, closedTabs };
 };
 
-export function useWorkspaceTabs() {
-  const [session] = useState(loadSession);
+export function useWorkspaceTabs(profileId: string) {
+  const key = storageKey(profileId);
+  const [session] = useState(() => loadSession(key));
   const [tabs, setTabs] = useState<WorkspaceTab[]>(session.tabs);
   const [activeTabId, setActiveTabId] = useState(session.activeTabId);
+  const [closedTabs, setClosedTabs] = useState(session.closedTabs ?? []);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId) ?? tabs[0]!,
@@ -102,23 +159,21 @@ export function useWorkspaceTabs() {
   );
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const queryTabs = tabs.filter((tab): tab is QueryTab => tab.kind === "query");
-      const activeQueryId = queryTabs.some((tab) => tab.id === activeTabId)
-        ? activeTabId
-        : queryTabs[0]?.id ?? "";
-      writeLocalJson(STORAGE_KEY, {
-        activeTabId: activeQueryId,
-        tabs: queryTabs.map(({ id, title, sql, lastExecutedSql }) => ({
-          id,
-          title,
-          sql,
-          lastExecutedSql,
-        })),
+    const persist = () => {
+      return writeLocalJson(key, {
+        version: 3,
+        activeTabId,
+        tabs: tabs.map(serializeTab),
+        closedTabs,
       } satisfies StoredQuerySession);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [activeTabId, tabs]);
+    };
+    persist();
+    window.addEventListener("pagehide", persist);
+    return () => {
+      window.removeEventListener("pagehide", persist);
+      persist();
+    };
+  }, [activeTabId, tabs, closedTabs, key]);
 
   const updateQueryTab = useCallback(
     (id: string, update: (tab: QueryTab) => QueryTab) => {
@@ -140,25 +195,43 @@ export function useWorkspaceTabs() {
 
   const addQueryTab = useCallback(
     (sql = "", preferredTitle?: string) => {
+      if (tabs.length >= 30) {
+        setNotice(
+          "30 open tabs per connection. Close a tab before opening another.",
+        );
+        return activeTabId;
+      }
       const queryCount = tabs.filter((tab) => tab.kind === "query").length;
-      const tab = createQueryTab(preferredTitle ?? `Query ${queryCount + 1}`, sql);
+      const tab = createQueryTab(
+        preferredTitle ?? `Query ${queryCount + 1}`,
+        sql,
+      );
       setTabs((current) => [...current, tab]);
       setActiveTabId(tab.id);
       return tab.id;
     },
-    [tabs],
+    [tabs, activeTabId],
   );
 
-  const openTable = useCallback((object: DatabaseObject) => {
-    const tab = createTableTab(object);
-    setTabs((current) =>
-      current.some((candidate) => candidate.id === tab.id)
-        ? current
-        : [...current, tab],
-    );
-    setActiveTabId(tab.id);
-    return tab.id;
-  }, []);
+  const openTable = useCallback(
+    (object: DatabaseObject) => {
+      const tab = createTableTab(object);
+      if (tabs.length >= 30 && !tabs.some((item) => item.id === tab.id)) {
+        setNotice(
+          "30 open tabs per connection. Close a tab before opening another.",
+        );
+        return activeTabId;
+      }
+      setTabs((current) =>
+        current.some((candidate) => candidate.id === tab.id)
+          ? current
+          : [...current, tab],
+      );
+      setActiveTabId(tab.id);
+      return tab.id;
+    },
+    [tabs, activeTabId],
+  );
 
   const closeTab = useCallback(
     (id: string) => {
@@ -166,12 +239,44 @@ export function useWorkspaceTabs() {
       const index = tabs.findIndex((tab) => tab.id === id);
       if (index < 0) return;
       const nextTabs = tabs.filter((tab) => tab.id !== id);
+      const closing = tabs[index];
+      const nextClosed =
+        closing.kind === "query"
+          ? [
+              {
+                id: closing.id,
+                title: closing.title,
+                sql: closing.sql,
+                lastExecutedSql: closing.lastExecutedSql,
+              },
+              ...closedTabs,
+            ].slice(0, 20)
+          : closedTabs;
+      if (
+        !writeLocalJson(key, {
+          version: 3,
+          activeTabId,
+          tabs: nextTabs.map(serializeTab),
+          closedTabs: nextClosed,
+        })
+      ) {
+        // Retry must persist the still-open session, not the aborted close action.
+        writeLocalJson(key, {
+          version: 3,
+          activeTabId,
+          tabs: tabs.map(serializeTab),
+          closedTabs,
+        });
+        setNotice("Could not save your session. The tab was kept open.");
+        return;
+      }
+      setClosedTabs(nextClosed);
       setTabs(nextTabs);
       if (activeTabId === id) {
         setActiveTabId(nextTabs[Math.min(index, nextTabs.length - 1)].id);
       }
     },
-    [activeTabId, tabs],
+    [activeTabId, tabs, closedTabs, key],
   );
 
   const renameQueryTab = useCallback(
@@ -189,22 +294,57 @@ export function useWorkspaceTabs() {
       error: QueryExecutionError | null,
       lastExecutedSql?: string,
     ) => {
-      updateQueryTab(id, (tab) => ({
-        ...tab,
-        lastExecutedSql: lastExecutedSql ?? tab.lastExecutedSql,
-        result,
-        error,
-      }));
+      setTabs((current) => {
+        // Keep at most three result-bearing query tabs per connection. SQL survives eviction.
+        let remaining = result ? 2 : 3;
+        return current.map((tab) => {
+          if (tab.kind !== "query") return tab;
+          if (tab.id === id)
+            return {
+              ...tab,
+              lastExecutedSql: lastExecutedSql ?? tab.lastExecutedSql,
+              result,
+              error,
+            };
+          if (tab.result && remaining-- <= 0) return { ...tab, result: null };
+          return tab;
+        });
+      });
     },
-    [updateQueryTab],
+    [],
   );
 
   return {
+    clearResults: useCallback(
+      () =>
+        setTabs((current) =>
+          current.map((tab) =>
+            tab.kind === "query" ? { ...tab, result: null, error: null } : tab,
+          ),
+        ),
+      [],
+    ),
+    notice,
+    dismissNotice: () => setNotice(null),
+    canRestore: closedTabs.length > 0,
+    restoreClosedTab: () => {
+      const tab = closedTabs[0];
+      if (!tab || tabs.length >= 30) return;
+      const id = createId();
+      setTabs((current) => [
+        ...current,
+        { ...tab, id, kind: "query", result: null, error: null },
+      ]);
+      setClosedTabs((current) => current.slice(1));
+      // Select the restored tab without executing SQL.
+      setActiveTabId(id);
+    },
     tabs,
     activeTab,
     activeTabId,
     setActiveTabId,
     updateSql,
+    updateQueryTab,
     addQueryTab,
     openTable,
     closeTab,

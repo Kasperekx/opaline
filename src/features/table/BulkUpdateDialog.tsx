@@ -39,8 +39,8 @@ export function BulkUpdateDialog({
     <TableMutationDialog
       open={open && Boolean(column)}
       title={`Update ${rowCount} selected rows`}
-      description="The same value will be written atomically to every selected row."
-      confirmLabel={`Update ${rowCount} rows`}
+      description="Stage this value on the selected rows. Nothing is written until you save the table changes."
+      confirmLabel={`Stage ${rowCount} rows`}
       Icon={PencilLine}
       busy={busy}
       confirmDisabled={Boolean(error)}
@@ -77,8 +77,8 @@ export function BulkUpdateDialog({
             />
           </label>
           <small>
-            Opaline verifies every row version first. If one row changed, none of them are
-            updated.
+            Review the highlighted cells before saving. Row versions are checked
+            when the entire change set is saved.
           </small>
         </div>
       )}

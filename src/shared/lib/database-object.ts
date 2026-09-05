@@ -1,7 +1,8 @@
 import type { DatabaseObject } from "../types/database";
 
-export const databaseObjectKey = (object: DatabaseObject) =>
-  JSON.stringify([object.schema, object.name]);
+export const databaseObjectKey = (
+  object: Pick<DatabaseObject, "schema" | "name">,
+) => JSON.stringify([object.schema, object.name]);
 
 export const quoteIdentifier = (identifier: string) =>
   `"${identifier.replace(/"/g, '""')}"`;

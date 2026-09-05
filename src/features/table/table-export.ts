@@ -1,5 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import type {
   ColumnInfo,
   TableDataRow,
@@ -18,6 +18,7 @@ type TableExport = {
 
 const csvCell = (value: string | null) => {
   if (value === null) return "";
+  if (value === "") return '""';
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 };
 
@@ -31,7 +32,10 @@ const serializeJson = (columns: ColumnInfo[], rows: TableDataRow[]) =>
   `${JSON.stringify(
     rows.map((row) =>
       Object.fromEntries(
-        columns.map((column, index) => [column.name, row.values[index] ?? null]),
+        columns.map((column, index) => [
+          column.name,
+          row.values[index] ?? null,
+        ]),
       ),
     ),
     null,
@@ -39,7 +43,10 @@ const serializeJson = (columns: ColumnInfo[], rows: TableDataRow[]) =>
   )}\n`;
 
 const safeFilenamePart = (value: string) =>
-  value.trim().replace(/[^a-z0-9._-]+/gi, "_").replace(/^_+|_+$/g, "") || "table";
+  value
+    .trim()
+    .replace(/[^a-z0-9._-]+/gi, "_")
+    .replace(/^_+|_+$/g, "") || "table";
 
 export const tableExportFilename = (
   schema: string,
@@ -82,7 +89,9 @@ export async function saveTableExport({
   if (!path) return null;
 
   const contents =
-    format === "csv" ? serializeCsv(columns, rows) : serializeJson(columns, rows);
-  await writeTextFile(path, contents);
+    format === "csv"
+      ? serializeCsv(columns, rows)
+      : serializeJson(columns, rows);
+  await invoke("save_text_export", { path, contents });
   return path;
 }

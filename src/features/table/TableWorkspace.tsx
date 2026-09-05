@@ -7,12 +7,16 @@ import { TableDataView } from "./TableDataView";
 
 type TableWorkspaceProps = {
   tab: TableTab;
+  active: boolean;
+  onDirtyChange: (id: string, dirty: boolean) => void;
   onOpenQuery: (sql: string, title: string) => void;
   onOpenTable: (schema: string, table: string) => void;
 };
 
 export function TableWorkspace({
   tab,
+  active,
+  onDirtyChange,
   onOpenQuery,
   onOpenTable,
 }: TableWorkspaceProps) {
@@ -41,7 +45,12 @@ export function TableWorkspace({
         aria-labelledby={`${id}-tab-data`}
         hidden={view !== "data"}
       >
-        <TableDataView tab={tab} onOpenQuery={onOpenQuery} />
+        <TableDataView
+          tab={tab}
+          active={active && view === "data"}
+          onDirtyChange={onDirtyChange}
+          onOpenQuery={onOpenQuery}
+        />
       </div>
       <div
         className="table-view-panel"

@@ -5,6 +5,7 @@ import type { QueryPreferences } from "./query-types";
 const STORAGE_KEY = "opaline.query-preferences.v2";
 
 const defaults: QueryPreferences = {
+  historyEnabled: true,
   fontSize: "large",
   density: "comfortable",
   maxRows: 500,
@@ -21,6 +22,10 @@ const loadPreferences = (): QueryPreferences => {
   const maxRows = stored.maxRows;
   const timeoutMs = stored.timeoutMs;
   return {
+    historyEnabled:
+      typeof stored.historyEnabled === "boolean"
+        ? stored.historyEnabled
+        : defaults.historyEnabled,
     fontSize:
       stored.fontSize === "comfortable" || stored.fontSize === "large"
         ? stored.fontSize
@@ -41,7 +46,8 @@ const loadPreferences = (): QueryPreferences => {
 };
 
 export function useQueryPreferences() {
-  const [preferences, setPreferences] = useState<QueryPreferences>(loadPreferences);
+  const [preferences, setPreferences] =
+    useState<QueryPreferences>(loadPreferences);
 
   useEffect(() => {
     document.documentElement.dataset.fontSize = preferences.fontSize;

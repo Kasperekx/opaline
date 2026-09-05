@@ -6,6 +6,7 @@ type WorkspaceTabsProps = {
   tabs: WorkspaceTab[];
   activeTabId: string;
   runningTabId: string | null;
+  dirtyTableIds?: ReadonlySet<string>;
   endAction: ReactNode;
   onAddQuery: () => void;
   onClose: (id: string) => void;
@@ -17,6 +18,7 @@ export function WorkspaceTabs({
   tabs,
   activeTabId,
   runningTabId,
+  dirtyTableIds,
   endAction,
   onAddQuery,
   onClose,
@@ -49,7 +51,10 @@ export function WorkspaceTabs({
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
           const running = tab.id === runningTabId;
-          const dirty = tab.kind === "query" && tab.sql !== tab.lastExecutedSql;
+          const dirty =
+            tab.kind === "query"
+              ? tab.sql !== tab.lastExecutedSql
+              : dirtyTableIds?.has(tab.id);
           return (
             <div
               className={`editor-tab ${tab.kind} ${active ? "active" : ""}`}
@@ -97,7 +102,16 @@ export function WorkspaceTabs({
                   ) : (
                     <FileCode2 size={14} />
                   )}
-                  {dirty && <span className="tab-dot dirty" aria-label="Modified" />}
+                  {dirty && (
+                    <span
+                      className={`tab-dot dirty ${tab.kind === "table" ? "table-tab-dirty" : ""}`}
+                      aria-label={
+                        tab.kind === "table"
+                          ? "Unsaved table changes"
+                          : "Modified"
+                      }
+                    />
+                  )}
                   <span>{tab.title}</span>
                 </button>
               )}

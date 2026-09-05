@@ -1,3 +1,4 @@
+use futures_util::{pin_mut, TryStreamExt};
 use std::collections::HashSet;
 
 use tokio_postgres::{types::ToSql, Client, Row};
@@ -79,10 +80,11 @@ pub(crate) async fn fetch_page(
     let filter = normalize_filter(request.filter.as_deref())?;
     let qualified_table = qualified_name(&request.schema, &request.table);
     let selected_columns = text_projection(&metadata.columns);
-    let row_version = metadata
-        .supports_row_versions()
-        .then_some(", xmin::text AS __opaline_row_version")
-        .unwrap_or_default();
+    let row_version = if metadata.supports_row_versions() {
+        ", xmin::text AS __opaline_row_version"
+    } else {
+        ""
+    };
     let searchable_columns = searchable_projection(&metadata.columns);
     let order_clause = order_clause(&metadata, request.sort.as_ref())?;
     let sql = format!(
@@ -94,16 +96,36 @@ pub(crate) async fn fetch_page(
     );
     let filter_parameter = filter.as_deref();
     let parameters: [&(dyn ToSql + Sync); 3] = [&filter_parameter, &limit, &offset];
-    let mut rows = client
-        .query(&sql, &parameters)
+    let rows = client
+        .query_raw(&sql, parameters)
         .await
         .map_err(|error| format!("Could not load table data: {error}"))?;
-    let has_more = rows.len() > usize::from(page_size);
-    rows.truncate(usize::from(page_size));
-    let data_rows = rows
-        .iter()
-        .map(|row| map_row(row, &metadata))
-        .collect::<Result<Vec<_>, _>>()?;
+    pin_mut!(rows);
+    let mut data_rows = Vec::new();
+    let mut has_more = false;
+    let mut bytes = 0usize;
+    while let Some(row) = rows
+        .try_next()
+        .await
+        .map_err(|error| format!("Could not load table data: {error}"))?
+    {
+        if data_rows.len() == usize::from(page_size) {
+            has_more = true;
+            break;
+        }
+        for index in 0..metadata.columns.len() {
+            bytes = bytes.saturating_add(
+                row.try_get::<_, Option<&str>>(index)
+                    .map_err(|_| "Could not decode row data.")?
+                    .map_or(0, str::len)
+                    + 24,
+            );
+        }
+        if bytes > 4 * 1024 * 1024 {
+            return Err("This page exceeds the 4 MiB data budget. Reduce the page size, select fewer columns in SQL, or use a streaming export.".into());
+        }
+        data_rows.push(map_row(&row, &metadata)?);
+    }
     let (editable, editability_reason) = metadata.editability();
     let (insertable, insertability_reason) = metadata.insertability();
 
@@ -117,6 +139,84 @@ pub(crate) async fn fetch_page(
         editability_reason,
         insertable,
         insertability_reason,
+    })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TableRowRequest {
+    pub schema: String,
+    pub table: String,
+    pub key: Vec<TableCellValue>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableRowSnapshot {
+    pub columns: Vec<String>,
+    pub row: Option<TableDataRow>,
+}
+
+// Read a fresh row for conflict review without replacing its original version or draft.
+pub(crate) async fn fetch_row(
+    client: &Client,
+    request: &TableRowRequest,
+) -> Result<TableRowSnapshot, String> {
+    validate_relation_name(&request.schema, &request.table)?;
+    if request.key.len() > 1600
+        || request.key.iter().any(|value| {
+            value
+                .value
+                .as_ref()
+                .is_some_and(|value| value.len() > 1024 * 1024)
+        })
+    {
+        return Err("Row identity exceeds the comparison budget.".into());
+    }
+    let metadata = table_metadata(client, &request.schema, &request.table).await?;
+    ensure_editable(&metadata)?;
+    let key = validated_key(&metadata, &request.key)?;
+    let parameters = key
+        .iter()
+        .map(|(_, value)| value.clone())
+        .collect::<Vec<_>>();
+    let predicate = key
+        .iter()
+        .enumerate()
+        .map(|(index, (column, _))| {
+            format!(
+                "{} IS NOT DISTINCT FROM {}",
+                quote_identifier(&column.name),
+                typed_parameter(index + 1, column)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let sql = format!(
+        "SELECT {} FROM {} WHERE {predicate}",
+        returning_clause(&metadata),
+        qualified_name(&request.schema, &request.table)
+    );
+    let row = client
+        .query_opt(&sql, &sql_parameters(&parameters))
+        .await
+        .map_err(|error| format!("Could not compare current values: {error}"))?
+        .map(|row| map_row(&row, &metadata))
+        .transpose()?;
+    if row.as_ref().is_some_and(|row| {
+        row.values.iter().flatten().map(String::len).sum::<usize>() > 4 * 1024 * 1024
+    }) {
+        return Err(
+            "This row exceeds the 4 MiB comparison budget. Inspect selected columns in SQL.".into(),
+        );
+    }
+    Ok(TableRowSnapshot {
+        columns: metadata
+            .columns
+            .into_iter()
+            .map(|column| column.name)
+            .collect(),
+        row,
     })
 }
 
@@ -544,6 +644,8 @@ mod tests {
             username: "postgres".into(),
             password: "opaline_test".into(),
             ssl_mode: SslMode::Disable,
+            ca_path: None,
+            read_only: false,
         };
         let (client, _) = postgres::connect(&config)
             .await

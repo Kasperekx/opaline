@@ -18,8 +18,18 @@ type TableExportMenuProps = {
 };
 
 const formats = [
-  { id: "csv" as const, label: "CSV", description: "Spreadsheet-friendly", Icon: FileSpreadsheet },
-  { id: "json" as const, label: "JSON", description: "Structured records", Icon: FileJson2 },
+  {
+    id: "csv" as const,
+    label: "CSV",
+    description: "Spreadsheet-friendly",
+    Icon: FileSpreadsheet,
+  },
+  {
+    id: "json" as const,
+    label: "JSON",
+    description: "Structured records",
+    Icon: FileJson2,
+  },
 ];
 
 export function TableExportMenu({
@@ -34,7 +44,10 @@ export function TableExportMenu({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const scope = selectedCount > 0 ? `${selectedCount} selected` : `${rowCount} on this page`;
+  const scope =
+    selectedCount > 0
+      ? `${selectedCount} selected`
+      : `${rowCount} on this page`;
 
   useEffect(() => {
     if (!open) return;
@@ -64,6 +77,7 @@ export function TableExportMenu({
       <button
         ref={triggerRef}
         type="button"
+        aria-label={busy ? "Exporting table data" : "Export table data"}
         aria-expanded={open}
         aria-haspopup="menu"
         disabled={disabled || busy}
@@ -80,13 +94,18 @@ export function TableExportMenu({
           role="menu"
           aria-label="Export format"
           onKeyDown={(event) => {
-            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))
+              return;
             event.preventDefault();
             const items = [
-              ...(popoverRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []),
+              ...(popoverRef.current?.querySelectorAll<HTMLButtonElement>(
+                "button",
+              ) ?? []),
             ];
             if (items.length === 0) return;
-            const current = items.indexOf(document.activeElement as HTMLButtonElement);
+            const current = items.indexOf(
+              document.activeElement as HTMLButtonElement,
+            );
             if (event.key === "Home") items[0].focus();
             else if (event.key === "End") items[items.length - 1].focus();
             else {

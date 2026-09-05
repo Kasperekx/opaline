@@ -1,6 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { MouseEvent, ReactNode } from "react";
-import { isDesktopRuntime } from "../lib/database-api";
+import type { ReactNode } from "react";
+import { handleWindowDrag } from "../lib/window-drag";
 
 type TopBarProps = {
   title: string;
@@ -8,26 +7,12 @@ type TopBarProps = {
   action?: ReactNode;
 };
 
-const isInteractiveTarget = (target: EventTarget) =>
-  target instanceof Element &&
-  Boolean(target.closest("button, input, select, a, [data-no-drag]"));
-
 export function TopBar({ title, subtitle, action }: TopBarProps) {
-  const handleMouseDown = (event: MouseEvent<HTMLElement>) => {
-    if (!isDesktopRuntime() || event.button !== 0 || isInteractiveTarget(event.target)) {
-      return;
-    }
-
-    const window = getCurrentWindow();
-    const action = event.detail === 2 ? window.toggleMaximize() : window.startDragging();
-    void action.catch(() => undefined);
-  };
-
   return (
     <header
       className="top-bar"
       data-tauri-drag-region
-      onMouseDown={handleMouseDown}
+      onMouseDown={handleWindowDrag}
     >
       <div className="top-bar-title" data-tauri-drag-region>
         <strong>{title}</strong>

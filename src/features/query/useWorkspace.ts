@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  databaseApi,
   errorMessage,
   isQueryExecutionError,
 } from "../../shared/lib/database-api";
@@ -12,7 +11,8 @@ import type {
 } from "../../shared/types/database";
 import type { QueryHistoryStatus } from "./query-types";
 import { useQueryHistory } from "./useQueryHistory";
-import { useQueryPreferences } from "./useQueryPreferences";
+import type { useQueryPreferences } from "./useQueryPreferences";
+import { useDatabaseSession } from "../connections/SessionContext";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 
 export type QuerySubmission = {
@@ -44,18 +44,30 @@ const historyStatus = (error: QueryExecutionError): QueryHistoryStatus => {
   return "error";
 };
 
-export function useWorkspace(database: string) {
+export function useWorkspace(
+  database: string,
+  queryPreferences: ReturnType<typeof useQueryPreferences>,
+) {
+  const { session, api: databaseApi } = useDatabaseSession();
   const queryInFlight = useRef(false);
   const expandedObject = useRef<string | null>(null);
   const columnRequest = useRef(0);
   const columnCache = useRef(new Map<string, ColumnInfo[]>());
-  const tabs = useWorkspaceTabs();
-  const history = useQueryHistory();
-  const queryPreferences = useQueryPreferences();
+  const tabs = useWorkspaceTabs(session.profileId);
+  const clearResults = tabs.clearResults;
+  useEffect(() => {
+    clearResults();
+  }, [databaseApi, clearResults]);
+  const history = useQueryHistory(
+    session.profileId,
+    queryPreferences.preferences.historyEnabled,
+  );
   const [objects, setObjects] = useState<DatabaseObject[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [selected, setSelected] = useState<DatabaseObject | null>(null);
-  const [expandedObjectKey, setExpandedObjectKey] = useState<string | null>(null);
+  const [expandedObjectKey, setExpandedObjectKey] = useState<string | null>(
+    null,
+  );
   const [filter, setFilter] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [explorerError, setExplorerError] = useState<string | null>(null);
@@ -64,9 +76,18 @@ export function useWorkspace(database: string) {
   const [columnsError, setColumnsError] = useState<string | null>(null);
   const [runningTabId, setRunningTabId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [cancellationError, setCancellationError] = useState<string | null>(
+    null,
+  );
   const [copied, setCopied] = useState(false);
 
   const refreshObjects = useCallback(async () => {
+    columnCache.current.clear();
+    columnRequest.current += 1;
+    expandedObject.current = null;
+    setExpandedObjectKey(null);
+    setColumns([]);
+    setColumnsBusy(false);
     setExplorerBusy(true);
     setExplorerError(null);
     try {
@@ -76,41 +97,53 @@ export function useWorkspace(database: string) {
     } finally {
       setExplorerBusy(false);
     }
-  }, []);
+  }, [databaseApi]);
 
   useEffect(() => {
     void refreshObjects();
   }, [refreshObjects]);
 
-  const expandObject = useCallback(async (object: DatabaseObject) => {
-    const key = databaseObjectKey(object);
-    const request = ++columnRequest.current;
-    expandedObject.current = key;
-    setExpandedObjectKey(key);
-    setColumnsError(null);
+  const expandObject = useCallback(
+    async (object: DatabaseObject) => {
+      const key = databaseObjectKey(object);
+      const request = ++columnRequest.current;
+      expandedObject.current = key;
+      setExpandedObjectKey(key);
+      setColumnsError(null);
 
-    if (columnCache.current.has(key)) {
-      setColumns(columnCache.current.get(key) ?? []);
-      setColumnsBusy(false);
-      return;
-    }
+      if (columnCache.current.has(key)) {
+        setColumns(columnCache.current.get(key) ?? []);
+        setColumnsBusy(false);
+        return;
+      }
 
-    setColumns([]);
-    setColumnsBusy(true);
-    try {
-      const nextColumns = await databaseApi.listColumns(object.schema, object.name);
-      columnCache.current.set(key, nextColumns);
-      if (request === columnRequest.current && expandedObject.current === key) {
-        setColumns(nextColumns);
+      setColumns([]);
+      setColumnsBusy(true);
+      try {
+        const nextColumns = await databaseApi.listColumns(
+          object.schema,
+          object.name,
+        );
+        columnCache.current.set(key, nextColumns);
+        if (
+          request === columnRequest.current &&
+          expandedObject.current === key
+        ) {
+          setColumns(nextColumns);
+        }
+      } catch (error) {
+        if (
+          request === columnRequest.current &&
+          expandedObject.current === key
+        ) {
+          setColumnsError(errorMessage(error));
+        }
+      } finally {
+        if (request === columnRequest.current) setColumnsBusy(false);
       }
-    } catch (error) {
-      if (request === columnRequest.current && expandedObject.current === key) {
-        setColumnsError(errorMessage(error));
-      }
-    } finally {
-      if (request === columnRequest.current) setColumnsBusy(false);
-    }
-  }, []);
+    },
+    [databaseApi],
+  );
 
   const selectObject = useCallback(
     (object: DatabaseObject) => {
@@ -152,6 +185,7 @@ export function useWorkspace(database: string) {
       };
       queryInFlight.current = true;
       setRunningTabId(tab.id);
+      setCancellationError(null);
       setActiveResultIndex(0);
       const started = performance.now();
 
@@ -173,7 +207,10 @@ export function useWorkspace(database: string) {
           database,
           executedAt: new Date().toISOString(),
           durationMs: result.durationMs,
-          rowCount: result.resultSets.reduce((total, set) => total + set.rows.length, 0),
+          rowCount: result.resultSets.reduce(
+            (total, set) => total + set.rows.length,
+            0,
+          ),
           status: "success",
         });
       } catch (caughtError) {
@@ -209,18 +246,23 @@ export function useWorkspace(database: string) {
         setCancelling(false);
       }
     },
-    [database, history, queryPreferences.preferences, tabs],
+    [databaseApi, database, history, queryPreferences.preferences, tabs],
   );
 
   const cancelQuery = useCallback(async () => {
     if (!queryInFlight.current || cancelling) return;
     setCancelling(true);
     try {
-      await databaseApi.cancelQuery();
-    } catch {
+      const requested = await databaseApi.cancelQuery();
+      if (!requested)
+        setCancellationError(
+          "No cancellable operation was found. Wait for the final outcome before retrying.",
+        );
+    } catch (error) {
+      setCancellationError(errorMessage(error));
       setCancelling(false);
     }
-  }, [cancelling]);
+  }, [databaseApi, cancelling]);
 
   const copyQuery = useCallback(async () => {
     if (tabs.activeTab.kind !== "query") return;
@@ -253,6 +295,7 @@ export function useWorkspace(database: string) {
     toggleObject,
     runQuery,
     cancelQuery,
+    cancellationError,
     copyQuery,
   };
 }

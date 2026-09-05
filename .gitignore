@@ -12,6 +12,22 @@ dist
 dist-ssr
 *.local
 
+# Local credentials, database contents and signing material are never source code.
+.env
+.env.*
+!.env.example
+*.dump
+*.backup
+*.p12
+*.pfx
+*.key
+connections.json
+
+# Generated, platform-specific desktop backup clients (sources pinned in scripts/).
+/work/
+/src-tauri/resources/postgres/*
+!/src-tauri/resources/postgres/README.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -19,11 +19,7 @@ import { useRelationStructure } from "./useRelationStructure";
 import "./structure.css";
 
 type StructureSection =
-  | "columns"
-  | "indexes"
-  | "foreign-keys"
-  | "constraints"
-  | "ddl";
+  "columns" | "indexes" | "foreign-keys" | "constraints" | "ddl";
 
 type StructureInspectorProps = {
   tab: TableTab;

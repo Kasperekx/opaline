@@ -4,6 +4,7 @@ import type {
 } from "../../shared/types/database";
 
 export type QueryTab = {
+  file?: { id: string; path: string; savedSql: string };
   kind: "query";
   id: string;
   title: string;
@@ -24,11 +25,7 @@ export type TableTab = {
 
 export type WorkspaceTab = QueryTab | TableTab;
 
-export type QueryHistoryStatus =
-  | "success"
-  | "error"
-  | "cancelled"
-  | "timeout";
+export type QueryHistoryStatus = "success" | "error" | "cancelled" | "timeout";
 
 export type QueryHistoryEntry = {
   id: string;
@@ -45,6 +42,7 @@ export type FontSizePreference = "comfortable" | "large";
 export type DensityPreference = "comfortable" | "compact";
 
 export type QueryPreferences = {
+  historyEnabled: boolean;
   fontSize: FontSizePreference;
   density: DensityPreference;
   maxRows: number;

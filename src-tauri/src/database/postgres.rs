@@ -1,7 +1,8 @@
-use std::{future::Future, time::Duration};
+use super::client::DatabaseClient;
+use std::time::Duration;
 
 use futures_util::{pin_mut, TryStreamExt};
-use rustls_tokio_postgres::{config_platform_verifier, MakeRustlsConnect};
+use rustls_tokio_postgres::{config_from_ca_cert, config_platform_verifier, MakeRustlsConnect};
 use tokio_postgres::{
     config::SslMode as PostgresSslMode, error::ErrorPosition, CancelToken, Client,
     Config as PostgresConfig, Error, NoTls, SimpleQueryMessage,
@@ -16,9 +17,33 @@ const CONNECTION_TIMEOUT: Duration = Duration::from_secs(12);
 const MAX_QUERY_BYTES: usize = 1_000_000;
 const DEFAULT_ROW_LIMIT: usize = 500;
 const MAX_ROW_LIMIT: usize = 10_000;
+const MAX_RESULT_BYTES: usize = 8 * 1024 * 1024;
+const MAX_RESULT_SETS: usize = 32;
 
-pub(crate) async fn connect(input: &ConnectionConfig) -> Result<(Client, ConnectionInfo), String> {
-    let client = open_client(input).await?;
+pub(crate) async fn connect(
+    input: &ConnectionConfig,
+) -> Result<(DatabaseClient, ConnectionInfo), String> {
+    let tls = tls_config(input).await?;
+    connect_with_tls(input, tls).await
+}
+
+pub(crate) async fn connect_with_tls(
+    input: &ConnectionConfig,
+    tls: Option<rustls::ClientConfig>,
+) -> Result<(DatabaseClient, ConnectionInfo), String> {
+    tokio::time::timeout(CONNECTION_TIMEOUT, establish_connection(input, tls))
+        .await
+        .map_err(|_| {
+            "Connection timed out after 12 seconds. Check the server, port and TLS settings."
+                .to_string()
+        })?
+}
+
+async fn establish_connection(
+    input: &ConnectionConfig,
+    tls: Option<rustls::ClientConfig>,
+) -> Result<(DatabaseClient, ConnectionInfo), String> {
+    let client = open_client(input, tls).await?;
     let row = client
         .query_one(
             "SELECT current_database()::text, current_user::text, version()::text",
@@ -157,10 +182,21 @@ pub(crate) async fn execute_query(
     pin_mut!(messages);
     let mut result_sets = Vec::new();
     let mut current: Option<QueryResultSet> = None;
+    let mut retained_bytes = 0usize;
 
     while let Some(message) = messages.try_next().await.map_err(query_error)? {
         match message {
             SimpleQueryMessage::RowDescription(columns) => {
+                if columns.len() > 512 {
+                    return Err(QueryExecutionError::simple(
+                        QueryErrorKind::Validation,
+                        "Result exceeds 512 columns. Select fewer columns.",
+                    ));
+                }
+                retained_bytes += columns
+                    .iter()
+                    .map(|column| column.name().len() + 24)
+                    .sum::<usize>();
                 current = Some(empty_result_set(
                     columns
                         .iter()
@@ -177,7 +213,13 @@ pub(crate) async fn execute_query(
                             .collect(),
                     )
                 });
-                if set.rows.len() < row_limit {
+                let row_bytes = (0..row.len())
+                    .map(|index| row.get(index).map_or(0, str::len) + 24)
+                    .sum::<usize>();
+                if set.rows.len() < row_limit
+                    && retained_bytes.saturating_add(row_bytes) <= MAX_RESULT_BYTES
+                {
+                    retained_bytes += row_bytes;
                     set.rows.push(
                         (0..row.len())
                             .map(|index| row.get(index).map(ToString::to_string))
@@ -193,6 +235,12 @@ pub(crate) async fn execute_query(
                     .unwrap_or_else(|| empty_result_set(Vec::new()));
                 set.affected_rows = affected_rows;
                 result_sets.push(set);
+                if result_sets.len() > MAX_RESULT_SETS {
+                    return Err(QueryExecutionError::simple(
+                        QueryErrorKind::Validation,
+                        "A run can return at most 32 result sets. Run a smaller selection.",
+                    ));
+                }
             }
             _ => {}
         }
@@ -208,19 +256,32 @@ pub(crate) async fn execute_query(
     })
 }
 
+#[cfg(test)]
 pub(crate) async fn cancel_query(
     cancel_token: &CancelToken,
     ssl_mode: SslMode,
 ) -> Result<(), String> {
-    if matches!(ssl_mode, SslMode::Disable) {
+    let tls = if matches!(ssl_mode, SslMode::Disable) {
+        None
+    } else {
+        Some(
+            config_platform_verifier()
+                .map_err(|error| format!("Could not load system TLS certificates: {error}"))?,
+        )
+    };
+    cancel_with_tls(cancel_token, tls).await
+}
+
+pub(crate) async fn cancel_with_tls(
+    cancel_token: &CancelToken,
+    tls: Option<rustls::ClientConfig>,
+) -> Result<(), String> {
+    let Some(tls_config) = tls else {
         return cancel_token
             .cancel_query(NoTls)
             .await
             .map_err(|error| database_error("Could not cancel query", error));
-    }
-
-    let tls_config = config_platform_verifier()
-        .map_err(|error| format!("Could not load system TLS certificates: {error}"))?;
+    };
     cancel_token
         .cancel_query(MakeRustlsConnect::new(tls_config))
         .await
@@ -261,6 +322,9 @@ fn build_config(input: &ConnectionConfig) -> Result<PostgresConfig, String> {
     }
 
     let mut config = PostgresConfig::new();
+    if input.read_only {
+        config.options("-c default_transaction_read_only=on");
+    }
     config
         .host(input.host.trim())
         .port(input.port)
@@ -278,38 +342,54 @@ fn build_config(input: &ConnectionConfig) -> Result<PostgresConfig, String> {
     Ok(config)
 }
 
-async fn open_client(input: &ConnectionConfig) -> Result<Client, String> {
+pub(crate) async fn tls_config(
+    input: &ConnectionConfig,
+) -> Result<Option<rustls::ClientConfig>, String> {
+    if let Some(path) = &input.ca_path {
+        if input.ssl_mode != SslMode::Require {
+            return Err("Custom CA requires TLS: Require.".into());
+        }
+        let path = std::path::PathBuf::from(path);
+        return tokio::task::spawn_blocking(move || {
+            let metadata =
+                std::fs::metadata(&path).map_err(|_| "Cannot read the custom CA certificate.")?;
+            if !path.is_absolute() || !metadata.is_file() || metadata.len() > 4 * 1024 * 1024 {
+                return Err("Choose a PEM certificate file smaller than 4 MB.".into());
+            }
+            config_from_ca_cert(path).map(Some).map_err(|_| {
+                "Invalid CA certificate. Choose a valid PEM certificate bundle.".into()
+            })
+        })
+        .await
+        .map_err(|_| "Could not load the custom CA certificate.".to_string())?;
+    }
+    if input.ssl_mode == SslMode::Disable {
+        return Ok(None);
+    }
+    config_platform_verifier()
+        .map(Some)
+        .map_err(|_| "Could not load system TLS certificates.".into())
+}
+
+async fn open_client(
+    input: &ConnectionConfig,
+    tls_config: Option<rustls::ClientConfig>,
+) -> Result<DatabaseClient, String> {
     let config = build_config(input)?;
 
-    if matches!(input.ssl_mode, SslMode::Disable) {
+    let Some(tls_config) = tls_config else {
         let (client, connection) = config
             .connect(NoTls)
             .await
             .map_err(|error| database_error("Could not connect", error))?;
-        drive_connection(connection);
-        return Ok(client);
-    }
-
-    let tls_config = config_platform_verifier()
-        .map_err(|error| format!("Could not load system TLS certificates: {error}"))?;
+        return Ok(DatabaseClient::new(client, connection));
+    };
     let tls = MakeRustlsConnect::new(tls_config);
     let (client, connection) = config
         .connect(tls)
         .await
         .map_err(|error| database_error("Could not connect securely", error))?;
-    drive_connection(connection);
-    Ok(client)
-}
-
-fn drive_connection<F>(connection: F)
-where
-    F: Future<Output = Result<(), Error>> + Send + 'static,
-{
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = connection.await {
-            eprintln!("PostgreSQL connection ended: {error}");
-        }
-    });
+    Ok(DatabaseClient::new(client, connection))
 }
 
 fn database_error(context: &str, error: Error) -> String {
@@ -355,6 +435,8 @@ mod tests {
             username: "postgres".into(),
             password: String::new(),
             ssl_mode: SslMode::Prefer,
+            ca_path: None,
+            read_only: false,
         }
     }
 
@@ -394,7 +476,7 @@ mod tests {
         config.password = "opaline_test".into();
         config.ssl_mode = SslMode::Disable;
 
-        let client = open_client(&config)
+        let client = open_client(&config, tls_config(&config).await.unwrap())
             .await
             .expect("Opaline should connect to the test database");
         let result = execute_query(&client, "SELECT 'opaline' AS client, 42 AS answer", None)

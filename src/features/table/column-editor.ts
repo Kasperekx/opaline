@@ -20,7 +20,11 @@ export function columnEditorKind(column: ColumnInfo): ColumnEditorKind {
   const type = column.dataType.toLowerCase();
   if (type === "boolean") return "boolean";
   if (integerTypes.has(type)) return "integer";
-  if (numberTypes.some((candidate) => type === candidate || type.startsWith(`${candidate}(`))) {
+  if (
+    numberTypes.some(
+      (candidate) => type === candidate || type.startsWith(`${candidate}(`),
+    )
+  ) {
     return "number";
   }
   if (type === "date") return "date";
@@ -44,11 +48,15 @@ export function initialColumnValue(column: ColumnInfo): string | null {
 }
 
 export function inputValue(column: ColumnInfo, value: string): string {
-  return columnEditorKind(column) === "datetime" ? value.replace(" ", "T") : value;
+  return columnEditorKind(column) === "datetime"
+    ? value.replace(" ", "T")
+    : value;
 }
 
 export function databaseValue(column: ColumnInfo, value: string): string {
-  return columnEditorKind(column) === "datetime" ? value.replace("T", " ") : value;
+  return columnEditorKind(column) === "datetime"
+    ? value.replace("T", " ")
+    : value;
 }
 
 export function validateColumnValue(
@@ -56,13 +64,18 @@ export function validateColumnValue(
   value: string | null | undefined,
 ): string | null {
   if (value === undefined) return null;
-  if (value === null) return column.nullable ? null : `${column.name} cannot be NULL.`;
+  if (value === null)
+    return column.nullable ? null : `${column.name} cannot be NULL.`;
 
   switch (columnEditorKind(column)) {
     case "boolean":
-      return value === "true" || value === "false" ? null : "Choose true or false.";
+      return value === "true" || value === "false"
+        ? null
+        : "Choose true or false.";
     case "enum":
-      return column.enumValues.includes(value) ? null : "Choose one of the allowed values.";
+      return column.enumValues.includes(value)
+        ? null
+        : "Choose one of the allowed values.";
     case "integer":
       return /^[+-]?\d+$/.test(value) ? null : "Enter a whole number.";
     case "number":
@@ -72,7 +85,9 @@ export function validateColumnValue(
     case "date":
       return /^\d{4}-\d{2}-\d{2}$/.test(value) ? null : "Enter a valid date.";
     case "datetime":
-      return /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)
+      return /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(
+        value,
+      )
         ? null
         : "Enter a valid date and time.";
     case "time":

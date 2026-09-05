@@ -79,7 +79,12 @@ export function TableMutationDialog({
           </div>
         )}
         <div className="table-mutation-actions">
-          <button type="button" autoFocus={!children} onClick={onCancel} disabled={busy}>
+          <button
+            type="button"
+            autoFocus={!children}
+            onClick={onCancel}
+            disabled={busy}
+          >
             Cancel
           </button>
           <button

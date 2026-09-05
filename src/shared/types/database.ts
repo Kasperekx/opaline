@@ -1,16 +1,11 @@
 export type SslMode = "prefer" | "require" | "disable";
 
-export type ConnectionConfig = {
+export type ConnectionInfo = {
   name: string;
   host: string;
   port: number;
   database: string;
   username: string;
-  password: string;
-  sslMode: SslMode;
-};
-
-export type ConnectionInfo = Omit<ConnectionConfig, "password" | "sslMode"> & {
   serverVersion: string;
 };
 
@@ -86,7 +81,10 @@ export type InsertTableRowRequest = {
 
 export type DeleteTableRowRequest = Omit<UpdateTableRowRequest, "changes">;
 
-export type TableRowIdentity = Pick<DeleteTableRowRequest, "key" | "rowVersion">;
+export type TableRowIdentity = Pick<
+  DeleteTableRowRequest,
+  "key" | "rowVersion"
+>;
 
 export type DeleteTableRowsRequest = {
   schema: string;
@@ -100,6 +98,29 @@ export type UpdateTableRowsRequest = DeleteTableRowsRequest & {
 
 export type TableMutationResult = {
   affectedRows: number;
+};
+
+export type TableChange =
+  | { kind: "insert"; id: string; values: TableCellValue[] }
+  | ({
+      kind: "update";
+      id: string;
+      changes: TableCellValue[];
+    } & TableRowIdentity)
+  | ({ kind: "delete"; id: string } & TableRowIdentity);
+export type TableChangesRequest = {
+  schema: string;
+  table: string;
+  changes: TableChange[];
+};
+export type TableChangesResult = {
+  rows: { id: string; row: TableDataRow | null }[];
+};
+export type TableRowSnapshot = { columns: string[]; row: TableDataRow | null };
+export type TableChangesError = {
+  kind: "rejected" | "unknown";
+  message: string;
+  rowId: string | null;
 };
 
 export type TableExportFormat = "csv" | "json";
@@ -132,11 +153,7 @@ export type QueryResult = {
 };
 
 export type QueryErrorKind =
-  | "busy"
-  | "cancelled"
-  | "database"
-  | "timeout"
-  | "validation";
+  "busy" | "cancelled" | "database" | "timeout" | "validation";
 
 export type QueryExecutionError = {
   kind: QueryErrorKind;

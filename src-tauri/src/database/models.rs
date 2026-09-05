@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum SslMode {
     Disable,
@@ -8,7 +8,7 @@ pub(crate) enum SslMode {
     Require,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ConnectionConfig {
     pub(crate) name: String,
@@ -18,6 +18,10 @@ pub(crate) struct ConnectionConfig {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) ssl_mode: SslMode,
+    #[serde(default)]
+    pub(crate) ca_path: Option<String>,
+    #[serde(default)]
+    pub(crate) read_only: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]

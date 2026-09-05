@@ -8,6 +8,7 @@
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
     "dialog:allow-save",
+    "dialog:allow-open",
     "fs:allow-write-text-file"
   ]
 }

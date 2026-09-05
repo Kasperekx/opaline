@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { databaseObjectKey } from "../../shared/lib/database-object";
+import { primaryModifierLabel } from "../../shared/lib/platform";
 import type {
   ColumnInfo,
   ConnectionInfo,
@@ -20,6 +21,10 @@ import type {
 } from "../../shared/types/database";
 
 type ExplorerProps = {
+  id: string;
+  active: boolean;
+  onSwitchConnection: () => void;
+  onReveal: () => void;
   connection: ConnectionInfo;
   objects: DatabaseObject[];
   selected: DatabaseObject | null;
@@ -37,6 +42,10 @@ type ExplorerProps = {
 };
 
 export function Explorer({
+  id,
+  active,
+  onSwitchConnection,
+  onReveal,
   connection,
   objects,
   selected,
@@ -58,15 +67,23 @@ export function Explorer({
   );
 
   useEffect(() => {
+    if (!active) return;
     const focusSearch = (event: KeyboardEvent) => {
+      if (document.querySelector("dialog[open]")) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("input, textarea, select")
+      )
+        return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        searchRef.current?.focus();
+        onReveal();
+        requestAnimationFrame(() => searchRef.current?.focus());
       }
     };
     window.addEventListener("keydown", focusSearch);
     return () => window.removeEventListener("keydown", focusSearch);
-  }, []);
+  }, [active, onReveal]);
 
   const schemas = useMemo(() => {
     const groups = new Map<string, DatabaseObject[]>();
@@ -74,7 +91,8 @@ export function Explorer({
 
     for (const object of objects) {
       const qualifiedName = `${object.schema}.${object.name}`.toLowerCase();
-      if (normalizedFilter && !qualifiedName.includes(normalizedFilter)) continue;
+      if (normalizedFilter && !qualifiedName.includes(normalizedFilter))
+        continue;
       const group = groups.get(object.schema);
       if (group) group.push(object);
       else groups.set(object.schema, [object]);
@@ -93,8 +111,13 @@ export function Explorer({
   };
 
   return (
-    <aside id="database-explorer" className="explorer" aria-label="Database explorer">
-      <div className="explorer-connection">
+    <aside id={id} className="explorer" aria-label="Database explorer">
+      <button
+        className="explorer-connection"
+        aria-label={`Switch connection: ${connection.name || connection.database}`}
+        aria-haspopup="dialog"
+        onClick={onSwitchConnection}
+      >
         <div className="tiny-db">
           <Database size={15} />
         </div>
@@ -103,7 +126,7 @@ export function Explorer({
           <span>{connection.database}</span>
         </div>
         <ChevronDown size={15} />
-      </div>
+      </button>
       <div className="search-box">
         <Search size={14} />
         <input
@@ -113,11 +136,15 @@ export function Explorer({
           placeholder="Filter objects"
           aria-label="Filter database objects"
         />
-        <kbd>⌘K</kbd>
+        <kbd>{primaryModifierLabel} K</kbd>
       </div>
       <div className="explorer-label">
         <span>Database objects</span>
-        <button onClick={onRefresh} aria-label="Refresh database objects" disabled={loading}>
+        <button
+          onClick={onRefresh}
+          aria-label="Refresh database objects"
+          disabled={loading}
+        >
           <RefreshCw className={loading ? "spin" : ""} size={13} />
         </button>
       </div>
@@ -185,12 +212,17 @@ export function Explorer({
                           <div className="column-list">
                             {columnsLoading ? (
                               <div className="column-state">
-                                <Loader2 className="spin" size={12} /> Loading columns…
+                                <Loader2 className="spin" size={12} /> Loading
+                                columns…
                               </div>
                             ) : columnsError ? (
-                              <div className="column-state error">{columnsError}</div>
+                              <div className="column-state error">
+                                {columnsError}
+                              </div>
                             ) : columns.length === 0 ? (
-                              <div className="column-state">No visible columns.</div>
+                              <div className="column-state">
+                                No visible columns.
+                              </div>
                             ) : (
                               columns.map((column) => (
                                 <div

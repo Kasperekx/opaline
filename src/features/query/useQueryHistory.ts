@@ -2,7 +2,8 @@ import { useCallback, useState } from "react";
 import { readLocalJson, writeLocalJson } from "../../shared/lib/local-storage";
 import type { QueryHistoryEntry } from "./query-types";
 
-const STORAGE_KEY = "opaline.query-history.v1";
+const storageKey = (profileId: string) =>
+  "opaline.query-history.v2." + profileId;
 const MAX_HISTORY_ENTRIES = 100;
 const statuses = new Set(["success", "error", "cancelled", "timeout"]);
 
@@ -23,27 +24,34 @@ const isHistoryEntry = (value: unknown): value is QueryHistoryEntry => {
   );
 };
 
-const loadHistory = () => {
-  const stored = readLocalJson<unknown>(STORAGE_KEY, []);
+const loadHistory = (key: string) => {
+  const stored = readLocalJson<unknown>(key, []);
   if (!Array.isArray(stored)) return [];
   return stored.filter(isHistoryEntry).slice(0, MAX_HISTORY_ENTRIES);
 };
 
-export function useQueryHistory() {
-  const [entries, setEntries] = useState<QueryHistoryEntry[]>(loadHistory);
+export function useQueryHistory(profileId: string, enabled = true) {
+  const key = storageKey(profileId);
+  const [entries, setEntries] = useState<QueryHistoryEntry[]>(() =>
+    loadHistory(key),
+  );
 
-  const addEntry = useCallback((entry: QueryHistoryEntry) => {
-    setEntries((current) => {
-      const next = [entry, ...current].slice(0, MAX_HISTORY_ENTRIES);
-      writeLocalJson(STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
+  const addEntry = useCallback(
+    (entry: QueryHistoryEntry) => {
+      if (!enabled) return;
+      setEntries((current) => {
+        const next = [entry, ...current].slice(0, MAX_HISTORY_ENTRIES);
+        writeLocalJson(key, next);
+        return next;
+      });
+    },
+    [key, enabled],
+  );
 
   const clearHistory = useCallback(() => {
     setEntries([]);
-    writeLocalJson(STORAGE_KEY, []);
-  }, []);
+    writeLocalJson(key, []);
+  }, [key]);
 
   return { entries, addEntry, clearHistory };
 }
