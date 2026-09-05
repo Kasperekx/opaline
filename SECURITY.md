@@ -20,10 +20,14 @@ History. Recovery backups remain local. Table drafts and results are memory-only
 table drafts do not survive a crash. Saved-query libraries and table filters are
 also local and unencrypted. Do not share the app data directory or backups.
 
-Each SQL Run is an application-owned transaction, committed only on success and
-rolled back on error. Cross-run transaction controls and commands requiring
-autocommit are unsupported. A lost commit response is an unknown outcome: inspect
-the database before retrying. Opaline never automatically replays writes.
+SQL Run defaults to an application-owned Atomic transaction: commit on success,
+rollback on error. Autocommit requires explicit confirmation for one query tab,
+executes a single statement and saves immediately, with no application rollback.
+It is disabled in read-only sessions and reset on reconnect/restart/new/reopened
+tabs. Manual transaction controls are unsupported in either mode. Dropped query
+futures invalidate their session. An autocommit error invalidates the session and
+requires inspecting the outcome; a lost COMMIT response is unknown as well.
+Opaline never automatically replays writes.
 
 Exports are sensitive local files. CSV retains original text, including potential
 spreadsheet formulas. Use JSON for untrusted data and review files before sharing.
@@ -57,6 +61,12 @@ or forced termination. Dumps, snapshots, SQL and exports can contain sensitive d
 No raw PostgreSQL tool output is recorded in task logs. Restore invalidates local
 sessions to the same configured host/port/database so stale results require reconnect.
 Host aliases and connections in other applications are not automatically discovered.
+Creating a new restore target requires a new quoted database name, CREATEDB access,
+typed name confirmation and separate creation consent. It does not reuse an existing
+database. Creation is outside the restore transaction; failure leaves the target
+for inspection, never automatic DROP. New-target restore leaves the original
+database/profile unchanged. Cancellation/transport loss during creation invalidates
+the source transport and reports that creation may have completed.
 
 Profile transfers use a strict allowlist: no passwords, credential IDs or local CA
 paths. Imported profiles have new identities; a missing required CA blocks use.
@@ -67,10 +77,22 @@ connection names, hostnames, usernames, passwords or result data.
 
 ## Reporting
 
-A public repository and private vulnerability-reporting channel have not yet been
-configured. Contact the project owner privately. Do not post real credentials,
+The public repository is [Kasperekx/opaline](https://github.com/Kasperekx/opaline).
+A private vulnerability-reporting channel is not yet confirmed; the owner must
+configure it before release. Contact the project owner privately through an
+already established channel. Do not post real credentials,
 customer data, exploit targets or raw application data in a public issue.
 Configuring a private reporting channel is a release blocker.
+
+Help opens only two explicitly allowlisted GitHub pages in the default browser;
+no diagnostic data is added to the URL, no report is submitted automatically, and
+the webview has no generic file/URL opener permission. See the
+[Tauri scoped opener documentation](https://v2.tauri.app/plugin/opener/).
+
+First-beta security gates evaluate both macOS target graphs. The Linux-only
+`glib` finding remains unresolved, not ignored or patched; see
+[macOS security scope](docs/macos-security-scope.md). Unmaintained dependencies
+and bundled binary advisories still require release-time review.
 
 See [P0 verification](docs/p0-verification.md) for known findings and unverified
 platforms. The absence of scanner findings is not a security certification.

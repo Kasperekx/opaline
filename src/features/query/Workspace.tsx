@@ -14,6 +14,7 @@ import {
   Wand2,
   Command,
   HardDriveDownload,
+  RotateCcw,
 } from "lucide-react";
 import {
   useCallback,
@@ -50,6 +51,7 @@ import { CommandPalette } from "./CommandPalette";
 import { useWorkspaceCommands } from "./useWorkspaceCommands";
 import "./p1.css";
 import { BackupDialog } from "../backup/BackupDialog";
+import { QueryExecutionControl } from "./QueryExecutionControl";
 
 type WorkspaceProps = {
   connection: SessionInfo;
@@ -283,10 +285,12 @@ export function Workspace({
             <>
               {workspace.tabs.canRestore && (
                 <button
-                  className="toolbar-button"
+                  className="icon-button subtle"
+                  aria-label="Reopen closed query"
+                  title="Reopen closed query"
                   onClick={workspace.tabs.restoreClosedTab}
                 >
-                  Reopen closed query
+                  <RotateCcw size={16} />
                 </button>
               )}
               <button
@@ -382,6 +386,21 @@ export function Workspace({
                     )}
                   </div>
                   <div className="editor-actions">
+                    <QueryExecutionControl
+                      key={`${connection.id}:${activeTab.id}`}
+                      mode={activeTab.executionMode ?? "atomic"}
+                      target={`${workspaceName ?? "Workspace"} / ${connection.name} · ${connection.environment} · ${connection.host}:${connection.port} / ${connection.database}`}
+                      readOnly={connection.readOnly}
+                      busy={
+                        workspace.runningTabId !== null || status !== "active"
+                      }
+                      onChange={(executionMode) =>
+                        workspace.tabs.updateQueryTab(activeTab.id, (tab) => ({
+                          ...tab,
+                          executionMode,
+                        }))
+                      }
+                    />
                     <button
                       className="toolbar-button"
                       disabled={documents.busy}
@@ -581,8 +600,24 @@ export function Workspace({
               : "Table browse mode"}
           </span>
           <span>UTF-8</span>
-          <span title="Each Run commits on success or rolls back on error. Manual transaction controls are not supported.">
-            Atomic run
+          <span
+            className={
+              activeTab.kind === "query" &&
+              activeTab.executionMode === "autocommit"
+                ? "autocommit-status"
+                : ""
+            }
+            title={
+              activeTab.kind === "query" &&
+              activeTab.executionMode === "autocommit"
+                ? "One statement per Run. Saves immediately; no application rollback."
+                : "Each Run commits on success or rolls back on error. Manual transaction controls are not supported."
+            }
+          >
+            {activeTab.kind === "query" &&
+            activeTab.executionMode === "autocommit"
+              ? "Autocommit · saves immediately"
+              : "Atomic run"}
           </span>
         </footer>
       </main>

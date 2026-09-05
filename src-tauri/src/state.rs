@@ -24,6 +24,10 @@ pub(crate) struct DatabaseSession {
     password: Option<zeroize::Zeroizing<String>>,
 }
 impl DatabaseSession {
+    pub fn invalidate(&self) {
+        self.closed.store(true, Ordering::Release);
+        self.client.abort();
+    }
     pub fn password(&self) -> Option<&str> {
         self.password.as_ref().map(|password| password.as_str())
     }
@@ -62,8 +66,7 @@ impl Drop for OperationLease {
 }
 impl OperationLease {
     pub fn invalidate(&self) {
-        self.session.closed.store(true, Ordering::Release);
-        self.session.client.abort();
+        self.session.invalidate();
     }
     pub async fn bounded<T>(
         &self,

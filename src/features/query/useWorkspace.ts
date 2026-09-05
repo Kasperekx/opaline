@@ -193,6 +193,7 @@ export function useWorkspace(
         const result = await databaseApi.runQuery(querySubmission.sql, {
           maxRows: queryPreferences.preferences.maxRows,
           timeoutMs: queryPreferences.preferences.timeoutMs,
+          executionMode: tab.executionMode ?? "atomic",
         });
         tabs.setExecution(
           tab.id,

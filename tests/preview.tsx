@@ -66,6 +66,22 @@ if (scenario === "many") {
 mockWindows("main");
 mockIPC(async (command, args) => {
   const payload = args as Record<string, unknown>;
+  if (command === "plugin:dialog|open")
+    return "/synthetic-fixture/archive.dump";
+  if (command === "prepare_restore")
+    return {
+      id: "synthetic-snapshot",
+      format: "custom",
+      bytes: 1024,
+      digest: "a".repeat(64),
+      preview: "TABLE public users\nSEQUENCE public users_id_seq",
+      serverMajor: 17,
+    };
+  if (command === "release_restore") return;
+  if (command === "restore_database" || command === "dump_database")
+    throw new Error(
+      "Visual fixture only: no database operation was performed.",
+    );
   if (scenario?.startsWith("inline")) {
     if (command === "load_table_page") return structuredClone(inlinePage);
     if (command === "list_columns") return inlinePage.columns;

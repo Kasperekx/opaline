@@ -42,6 +42,8 @@ fn info() -> SessionInfo {
 }
 fn restore_input() -> RestoreInput {
     RestoreInput {
+        new_database: None,
+        confirm_create: false,
         prepared_id: "test".into(),
         password: None,
         trusted_file: true,
@@ -73,6 +75,29 @@ fn restore_requires_explicit_target_and_independent_consents() {
     input.confirm_database = "other".into();
     assert!(operations::validate_restore(&info, &input).is_err());
     input.confirm_database = "target".into();
+    info.read_only = true;
+    assert!(operations::validate_restore(&info, &input).is_err());
+}
+
+#[test]
+fn new_database_requires_its_own_name_and_creation_consent() {
+    let mut info = info();
+    let mut input = restore_input();
+    input.new_database = Some("new target".into());
+    assert!(operations::validate_restore(&info, &input).is_err());
+    input.confirm_create = true;
+    assert!(operations::validate_restore(&info, &input).is_err());
+    input.confirm_database = "new target".into();
+    assert!(operations::validate_restore(&info, &input).is_ok());
+    input.allow_nonempty = true;
+    assert!(operations::validate_restore(&info, &input).is_err());
+    input.allow_nonempty = false;
+    input.clean = true;
+    assert!(operations::validate_restore(&info, &input).is_err());
+    input.clean = false;
+    input.confirm_production = false;
+    assert!(operations::validate_restore(&info, &input).is_err());
+    input.confirm_production = true;
     info.read_only = true;
     assert!(operations::validate_restore(&info, &input).is_err());
 }
@@ -296,6 +321,74 @@ async fn dump_restore_round_trip_and_failures_on_disposable_databases() {
         .unwrap();
         assert!(result.bytes > 0);
         drop(guard);
+        // Restore into a freshly created database, keeping the source connection
+        // and its existing data intact. Exercise libpq and SQL identifier quoting.
+        let new_db = format!("new \"ż {}", uuid::Uuid::new_v4().simple());
+        let (source, guard) = state.maintenance(&source_id, true).await.unwrap();
+        for attempt in 0..2 {
+            let mut input = restore_input();
+            input.new_database = Some(new_db.clone());
+            input.confirm_database = new_db.clone();
+            input.confirm_create = true;
+            let prepared = PreparedRestore {
+                session_id: source_id.clone(),
+                tools: tools.clone(),
+                file: files::snapshot(&path).unwrap(),
+            };
+            let (_sender, cancel) = watch::channel(false);
+            let result = operations::restore(
+                &source,
+                prepared,
+                config(&source_db, port),
+                input,
+                cancel,
+                |_| {},
+            )
+            .await;
+            if attempt == 0 {
+                assert!(result
+                    .unwrap()
+                    .message
+                    .contains("created and restore completed"));
+            } else {
+                assert!(result.unwrap_err().contains("already exist"));
+            }
+            let (created, _) = postgres::connect(&config(&new_db, port)).await.unwrap();
+            assert_eq!(
+                created
+                    .query_one("SELECT count(*) FROM records", &[])
+                    .await
+                    .unwrap()
+                    .get::<_, i64>(0),
+                3
+            );
+            assert_eq!(
+                created
+                    .query_one("SELECT last_value FROM records_id_seq", &[])
+                    .await
+                    .unwrap()
+                    .get::<_, i64>(0),
+                3
+            );
+            assert_eq!(
+                source
+                    .client
+                    .query_one("SELECT count(*) FROM records", &[])
+                    .await
+                    .unwrap()
+                    .get::<_, i64>(0),
+                3
+            );
+            created.abort();
+        }
+        drop(guard);
+        admin
+            .batch_execute(&format!(
+                "DROP DATABASE {} WITH (FORCE)",
+                crate::database::table_data::quote_identifier(&new_db)
+            ))
+            .await
+            .unwrap();
         let file = files::snapshot(&path).unwrap();
         assert_eq!(file.format, format);
         let id = session(&state, &target_db, port).await;
@@ -434,6 +527,76 @@ async fn dump_restore_round_trip_and_failures_on_disposable_databases() {
 }
 
 #[tokio::test]
+#[ignore = "Requires a disposable PostgreSQL server and prepared clients"]
+async fn failed_new_database_restore_keeps_target_and_precancel_creates_nothing() {
+    let port: u16 = std::env::var("OPALINE_TEST_POSTGRES_PORT")
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_ne!(port, 5432);
+    let tools = tools::PgTools::detect(Path::new(&std::env::var("OPALINE_TEST_PG_TOOLS").unwrap()))
+        .await
+        .unwrap();
+    let state = AppState::default();
+    let id = session(&state, "postgres", port).await;
+    let (source, _guard) = state.maintenance(&id, true).await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("failure.sql");
+    std::fs::write(&path, "CREATE TABLE must_rollback(id int); SELECT 1/0;\n").unwrap();
+    for cancelled in [true, false] {
+        let name = format!("failed_{}", uuid::Uuid::new_v4().simple());
+        let mut input = restore_input();
+        input.new_database = Some(name.clone());
+        input.confirm_database = name.clone();
+        input.confirm_create = true;
+        let prepared = PreparedRestore {
+            session_id: id.clone(),
+            tools: tools.clone(),
+            file: files::snapshot(&path).unwrap(),
+        };
+        let (_sender, cancel) = watch::channel(cancelled);
+        let error = operations::restore(
+            &source,
+            prepared,
+            config("postgres", port),
+            input,
+            cancel,
+            |_| {},
+        )
+        .await
+        .unwrap_err();
+        let exists = source
+            .client
+            .query_one(
+                "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)",
+                &[&name],
+            )
+            .await
+            .unwrap()
+            .get::<_, bool>(0);
+        assert_eq!(exists, !cancelled);
+        if cancelled {
+            assert!(error.contains("Nothing was created"));
+        } else {
+            assert!(error.contains("has been kept"));
+            let (created, _) = postgres::connect(&config(&name, port)).await.unwrap();
+            assert!(created
+                .query_one("SELECT to_regclass('public.must_rollback')::text", &[])
+                .await
+                .unwrap()
+                .get::<_, Option<String>>(0)
+                .is_none());
+            created.abort();
+            source
+                .client
+                .batch_execute(&format!("DROP DATABASE {name} WITH (FORCE)"))
+                .await
+                .unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 #[ignore = "Requires a disposable PostgreSQL server and patched local PostgreSQL tools"]
 async fn failed_dump_preserves_file_and_cancel_reaps_client() {
     let port: u16 = std::env::var("OPALINE_TEST_POSTGRES_PORT")
@@ -478,7 +641,11 @@ async fn failed_dump_preserves_file_and_cancel_reaps_client() {
         cancel,
         |_| {},
         "Test cancellation",
-        operations::cancel_tool(&session.client, &credentials.application_name),
+        operations::cancel_tool(
+            &session.client,
+            &credentials.application_name,
+            &session.info.connection.database,
+        ),
     );
     let stop = async {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;

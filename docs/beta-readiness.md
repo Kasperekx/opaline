@@ -1,6 +1,11 @@
 # Beta Opaline — co jeszcze robimy
 
-Data: 2026-09-05. **Plan do wspólnego uzupełnienia, nie zgoda na publikację.**
+Data: 2026-09-05. **Stabilizacja w toku, nie zgoda na publikację.**
+
+Decyzje właściciela: pierwsza beta na **macOS**, Windows/Linux później;
+tworzenie bazy przy restore i jawny autocommit **wchodzą przed betą**.
+Kod jest już w publicznym repozytorium. Aktualne dowody techniczne i pozostające
+ograniczenia: [odbiór stabilizacji](beta-stabilization-verification.md).
 
 Cel: tester instaluje aplikację, łączy się z PostgreSQL, wykonuje SQL, przegląda
 i zmienia dane oraz robi backup bez pomocy autora i bez środowiska developerskiego.
@@ -32,10 +37,10 @@ wszystkich platformach.** Dowody i ograniczenia: [P0](p0-verification.md),
 
 | ID | Do ustalenia | Propozycja do Twojej oceny |
 | --- | --- | --- |
-| D1 | Systemy, architektury i najstarsza wersja OS w pierwszej becie | Najpierw sprawdzić macOS ARM64, gdzie mamy lokalny build. Windows/Linux i Intel Mac deklarować dopiero po osobnym odbiorze; nie wykreślamy ich automatycznie z zakresu. |
+| D1 | Systemy, architektury i najstarsza wersja OS w pierwszej becie | Potwierdzone: macOS najpierw; Windows/Linux później. CI buduje ARM64 i Intel na macOS 15; minimum OS i odbiór obu architektur nadal wymagają potwierdzenia paczką. |
 | D2 | Aktualizacje | W pierwszej becie może wystarczyć ręczna aktualizacja z zachowaniem konfiguracji; auto-update to osobna decyzja. |
-| D3 | Odtwarzanie do nowej bazy | Dokończyć kreator CREATE DATABASE z pierwotnego P1 albo świadomie zaakceptować restore wyłącznie do istniejącej bazy. |
-| D4 | Komendy poza transakcją | Zdecydować, czy jawne ograniczenie VACUUM/CREATE DATABASE wystarczy testerom, czy potrzebny jest osobny, bezpieczny tryb autocommit. |
+| D3 | Odtwarzanie do nowej bazy | Potwierdzone: przed betą. Wdrożone i sprawdzone integracyjnie 14–18; pozostaje odbiór finalnej paczki. |
+| D4 | Komendy poza transakcją | Potwierdzone: jawny autocommit przed betą. Wdrożony per karta, z potwierdzeniem i resetem przy reconnect/restart; testy VACUUM/CREATE DATABASE 14–18. |
 | D5 | Pierwsza grupa testerów | Deweloperzy backendu pracujący z PostgreSQL, początkowo na danych testowych/local/staging. Zapisać ich 3 najczęstsze zadania. |
 | D6 | SSH i pozostałe integracje | SSH przed betą tylko jeśli potrzebuje go wybrana grupa. Kafka, logi Dockera i diagramy proponuję zostawić na kolejną iterację. |
 | D7 | Repo, nazwa i kanał kontaktu | Repo wybrane: `Kasperekx/opaline`, podłączone przez SSH. Pozostaje ustalić nazwę wydania, kanał błędów i prywatnych zgłoszeń bezpieczeństwa. |
@@ -145,7 +150,9 @@ każdego ujawnionego błędu. Podgląd w przeglądarce nie zastępuje tych test�
   liczba w kodzie nie jest dowodem, że operacja na takim rozmiarze została przetestowana.
 - [ ] Odtwarzanie nadal wymaga jasnego celu, zaufanego pliku i osobnych zgód na
   production/niepustą bazę/DROP. Nie obiecywać rollbacku dowolnego skryptu SQL.
-- [ ] Rozstrzygnąć D3: kreator nowej bazy albo jawnie zaakceptowany brak w becie.
+- [x] Rozstrzygnąć D3 i wdrożyć kreator nowej bazy: osobna zgoda, wolna nazwa,
+  brak automatycznego DROP przy błędzie; integracja custom/SQL na PostgreSQL 14–18.
+  Nie zastępuje to powyższego odbioru na czystej maszynie.
 
 **Twoje uwagi B04:**
 
@@ -193,14 +200,13 @@ każdego ujawnionego błędu. Podgląd w przeglądarce nie zastępuje tych test�
 ## B07 — repozytorium, CI i macierz wersji
 
 - [x] Podłączyć zdalne repo: `origin` → `git@github.com:Kasperekx/opaline.git`.
-  Dostęp przez SSH sprawdzony 2026-09-05. Zdalne repo jest jeszcze puste; kod i workflow
-  pozostają lokalne — nie wykonano push.
-- [ ] Przed pierwszym push sprawdzić sekrety i zakres plików, przygotować commit
-  oraz wysłać kod po zatwierdzeniu publikacji.
+  Kod i workflow wypchnięte 2026-09-05 (`5d1c42f` i kolejne poprawki).
+- [x] Przed pierwszym push sprawdzić sekrety i zakres plików, przygotować commit
+  oraz wysłać kod po zatwierdzeniu publikacji. Gitleaks: staging i historia bez wykryć.
 - [ ] Uruchomić istniejący workflow na zdalnym CI i naprawić rzeczywiste błędy
   na wszystkich zadeklarowanych systemach. Plik YAML nie oznacza zielonego CI.
-- [ ] Dołączyć do macierzy testy `database::table_changes` wymagające PostgreSQL:
-  są oznaczone `ignored`, a obecny job uruchamia osobno tylko `session_tests`.
+- [x] Dołączyć do CI i lokalnej macierzy `database::table_changes` wymagające
+  PostgreSQL. Opt-in testy są teraz faktycznie uruchamiane dla wersji 14–18.
 - [ ] Przetestować edycję/duplikowanie na zadeklarowanych wersjach serwera.
   Dotychczasowa macierz backup/TLS/sesji 14–18 nie oznacza identycznego pokrycia edycji.
 - [ ] Egzekwować typecheck/lint/format/tests/build oraz audyt sekretów/zależności;
@@ -271,6 +277,7 @@ ten plan ich nie uruchamia.
 | U04 |  |  |  |
 | U05 |  |  |  |
 
-Po Twoich uwagach ustalamy D1–D7 i finalny zakres. Proponowana następna praca:
-**B01 — jeden pełny przegląd UX z zamkniętą listą poprawek**, następnie B02/B03,
-zamiast dokładania kolejnego dużego modułu przed stabilizacją.
+D1 (systemy), D3 i D4 są potwierdzone. Nadal potrzebujemy minimum macOS, sposobu
+podpisywania/dostarczenia paczki, prywatnego kanału bezpieczeństwa i testerów.
+Kolejna praca: odbiór dokładnej paczki na czystych Macach oraz pozostałe B01–B09,
+bez dokładania nowych integracji. Nie oznaczamy całej bety jako gotowej po samym CI.

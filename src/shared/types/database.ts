@@ -164,7 +164,9 @@ export type QueryExecutionError = {
   position: number | null;
 };
 
+export type QueryExecutionMode = "atomic" | "autocommit";
 export type RunQueryOptions = {
   maxRows: number;
   timeoutMs: number;
+  executionMode?: QueryExecutionMode;
 };

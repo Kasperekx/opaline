@@ -7,7 +7,11 @@ import { useDatabaseSession } from "../connections/SessionContext";
 import type { DatabaseObject } from "../../shared/types/database";
 import { backupApi } from "./backup-api";
 import { BackupOptions, useBackupOptions } from "./BackupOptions";
-import { RestoreOptions, useRestoreOptions } from "./RestoreOptions";
+import {
+  RestoreOptions,
+  useRestoreOptions,
+  validNewDatabaseName,
+} from "./RestoreOptions";
 import { useBackupTask } from "./useBackupTask";
 import { BackupAdvanced } from "./BackupAdvanced";
 import "./backup.css";
@@ -30,10 +34,14 @@ export function BackupDialog({
   const restoreForm = useRestoreOptions();
   const { trusted, name, production, nonempty, clean, cleanConsent, owners } =
     restoreForm;
+  const { createNew, newDatabase, createConsent } = restoreForm;
+  const targetDatabase =
+    mode === "restore" && createNew ? newDatabase : session.database;
   const readyRestore =
     task.preview &&
     trusted &&
-    name === session.database &&
+    name === targetDatabase &&
+    (!createNew || (validNewDatabaseName(newDatabase) && createConsent)) &&
     (!clean || (cleanConsent && nonempty)) &&
     (session.environment !== "production" || production);
   return (
@@ -51,7 +59,10 @@ export function BackupDialog({
             <small>
               {workspaceName} / {session.name}
             </small>
-            <strong>{session.database}</strong>
+            <strong>
+              {targetDatabase || "New database"}
+              {mode === "restore" && createNew ? " · new" : ""}
+            </strong>
             <span>
               {session.host}:{session.port} · {session.username}
             </span>
@@ -197,6 +208,8 @@ export function BackupDialog({
                       session.id,
                       {
                         preparedId,
+                        newDatabase: createNew ? newDatabase : null,
+                        confirmCreate: createNew && createConsent,
                         password: suppliedPassword,
                         trustedFile: trusted,
                         confirmDatabase: name,
@@ -213,7 +226,11 @@ export function BackupDialog({
               }
             }}
           >
-            {mode === "backup" ? "Create backup" : "Restore to this database"}
+            {mode === "backup"
+              ? "Create backup"
+              : createNew
+                ? "Create database & restore"
+                : "Restore to this database"}
           </button>
         )}
       </footer>

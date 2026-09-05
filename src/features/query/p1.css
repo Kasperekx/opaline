@@ -5,6 +5,31 @@
   gap: 16px;
   min-width: 0;
 }
+.workspace-tab-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: center;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+}
+.tab-bar > .new-tab {
+  flex: 0 0 40px;
+}
+.query-execution-control select {
+  min-height: 32px;
+  max-width: 135px;
+  padding: 4px 8px;
+  color: var(--text-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: var(--text-xs);
+}
+.query-execution-control.autocommit select,
+.autocommit-status {
+  color: #e5c484;
+}
 .p1-muted {
   color: var(--text-soft);
   font-size: var(--text-sm);
@@ -255,4 +280,9 @@
   .query-path {
     width: 100%;
   }
+}
+.project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }

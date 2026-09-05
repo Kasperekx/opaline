@@ -9,6 +9,13 @@
     "core:window:allow-toggle-maximize",
     "dialog:allow-save",
     "dialog:allow-open",
-    "fs:allow-write-text-file"
+    "fs:allow-write-text-file",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://github.com/Kasperekx/opaline/issues/new/choose" },
+        { "url": "https://github.com/Kasperekx/opaline/blob/main/docs/tester-guide.md" }
+      ]
+    }
   ]
 }

@@ -8,6 +8,8 @@ permissions:
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+env:
+  VITE_BUILD_SHA: ${{ github.sha }}
 jobs:
   rust-security:
     runs-on: ubuntu-22.04
@@ -59,31 +61,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libdbus-1-dev zlib1g-dev bison flex
-      - if: runner.os == 'macOS'
-        run: brew install openssl@3
-      - if: runner.os == 'Windows'
-        id: msys
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: make bison flex tar mingw-w64-x86_64-toolchain mingw-w64-x86_64-openssl mingw-w64-x86_64-zlib
+      - run: brew install openssl@3
       - run: npm ci
       - run: npm run desktop:prepare
-        env:
-          OPALINE_MINGW_PREFIX: ${{ steps.msys.outputs.msys2-location }}/mingw64
       - run: npm run build
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
       - run: npm run tauri build
-        env:
-          OPALINE_MINGW_PREFIX: ${{ steps.msys.outputs.msys2-location }}/mingw64
+      - run: node scripts/describe-macos-artifact.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: opaline-unsigned-${{ matrix.os }}-${{ github.sha }}
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/dmg/build-info.json
           if-no-files-found: error
           retention-days: 7
   postgres:

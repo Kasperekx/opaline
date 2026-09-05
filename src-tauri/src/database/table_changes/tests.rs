@@ -30,6 +30,11 @@ fn validates_change_set_ids_keys_versions_and_size() {
 }
 
 async fn connect() -> DatabaseClient {
+    assert_ne!(
+        std::env::var("OPALINE_TEST_POSTGRES_PORT").as_deref(),
+        Ok("5432"),
+        "Only disposable servers are allowed"
+    );
     postgres::connect(&ConnectionConfig {
         name: "Isolated inline-editing test".into(),
         host: "127.0.0.1".into(),
@@ -47,6 +52,96 @@ async fn connect() -> DatabaseClient {
     .await
     .unwrap()
     .0
+}
+
+#[tokio::test]
+#[ignore = "Requires a disposable PostgreSQL server"]
+async fn rls_permissions_triggers_and_schema_changes_preserve_atomic_edits() {
+    let client = connect().await;
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let schema = format!("guard_{suffix}");
+    let role = format!("limited_{suffix}");
+    // All objects and the NOLOGIN role belong only to this disposable test server.
+    client.batch_execute(&format!("CREATE SCHEMA {schema}; CREATE ROLE {role} NOLOGIN; CREATE TABLE {schema}.inline_changes(id int PRIMARY KEY, name text NOT NULL, note text); INSERT INTO {schema}.inline_changes VALUES (1,'Ada',NULL),(2,'Grace',NULL); GRANT USAGE ON SCHEMA {schema} TO {role}; GRANT SELECT,INSERT,UPDATE,DELETE ON {schema}.inline_changes TO {role}; ALTER TABLE {schema}.inline_changes ENABLE ROW LEVEL SECURITY; CREATE POLICY test_policy ON {schema}.inline_changes USING (true) WITH CHECK (name <> 'blocked'); SET ROLE {role};")).await.unwrap();
+    let before = page(&client, &schema).await;
+    let input = TableChangesRequest {
+        schema: schema.clone(),
+        table: "inline_changes".into(),
+        changes: vec![
+            update(
+                "first",
+                "1",
+                before.rows[0].row_version.as_deref().unwrap(),
+                "Allowed",
+            ),
+            update(
+                "second",
+                "2",
+                before.rows[1].row_version.as_deref().unwrap(),
+                "blocked",
+            ),
+        ],
+    };
+    assert_eq!(
+        apply_changes(&client, &input, &AtomicBool::new(false), None)
+            .await
+            .unwrap_err()
+            .kind,
+        "rejected"
+    );
+    assert_eq!(
+        page(&client, &schema).await.rows[0].values[1].as_deref(),
+        Some("Ada")
+    );
+    client
+        .batch_execute(&format!(
+            "RESET ROLE; REVOKE UPDATE ON {schema}.inline_changes FROM {role}; SET ROLE {role}"
+        ))
+        .await
+        .unwrap();
+    assert!(
+        apply_changes(&client, &input, &AtomicBool::new(false), None)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        page(&client, &schema).await.rows[0].values[1].as_deref(),
+        Some("Ada")
+    );
+    client.batch_execute(&format!("RESET ROLE; CREATE FUNCTION {schema}.normalize_name() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.name := upper(NEW.name); RETURN NEW; END $$; CREATE TRIGGER normalize_name BEFORE UPDATE ON {schema}.inline_changes FOR EACH ROW EXECUTE FUNCTION {schema}.normalize_name();")).await.unwrap();
+    let mut input = input;
+    input.changes.truncate(1);
+    let saved = apply_changes(&client, &input, &AtomicBool::new(false), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        saved.rows[0].row.as_ref().unwrap().values[1].as_deref(),
+        Some("ALLOWED")
+    );
+    let latest = page(&client, &schema).await;
+    input.changes = vec![
+        update("first", "1", latest.rows[0].row_version.as_deref().unwrap(), "Must not save"),
+        serde_json::from_value(serde_json::json!({"kind":"update","id":"second","key":[{"column":"id","value":"2"}],"rowVersion":latest.rows[1].row_version,"changes":[{"column":"note","value":"stale column"}]})).unwrap(),
+    ];
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {schema}.inline_changes DROP COLUMN note"
+        ))
+        .await
+        .unwrap();
+    assert!(
+        apply_changes(&client, &input, &AtomicBool::new(false), None)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        page(&client, &schema).await.rows[0].values[1].as_deref(),
+        Some("ALLOWED")
+    );
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE; DROP ROLE {role}"))
+        .await
+        .unwrap();
 }
 async fn setup(client: &DatabaseClient) -> String {
     client.batch_execute("CREATE TEMP TABLE inline_changes (id integer PRIMARY KEY, name text NOT NULL UNIQUE, note text DEFAULT 'default note'); INSERT INTO inline_changes VALUES (1,'Ada',NULL),(2,'Grace',NULL);").await.unwrap();

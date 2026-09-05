@@ -17,9 +17,9 @@ use std::{
 use tokio::sync::watch;
 use tokio_postgres::Client;
 
-pub(crate) async fn cancel_tool(client: &Client, application_name: &str) {
+pub(crate) async fn cancel_tool(client: &Client, application_name: &str, database: &str) {
     // Only this random per-job marker, current database and current role. Never all user queries.
-    let _ = client.query("SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE application_name = $1 AND datname = current_database() AND usename = current_user AND pid <> pg_backend_pid() AND backend_type = 'client backend'", &[&application_name]).await;
+    let _ = client.query("SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE application_name = $1 AND datname = $2 AND usename = current_user AND pid <> pg_backend_pid() AND backend_type = 'client backend'", &[&application_name, &database]).await;
 }
 
 pub(crate) async fn server_major(client: &Client) -> Result<u32, String> {
@@ -62,7 +62,8 @@ pub(crate) fn check_dump_version(preview: &str, server_major: u32) -> Result<(),
 }
 async fn credentials(
     session: &DatabaseSession,
-    config: ConnectionConfig,
+    mut config: ConnectionConfig,
+    target_database: Option<&str>,
 ) -> Result<ProcessCredentials, String> {
     if session.info.connection.host.trim() != config.host.trim()
         || session.info.connection.port != config.port
@@ -82,6 +83,9 @@ async fn credentials(
     .map_err(|_| "TLS state check timed out.")?
     .map_err(|_| "Cannot check the session transport security.")?
     .get::<_, bool>(0);
+    if let Some(name) = target_database {
+        config.database = name.to_owned();
+    }
     tokio::task::spawn_blocking(move || ProcessCredentials::create(&config, ssl))
         .await
         .map_err(|_| "Cannot prepare client credentials.")?
@@ -145,7 +149,7 @@ pub(crate) async fn dump(
     let started = Instant::now();
     check_server(&session.client, tools).await?;
     let arguments = dump_arguments(&input)?;
-    let credentials = credentials(session, config).await?;
+    let credentials = credentials(session, config, None).await?;
     let output = AtomicExport::create(Path::new(&input.path)).await?;
     let file = tokio::fs::OpenOptions::new()
         .write(true)
@@ -162,7 +166,11 @@ pub(crate) async fn dump(
         cancel,
         progress,
         "Creating dump",
-        cancel_tool(&session.client, &credentials.application_name),
+        cancel_tool(
+            &session.client,
+            &credentials.application_name,
+            &session.info.connection.database,
+        ),
     )
     .await?;
     let file = tokio::fs::OpenOptions::new()
@@ -186,7 +194,22 @@ pub(crate) fn validate_restore(info: &SessionInfo, input: &RestoreInput) -> Resu
     if info.read_only {
         return Err("Restore is disabled for read-only connections.".into());
     }
-    if !input.trusted_file || input.confirm_database != info.connection.database {
+    if let Some(name) = &input.new_database {
+        super::create_database::validate_name(name)?;
+        if !input.confirm_create {
+            return Err("Confirm that database creation is immediate and is not automatically undone if restore fails.".into());
+        }
+        if input.clean || input.confirm_clean || input.allow_nonempty {
+            return Err(
+                "Creating a new database cannot reuse existing data or drop objects.".into(),
+            );
+        }
+    }
+    let target = input
+        .new_database
+        .as_deref()
+        .unwrap_or(&info.connection.database);
+    if !input.trusted_file || input.confirm_database != target {
         return Err(
             "Trust the selected dump and type the exact target database name before restoring."
                 .into(),
@@ -216,14 +239,18 @@ pub(crate) async fn restore(
     if input.clean && prepared.file.format != DumpFormat::Custom {
         return Err("Clean / drop is available only for custom archives. SQL scripts control their own statements.".into());
     }
-    if !input.allow_nonempty {
+    if input.new_database.is_none() && !input.allow_nonempty {
         // Check relations, routines, user-defined types, schemas and extensions, not just visible tables.
         let empty = tokio::time::timeout(Duration::from_secs(10), session.client.query_one("SELECT NOT (EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema') OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema') OR EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema') OR EXISTS (SELECT 1 FROM pg_namespace WHERE nspname NOT LIKE 'pg_%' AND nspname NOT IN ('public','information_schema')) OR EXISTS (SELECT 1 FROM pg_extension WHERE extname <> 'plpgsql'))", &[])).await.map_err(|_| "Empty database check timed out.")?.map_err(|_| "Cannot verify that the target database is empty.")?.get::<_, bool>(0);
         if !empty {
             return Err("The target database is not empty. Choose an empty database or explicitly allow restoring into existing data.".into());
         }
     }
-    let credentials = credentials(session, config).await?;
+    let target = input
+        .new_database
+        .as_deref()
+        .unwrap_or(&session.info.connection.database);
+    let credentials = credentials(session, config, input.new_database.as_deref()).await?;
     let mut command;
     if prepared.file.format == DumpFormat::Custom {
         command = credentials.command(&prepared.tools.restore);
@@ -248,6 +275,19 @@ pub(crate) async fn restore(
             ])
             .arg(prepared.file.file.path());
     }
-    process::run(command, cancel, progress, "Restoring database", cancel_tool(&session.client, &credentials.application_name)).await.map_err(|error| format!("{error} Restore is not confirmed complete. SQL scripts may contain their own transaction control; partial changes or external effects are possible. Reconnect and inspect before retrying."))?;
-    Ok(JobResult {bytes: prepared.file.bytes, duration_ms: started.elapsed().as_millis() as u64, message: "PostgreSQL reported successful restore. Reconnect to refresh schema and data. No prior query is replayed.".into()})
+    if let Some(name) = &input.new_database {
+        progress(JobProgress { stage: "Creating database".into(), elapsed_ms: started.elapsed().as_millis() as u64, message: "Creating an empty database before restoring. Existing databases will not be reused.".into() });
+        super::create_database::create(session, name, cancel.clone()).await?;
+    }
+    process::run(command, cancel, progress, "Restoring database", cancel_tool(&session.client, &credentials.application_name, target)).await.map_err(|error| format!("{error} Restore into {target:?} is not confirmed complete. Partial changes or external effects are possible. Inspect before retrying. If a database was created, it has been kept; nothing was automatically dropped."))?;
+    let message = if input.new_database.is_some() {
+        format!("Database {target:?} created and restore completed. Add a connection profile for this database to open it. The previous connection was not changed.")
+    } else {
+        "PostgreSQL reported successful restore. Reconnect to refresh schema and data. No prior query is replayed.".into()
+    };
+    Ok(JobResult {
+        bytes: prepared.file.bytes,
+        duration_ms: started.elapsed().as_millis() as u64,
+        message,
+    })
 }

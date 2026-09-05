@@ -32,6 +32,10 @@ pub(crate) struct TableName {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RestoreInput {
+    #[serde(default)]
+    pub new_database: Option<String>,
+    #[serde(default)]
+    pub confirm_create: bool,
     pub prepared_id: String,
     pub password: Option<String>,
     pub trusted_file: bool,

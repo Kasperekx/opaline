@@ -1119,7 +1119,7 @@ kbd {
 }
 
 .editor-pane {
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   background: #111416;
 }
 
@@ -2838,7 +2838,6 @@ body[data-resizing] * {
   grid-template-rows: 60px 38px minmax(0, 1fr) 27px;
 }
 
-:root[data-density="compact"] .editor-pane,
 :root[data-density="compact"] .results-pane {
   grid-template-rows: 38px minmax(0, 1fr);
 }

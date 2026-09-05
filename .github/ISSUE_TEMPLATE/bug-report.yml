@@ -1,0 +1,55 @@
+name: Bug report
+description: Report an Opaline issue with safe reproduction steps
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This report is public. Never include passwords, connection strings, SQL with private values,
+        dumps, customer records, or the application data directory. Redact screenshots.
+        For security vulnerabilities, follow SECURITY.md instead of filing a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Opaline version and build
+      description: From About Opaline & help, plus the artifact/commit if using a CI build.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: macOS version and architecture
+      placeholder: "macOS version / Apple Silicon or Intel"
+    validations:
+      required: true
+  - type: input
+    id: postgres
+    attributes:
+      label: PostgreSQL major version
+      description: Version only; do not provide a hostname or connection string.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Use a disposable database and synthetic data. Say whether the problem happens consistently.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Optional safe diagnostics
+      description: Help → Copy safe diagnostics. Review before posting; no raw application logs or dump contents.
+      render: json
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed secrets, private SQL, customer data and identifying details from attachments.
+          required: true

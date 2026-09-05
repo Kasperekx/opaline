@@ -23,6 +23,7 @@ async fn session(state: &AppState, name: &str, read_only: bool) -> String {
         ca_path: None,
         read_only,
     };
+    assert_ne!(config.port, 5432, "Only a disposable server is allowed");
     let (client, connection) = postgres::connect(&config).await.unwrap();
     let info = SessionInfo {
         id: name.into(),
@@ -34,6 +35,153 @@ async fn session(state: &AppState, name: &str, read_only: bool) -> String {
     };
     state.add(client, info, None).await.unwrap();
     name.into()
+}
+
+#[tokio::test]
+#[ignore = "Requires a disposable PostgreSQL server"]
+async fn explicit_autocommit_supports_maintenance_and_never_replays_or_batches_writes() {
+    use crate::database::transaction_policy::ExecutionMode::Autocommit;
+    let state = AppState::default();
+    let writer = session(&state, "autocommit-writer", false).await;
+    let observer = session(&state, "autocommit-observer", false).await;
+    let reader = session(&state, "autocommit-reader", true).await;
+    let table = format!("ac_{}", uuid::Uuid::new_v4().simple());
+    query::execute(
+        &state,
+        &writer,
+        &format!("CREATE TABLE {table}(id int)"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    for sql in [
+        format!("INSERT INTO {table} VALUES (1)"),
+        format!("VACUUM {table}"),
+    ] {
+        query::execute_with_mode(&state, &writer, &sql, None, None, Autocommit)
+            .await
+            .unwrap();
+    }
+    let count = query::execute(
+        &state,
+        &observer,
+        &format!("SELECT count(*) FROM {table}"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(count.result_sets[0].rows[0][0].as_deref(), Some("1"));
+    assert!(query::execute_with_mode(
+        &state,
+        &writer,
+        &format!("INSERT INTO {table} VALUES (2); SELECT 1"),
+        None,
+        None,
+        Autocommit
+    )
+    .await
+    .is_err());
+    assert!(
+        query::execute_with_mode(&state, &reader, "VACUUM", None, None, Autocommit)
+            .await
+            .is_err()
+    );
+    // Validation failures preserve the session; server errors in autocommit do not.
+    query::execute(&state, &reader, "SELECT 1", None, None)
+        .await
+        .unwrap();
+    let database = format!("ac_db_{}", uuid::Uuid::new_v4().simple());
+    query::execute_with_mode(
+        &state,
+        &writer,
+        &format!("CREATE DATABASE {database}"),
+        None,
+        None,
+        Autocommit,
+    )
+    .await
+    .unwrap();
+    query::execute_with_mode(
+        &state,
+        &writer,
+        &format!("DROP DATABASE {database}"),
+        None,
+        None,
+        Autocommit,
+    )
+    .await
+    .unwrap();
+    let error = query::execute_with_mode(&state, &writer, "SELECT 1/0", None, None, Autocommit)
+        .await
+        .unwrap_err();
+    assert!(error.message.contains("no application rollback"));
+    assert!(state.client(&writer).await.is_err());
+    let count = query::execute(
+        &state,
+        &observer,
+        &format!("SELECT count(*) FROM {table}"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(count.result_sets[0].rows[0][0].as_deref(), Some("1"));
+    query::execute(
+        &state,
+        &observer,
+        &format!("DROP TABLE {table}"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+#[ignore = "Requires a disposable PostgreSQL server"]
+async fn dropping_a_running_query_invalidates_the_session_and_rolls_back_atomic_work() {
+    let state = AppState::default();
+    let writer = session(&state, "dropped-writer", false).await;
+    let observer = session(&state, "dropped-observer", false).await;
+    let table = format!("drop_{}", uuid::Uuid::new_v4().simple());
+    query::execute(
+        &state,
+        &writer,
+        &format!("CREATE TABLE {table}(id int)"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let sql = format!("INSERT INTO {table} VALUES (1); SELECT pg_sleep(30)");
+    assert!(tokio::time::timeout(
+        std::time::Duration::from_millis(250),
+        query::execute(&state, &writer, &sql, None, None)
+    )
+    .await
+    .is_err());
+    assert!(state.client(&writer).await.is_err());
+    let count = query::execute(
+        &state,
+        &observer,
+        &format!("SELECT count(*) FROM {table}"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(count.result_sets[0].rows[0][0].as_deref(), Some("0"));
+    query::execute(
+        &state,
+        &observer,
+        &format!("DROP TABLE {table}"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test]

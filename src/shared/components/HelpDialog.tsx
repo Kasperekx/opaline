@@ -2,16 +2,19 @@ import { useState } from "react";
 import { ConnectionDialog } from "../../features/connections/ConnectionDialog";
 import { primaryModifierLabel } from "../lib/platform";
 import { version } from "../../../package.json";
+import { ProjectLinks } from "./ProjectLinks";
+import { buildCommit } from "../lib/build-info";
 
 export function HelpDialog({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState("");
   return (
     <ConnectionDialog
-      title="Help & diagnostics"
+      title="About Opaline & help"
       subtitle={`Opaline ${version} · PostgreSQL`}
       onClose={onClose}
     >
       <div className="safety-content">
+        <p>Build: {buildCommit}. Pre-beta · MIT license · local-first.</p>
         <h3>Working with connections</h3>
         <p>
           Click the connection name above the explorer to switch within a
@@ -29,10 +32,12 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
         </p>
         <h3>Transactions & recovery</h3>
         <p>
-          Each Run is atomic: commit on success, rollback on error. Manual
-          transaction controls and operations requiring autocommit (such as
-          VACUUM or CREATE DATABASE) are not supported yet. Never automatically
-          retry a write after losing its result.
+          Atomic is the default: commit on success, rollback on error. For
+          VACUUM or CREATE DATABASE, explicitly enable Autocommit in the SQL
+          toolbar. It runs one statement, saves immediately and applies only to
+          that tab until reconnect/restart. Read-only sessions cannot enable it.
+          Manual BEGIN/COMMIT are not supported. Never automatically retry a
+          write after losing its result.
         </p>
         <p>
           SQL drafts and optional history are stored on this device, not
@@ -76,9 +81,11 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           save. PostgreSQL 14–18 clients are included and selected
           automatically, with no separate installation or download. Your active
           connection password is reused. Custom tools are optional under
-          Advanced. Restore only trusted files into an existing database. Review
-          the target and all warnings. Production and dropping objects require
-          separate approvals.
+          Advanced. Restore trusted files into the current database, or choose
+          Create a new database on this server. Creation needs CREATEDB
+          permission and a new name; existing names are never reused. The new
+          database is kept if restore fails. Review the target and all warnings.
+          Creation, production and dropping objects require separate approvals.
         </p>
         <p>
           Restore is unavailable in read-only sessions. Maintenance blocks local
@@ -103,6 +110,7 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
                   {
                     app: "Opaline",
                     version,
+                    build: buildCommit,
                     platform,
                     engine: "PostgreSQL",
                     runtime: "Tauri 2",
@@ -126,6 +134,7 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           Copy safe diagnostics
         </button>
         <p role="status">{status}</p>
+        <ProjectLinks />
       </div>
     </ConnectionDialog>
   );

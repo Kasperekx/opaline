@@ -319,7 +319,14 @@ export function useWorkspaceTabs(profileId: string) {
       () =>
         setTabs((current) =>
           current.map((tab) =>
-            tab.kind === "query" ? { ...tab, result: null, error: null } : tab,
+            tab.kind === "query"
+              ? {
+                  ...tab,
+                  result: null,
+                  error: null,
+                  executionMode: "atomic" as const,
+                }
+              : tab,
           ),
         ),
       [],

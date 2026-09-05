@@ -27,6 +27,8 @@ export type DumpOptions = {
   password: string | null;
 };
 export type RestoreOptions = {
+  newDatabase?: string | null;
+  confirmCreate?: boolean;
   preparedId: string;
   password: string | null;
   trustedFile: boolean;

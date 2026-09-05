@@ -1,3 +1,4 @@
+mod create_database;
 mod files;
 mod managed;
 pub(crate) mod models;
@@ -256,12 +257,15 @@ pub(crate) async fn restore_database(
     drop(prepared_map);
     let (sender, cancel) = watch::channel(false);
     state.jobs.lock().await.insert(session_id.clone(), sender);
+    let creates_database = input.new_database.is_some();
     let result = operations::restore(&session, prepared, config, input, cancel, |event| {
         let _ = on_progress.send(event);
     })
     .await;
     state.jobs.lock().await.remove(&session_id);
     // Even a failed restore may have changed data. Never present earlier results as current.
-    database.invalidate_database(&session.info).await;
+    if !creates_database {
+        database.invalidate_database(&session.info).await;
+    }
     result
 }

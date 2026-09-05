@@ -4,6 +4,7 @@ import { expect, it, vi } from "vitest";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { BackupDialog } from "../src/features/backup/BackupDialog";
 import { backupApi } from "../src/features/backup/backup-api";
+import { validNewDatabaseName } from "../src/features/backup/RestoreOptions";
 import { SessionProvider } from "../src/features/connections/SessionContext";
 import {
   WorkSafetyProvider,
@@ -64,6 +65,108 @@ function tools() {
     return null;
   });
 }
+it("validates database names by UTF-8 bytes without silently trimming", () => {
+  for (const name of [
+    "",
+    " new",
+    "new ",
+    "a\nb",
+    "x".repeat(64),
+    "ż".repeat(32),
+  ])
+    expect(validNewDatabaseName(name)).toBe(false);
+  for (const name of ["new database", 'odd"name', "żółć", "x".repeat(63)])
+    expect(validNewDatabaseName(name)).toBe(true);
+});
+it("requires separate new database consent and resets it when the target changes", async () => {
+  tools();
+  const user = userEvent.setup();
+  const restore = vi.spyOn(backupApi, "restore").mockResolvedValue({
+    bytes: 1024,
+    durationMs: 20,
+    message: "Created and restored",
+  });
+  view();
+  await user.click(screen.getByRole("button", { name: "Restore database" }));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Restore destination" }),
+    "new",
+  );
+  await user.type(
+    screen.getByRole("textbox", { name: "New database name" }),
+    "game_copy",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Choose dump and inspect" }),
+  );
+  await screen.findByRole("textbox", { name: "Dump preview" });
+  const run = screen.getByRole("button", {
+    name: "Create database & restore",
+  }) as HTMLButtonElement;
+  expect(run.disabled).toBe(true);
+  expect(
+    screen.queryByRole("checkbox", {
+      name: /Allow restoring into a non-empty/,
+    }),
+  ).toBeNull();
+  await user.click(screen.getByRole("checkbox", { name: /I trust this file/ }));
+  await user.click(
+    screen.getByRole("checkbox", {
+      name: /I approve restoring into PRODUCTION/,
+    }),
+  );
+  await user.type(
+    screen.getByRole("textbox", {
+      name: "Type the target database name: game_copy",
+    }),
+    "game_copy",
+  );
+  expect(run.disabled).toBe(true);
+  await user.click(
+    screen.getByRole("checkbox", { name: /I approve creating this database/ }),
+  );
+  expect(run.disabled).toBe(false);
+  await user.type(
+    screen.getByRole("textbox", { name: "New database name" }),
+    "2",
+  );
+  expect(run.disabled).toBe(true);
+  expect(
+    (
+      screen.getByRole("checkbox", {
+        name: /I approve creating this database/,
+      }) as HTMLInputElement
+    ).checked,
+  ).toBe(false);
+  expect(restore).not.toHaveBeenCalled();
+  await user.click(
+    screen.getByRole("checkbox", {
+      name: /I approve restoring into PRODUCTION/,
+    }),
+  );
+  await user.click(
+    screen.getByRole("checkbox", { name: /I approve creating this database/ }),
+  );
+  await user.type(
+    screen.getByRole("textbox", {
+      name: "Type the target database name: game_copy2",
+    }),
+    "game_copy2",
+  );
+  await user.click(run);
+  await waitFor(() => expect(restore).toHaveBeenCalledOnce());
+  expect(restore.mock.calls[0].slice(0, 2)).toEqual([
+    "production-session",
+    expect.objectContaining({
+      newDatabase: "game_copy2",
+      confirmCreate: true,
+      confirmDatabase: "game_copy2",
+      clean: false,
+      allowNonempty: false,
+      confirmProduction: true,
+    }),
+  ]);
+});
 it("never offers restore for a read-only session", () => {
   view(true);
   expect(

@@ -170,7 +170,7 @@ try {
       OPALINE_TEST_BUNDLED_ROOT: bundle,
       OPALINE_TEST_CA_PATH: ca,
     };
-    for (const filter of ["backup::tests", "tls_tests", "session_tests", "database::table_changes", "database::table_data"]) {
+    for (const filter of ["backup::tests", "tls_tests", "session_tests", "database::table_changes", "database::"]) {
       const output = await run(
         "cargo",
         [
@@ -181,18 +181,22 @@ try {
           "--lib",
           filter,
           "--",
-          "--ignored",
+          ...(filter === "database::" ? [] : ["--ignored"]),
           "--test-threads=1",
         ],
         { env },
       );
+      const summary = output.split("\n").find((line) => line.startsWith("test result:"));
+      if (!summary || !/\b[1-9]\d* passed; 0 failed;/.test(summary)) {
+        throw new Error(`No successful tests ran for ${filter}: ${summary}`);
+      }
       console.log(
         "PostgreSQL " +
           major +
           " / " +
           filter +
           ": " +
-          output.split("\n").find((line) => line.startsWith("test result:")),
+          summary,
       );
     }
     await run("docker", ["rm", "--force", id]);

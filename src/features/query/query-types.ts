@@ -1,9 +1,12 @@
 import type {
   QueryExecutionError,
   QueryResult,
+  QueryExecutionMode,
 } from "../../shared/types/database";
 
 export type QueryTab = {
+  // Explicit consent is tab-local and never persisted in recovery/history.
+  executionMode?: QueryExecutionMode;
   file?: { id: string; path: string; savedSql: string };
   kind: "query";
   id: string;

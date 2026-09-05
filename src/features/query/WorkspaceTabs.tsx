@@ -28,8 +28,28 @@ export function WorkspaceTabs({
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const renameFocusId = useRef<string | null>(null);
 
-  useEffect(() => inputRef.current?.select(), [editingTabId]);
+  useEffect(() => {
+    if (editingTabId) inputRef.current?.select();
+    else if (renameFocusId.current) {
+      const id = renameFocusId.current;
+      const buttons =
+        listRef.current?.querySelectorAll<HTMLButtonElement>(
+          'button[role="tab"]',
+        );
+      Array.from(buttons ?? [])
+        .find((button) => button.dataset.tabId === id)
+        ?.focus();
+      renameFocusId.current = null;
+    }
+  }, [editingTabId]);
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [activeTabId]);
 
   const startRenaming = (tab: QueryTab) => {
     setEditingTabId(tab.id);
@@ -47,6 +67,7 @@ export function WorkspaceTabs({
         className="query-tabs-scroll"
         role="tablist"
         aria-label="Workspace tabs"
+        ref={listRef}
       >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
@@ -65,6 +86,7 @@ export function WorkspaceTabs({
                   className="tab-select editing"
                   role="tab"
                   aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                 >
                   <FileCode2 size={14} />
                   <input
@@ -75,8 +97,13 @@ export function WorkspaceTabs({
                     onChange={(event) => setDraftTitle(event.target.value)}
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter") finishRenaming();
-                      if (event.key === "Escape") setEditingTabId(null);
+                      if (event.key === "Enter" || event.key === "Escape") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        renameFocusId.current = tab.id;
+                        if (event.key === "Enter") finishRenaming();
+                        else setEditingTabId(null);
+                      }
                     }}
                   />
                 </div>
@@ -84,13 +111,43 @@ export function WorkspaceTabs({
                 <button
                   className="tab-select"
                   role="tab"
+                  data-tab-id={tab.id}
                   aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                   title={
                     tab.kind === "query"
-                      ? "Double-click to rename"
+                      ? `${tab.title} · Double-click or F2 to rename`
                       : `${tab.schema}.${tab.table}`
                   }
                   onClick={() => onSelect(tab.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "F2" && tab.kind === "query") {
+                      event.preventDefault();
+                      startRenaming(tab);
+                      return;
+                    }
+                    if (
+                      !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                        event.key,
+                      )
+                    )
+                      return;
+                    event.preventDefault();
+                    const index = tabs.findIndex((item) => item.id === tab.id);
+                    const next =
+                      event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? tabs.length - 1
+                          : (index +
+                              (event.key === "ArrowRight" ? 1 : -1) +
+                              tabs.length) %
+                            tabs.length;
+                    onSelect(tabs[next].id);
+                    listRef.current
+                      ?.querySelectorAll<HTMLElement>('button[role="tab"]')
+                      [next]?.focus();
+                  }}
                   onDoubleClick={() => {
                     if (tab.kind === "query") startRenaming(tab);
                   }}
@@ -119,6 +176,7 @@ export function WorkspaceTabs({
                 className="tab-close"
                 aria-label={`Close ${tab.title}`}
                 disabled={tabs.length === 1 || running}
+                tabIndex={active ? 0 : -1}
                 onClick={() => onClose(tab.id)}
               >
                 <X size={14} />
@@ -136,7 +194,7 @@ export function WorkspaceTabs({
         <Plus size={17} />
       </button>
       <div className="tab-spacer" />
-      {endAction}
+      <div className="workspace-tab-actions">{endAction}</div>
     </div>
   );
 }

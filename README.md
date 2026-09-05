@@ -1,7 +1,9 @@
 # Opaline
 
 Opaline is a calm, open-source PostgreSQL workspace built with Tauri 2, Rust,
-React, and TypeScript. The project is currently an early alpha.
+React, and TypeScript. The project is in pre-beta stabilization: **macOS first**,
+Windows and Linux later. No public beta has been published. CI packages are unsigned
+test artifacts, not a supported/notarized release. [Tester guide](docs/tester-guide.md).
 
 The working name is provisional. The product direction is not: a fast,
 local-first database client with a precise interface and no required account.
@@ -22,6 +24,7 @@ local-first database client with a precise interface and no required account.
 - per-workspace saved query library and searchable command palette
 - execution of selected SQL or the full editor with `Cmd/Ctrl+Enter`
 - multi-statement query execution
+- explicit per-tab autocommit for single maintenance statements, with confirmation
 - cancellable queries with a configurable timeout
 - streamed query execution with configurable, bounded result retention
 - multiple result-set navigation for multi-statement queries
@@ -30,7 +33,7 @@ local-first database client with a precise interface and no required account.
 - restored table tabs, filters, sorting and last selected workspace
 - rectangular cell selection, escaped TSV / lossless JSON copy, column resizing and full-value inspection
 - profile moves, guarded workspace removal and credential-free profile import/export
-- PostgreSQL custom/plain SQL backups and guarded restore to an existing database
+- PostgreSQL custom/plain SQL backups and guarded restore to an existing or newly created database
 - a read-only Structure inspector with columns, defaults, identity options,
   generated expressions, comments, and enum values
 - index definitions including expressions, included columns, partial predicates,
@@ -207,13 +210,24 @@ schemas/tables, and structure/data/both. Partial dumps may lack dependencies.
 Cluster roles/tablespaces are not included. A native Save dialog approves the
 destination; a private sibling file is published only after success.
 
-Restore accepts a trusted custom archive or UTF-8 SQL script into an **existing**
-database. Automatic database creation is not implemented. Inspection makes a
+Restore accepts a trusted custom archive or UTF-8 SQL script into the current
+database, or **Create a new database on this server**. Creating needs CREATEDB
+permission, a fresh name of 1–63 UTF-8 bytes, typed target confirmation and separate
+consent. Existing names are refused. Creation cannot be rolled back with restore;
+if restore fails, the database is kept for inspection and is never automatically
+dropped. The original profile stays unchanged; add a profile for the new database.
+Inspection makes a
 private snapshot (extra disk space needed), shows its inventory or SQL beginning,
 and binds it to the selected session. The preview is not a security audit.
 Read-only sessions cannot restore. Non-empty targets, dropping archive objects
 and production each require explicit, independent consent, plus the target name.
 Custom restore defaults to skipping original ownership and grants.
+
+SQL runs default to Atomic. Explicitly enable Autocommit in a query tab for VACUUM
+or CREATE DATABASE. Only one statement is allowed per run; select it if necessary.
+Writes save immediately, without application rollback. New/reopened tabs and
+reconnect/restart return to Atomic. Read-only sessions cannot enable autocommit;
+manual BEGIN/COMMIT remain unsupported. Verify outcomes before retrying after errors.
 
 Custom restore uses one transaction and stops on error. SQL restore uses patched
 psql restricted mode and stops on error; a trusted script can still contain

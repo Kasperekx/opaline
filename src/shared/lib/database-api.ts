@@ -62,6 +62,7 @@ export const createDatabaseApi = (sessionId: string) => {
         sql,
         maxRows: options.maxRows,
         timeoutMs: options.timeoutMs,
+        executionMode: options.executionMode ?? "atomic",
       }),
     cancelQuery: () => scopedInvoke<boolean>("cancel_query"),
     loadTablePage: (input: TablePageRequest) =>
