@@ -25,7 +25,7 @@ import { TopBar } from "../../shared/components/TopBar";
 import { useMediaQuery } from "../../shared/hooks/useMediaQuery";
 import { primaryModifierLabel } from "../../shared/lib/platform";
 import type { ConnectionInfo } from "../../shared/types/database";
-import { TableDataView } from "../table/TableDataView";
+import { TableWorkspace } from "../table/TableWorkspace";
 import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { QueryPreferencesPanel } from "./QueryPreferencesPanel";
 import { ResultsGrid } from "./ResultsGrid";
@@ -299,10 +299,13 @@ export function Workspace({ connection, onDisconnect }: WorkspaceProps) {
           </section>
         </div>
         ) : (
-          <TableDataView
+          <TableWorkspace
             key={activeTab.id}
             tab={activeTab}
             onOpenQuery={(sql, title) => workspace.tabs.addQueryTab(sql, title)}
+            onOpenTable={(schema, table) => workspace.selectObject({
+              schema, name: table, objectType: "table", estimatedRows: 0,
+            })}
           />
         )}
         <footer className="status-bar">

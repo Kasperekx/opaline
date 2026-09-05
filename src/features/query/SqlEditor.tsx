@@ -10,7 +10,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { editorTheme, sqlHighlighting } from "./editor-theme";
+import { editorTheme, sqlHighlighting } from "../../shared/lib/sql-editor-theme";
 import type { QuerySubmission } from "./useWorkspace";
 
 type SqlEditorProps = {

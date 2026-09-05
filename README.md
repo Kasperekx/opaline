@@ -19,6 +19,14 @@ local-first database client with a precise interface and no required account.
 - multiple result-set navigation for multi-statement queries
 - multiple renamable query tabs with local session restore
 - dedicated table tabs opened directly from the database explorer
+- a read-only Structure inspector with columns, defaults, identity options,
+  generated expressions, comments, and enum values
+- index definitions including expressions, included columns, partial predicates,
+  uniqueness, and validity
+- incoming and outgoing foreign keys with column mappings, referential actions,
+  and navigation to related tables
+- constraint definitions with validation and deferral status
+- syntax-highlighted structure DDL with clipboard copy and opening in a SQL tab
 - paginated table browsing with per-column sorting and all-column filtering
 - guarded inline row editing with type-aware controls for booleans, numbers,
   dates, times, JSON, UUIDs, and PostgreSQL enums
@@ -73,6 +81,32 @@ npm run build
 cd src-tauri && cargo fmt --check && cargo check && cargo test
 ```
 
+PostgreSQL integration tests run when `OPALINE_TEST_POSTGRES_PORT` is set. Use a
+disposable server on `127.0.0.1` with database/user `postgres` and password
+`opaline_test`, then run `OPALINE_TEST_POSTGRES_PORT=55432 cargo test` from
+`src-tauri`. Without that variable, database integration tests are skipped.
+The structure test recreates its generated DDL and compares the resulting
+metadata; its test schemas are rolled back after the checks.
+
+## Structure inspector
+
+Open a table and choose **Structure**. Switching between Data and Structure
+preserves the current data page, selection, and row draft within that table tab.
+The inspector loads metadata on first use; **Refresh** retrieves changes made
+elsewhere. Inspecting or copying a definition never executes its DDL.
+
+DDL previews cover regular tables, partitioned parent tables, views, and
+materialized views. They include columns, constraints, indexes, and table/column
+comments. PostgreSQL's own [catalog definition functions](https://www.postgresql.org/docs/current/functions-info.html#FUNCTIONS-INFO-CATALOG-TABLE)
+provide expressions and object definitions. Referenced schemas, types,
+sequences, and tables must already exist. Materialized views are created with
+`WITH NO DATA`.
+
+This is a structure preview, not a full backup: ownership, grants, triggers,
+policies, and storage placement are not included. Foreign tables, individual
+partitions, and inherited tables expose their metadata but do not yet generate
+CREATE DDL. Use `pg_dump` when a complete schema export is required.
+
 ## Security notes
 
 Opaline executes SQL using the privileges of the connected PostgreSQL user.
@@ -96,9 +130,8 @@ development only.
 1. read-only connection safeguards and explicit transaction controls
 2. encrypted connection profiles backed by the operating system keychain
 3. saved queries, SQL autocomplete, and keyboard command palette
-4. table structure, indexes, constraints, and object DDL views
-5. SSH tunnels and custom CA certificates
-6. signed release builds for macOS, Windows, and Linux
+4. SSH tunnels and custom CA certificates
+5. signed release builds for macOS, Windows, and Linux
 
 ## Contributing
 

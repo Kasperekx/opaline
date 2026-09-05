@@ -1,7 +1,7 @@
 use crate::{
     database::{
         models::{ColumnInfo, DatabaseObject},
-        postgres,
+        postgres, structure,
     },
     state::AppState,
 };
@@ -12,6 +12,16 @@ pub(crate) async fn list_database_objects(
 ) -> Result<Vec<DatabaseObject>, String> {
     let client = state.client().await?;
     postgres::list_objects(&client).await
+}
+
+#[tauri::command]
+pub(crate) async fn inspect_relation(
+    schema: String,
+    table: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<structure::models::RelationStructure, String> {
+    let client = state.client().await?;
+    structure::inspect(&client, &schema, &table).await
 }
 
 #[tauri::command]

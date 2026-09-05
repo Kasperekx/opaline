@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import type { RelationStructure } from "../types/structure";
 import type {
   ColumnInfo,
   ConnectionConfig,
@@ -38,6 +39,8 @@ export const isQueryExecutionError = (
 };
 
 export const databaseApi = {
+  inspectRelation: (schema: string, table: string) =>
+    invoke<RelationStructure>("inspect_relation", { schema, table }),
   connectionInfo: () => invoke<ConnectionInfo | null>("connection_info"),
   connect: (input: ConnectionConfig) =>
     invoke<ConnectionInfo>("connect_postgres", { input }),
