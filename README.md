@@ -1,314 +1,224 @@
-# Opaline
+<div align="center">
+  <img src="public/opaline-mark.svg" width="88" height="88" alt="Opaline logo" />
 
-Opaline is a calm, open-source PostgreSQL workspace built with Tauri 2, Rust,
-React, and TypeScript. The project is in pre-beta stabilization: **macOS first**,
-Windows and Linux later. No public beta has been published. CI packages are unsigned
-test artifacts, not a supported/notarized release. [Tester guide](docs/tester-guide.md).
+  <h1>Opaline</h1>
 
-The working name is provisional. The product direction is not: a fast,
-local-first database client with a precise interface and no required account.
+  <p><strong>A calmer way to work with PostgreSQL.</strong></p>
+  <p>An open-source desktop client for your databases, queries, and everyday work.<br />Local-first. No account. No telemetry.</p>
 
-## What works
+  <p>
+    <a href="https://github.com/Kasperekx/opaline/actions/workflows/check.yml"><img src="https://github.com/Kasperekx/opaline/actions/workflows/check.yml/badge.svg?branch=main" alt="Quality gates on main" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-C8F26A?labelColor=171C1C" alt="License: MIT" /></a>
+    <a href="#project-status"><img src="https://img.shields.io/badge/status-pre--beta-72D6C9?labelColor=171C1C" alt="Status: pre-beta" /></a>
+  </p>
 
-- product workspaces with multiple saved PostgreSQL profiles
-- create, edit, duplicate and test connections before saving
-- multiple active connections with isolated queries, cancellation and results
-- local, staging and production labels; explicit warning before production writes
-- optional connection-level read-only enforcement in Rust and PostgreSQL
-- verified TLS with system trust or a custom PEM CA and hostname verification
-- optional passwords in macOS Keychain, Windows Credential Manager or Linux Secret Service
-- schema, table, view, and column discovery
-- SQL editing with PostgreSQL syntax highlighting
-- session-scoped schema/table/column autocomplete and undoable, AST-checked SQL formatting
-- native SQL file Open / Save / Save as with external-change detection
-- per-workspace saved query library and searchable command palette
-- execution of selected SQL or the full editor with `Cmd/Ctrl+Enter`
-- multi-statement query execution
-- explicit per-tab autocommit for single maintenance statements, with confirmation
-- cancellable queries with a configurable timeout
-- streamed query execution with configurable, bounded result retention
-- multiple result-set navigation for multi-statement queries
-- multiple renamable query tabs with local session restore
-- dedicated table tabs opened directly from the database explorer
-- restored table tabs, filters, sorting and last selected workspace
-- rectangular cell selection, escaped TSV / lossless JSON copy, column resizing and full-value inspection
-- profile moves, guarded workspace removal and credential-free profile import/export
-- PostgreSQL custom/plain SQL backups and guarded restore to an existing or newly created database
-- a read-only Structure inspector with columns, defaults, identity options,
-  generated expressions, comments, and enum values
-- index definitions including expressions, included columns, partial predicates,
-  uniqueness, and validity
-- incoming and outgoing foreign keys with column mappings, referential actions,
-  and navigation to related tables
-- constraint definitions with validation and deferral status
-- syntax-highlighted structure DDL with clipboard copy and opening in a SQL tab
-- paginated table browsing with per-column sorting and all-column filtering
-- double-click / F2 cell editing with type-aware controls for booleans, numbers,
-  dates, times, JSON, UUIDs, and PostgreSQL enums
-- local cell drafts, review of original/current/pending values, and visible unsaved changes
-- row creation with PostgreSQL defaults, identity columns, and `NULL` handling
-- contextual copy/inspect actions and row duplication into the local change buffer
-- multi-row selection that can be carried across table pages
-- one atomic save for mixed inserts, updates and deletions (up to 500 changed rows)
-- staged deletion with confirmation, contextual Cmd/Ctrl+S, and Save/Discard/Keep working guards
-- CSV and JSON export of the current page or selected rows through a native save dialog
-- streamed CSV and JSON export of every row matching the active filter and sort,
-  with live progress and cancellation
-- optimistic concurrency checks that prevent silent overwrites of changed rows
-- automatic read-only mode for views, foreign tables, and tables without a primary key
-- local query history with duration, row count, and execution status
-- structured PostgreSQL errors with SQLSTATE, detail, hint, and cursor position
-- resizable explorer and editor/result panels with keyboard-accessible handles
-- font-size and interface-density preferences
-- movable, resizable, minimizable, and maximizable desktop window
-- macOS, Windows, and Linux project configuration through Tauri 2
+  <p>
+    <a href="#features">Features</a> &nbsp;·&nbsp;
+    <a href="#getting-started">Get started</a> &nbsp;·&nbsp;
+    <a href="docs/tester-guide.md">Tester guide</a> &nbsp;·&nbsp;
+    <a href="#roadmap">Roadmap</a> &nbsp;·&nbsp;
+    <a href="CONTRIBUTING.md">Contribute</a>
+  </p>
+</div>
 
-## Editing table data
+<p align="center">
+  <a href="docs/screenshots/table-clean-grid.png">
+    <img src="docs/screenshots/table-clean-grid.png" width="1280" alt="Opaline's dark desktop workspace with connection navigation, query tabs, and an editable PostgreSQL table" />
+  </a>
+  <br />
+  <sub>Development preview with synthetic data. The interface is evolving as we prepare the beta.</sub>
+</p>
 
-Double-click a cell or press F2. Enter stages the value **locally**; it does not
-write to PostgreSQL. Use **Save changes** or **Cmd/Ctrl+S** to save the active
-table's entire change set in one transaction. Escape restores the value from
-before the current edit; Tab moves between editable cells. In a multiline/JSON
-editor, Enter adds a line and Apply or Cmd/Ctrl+Enter stages the value.
+## Built around your workflow
 
-Right-click a cell (or press Shift+F10) for Copy, Copy as JSON, Inspect value,
-Duplicate row, and staged deletion. Cmd/Ctrl+C copies the selected cells; opening
-the menu inside an existing selection preserves that range. These table actions
-do not occupy a permanent toolbar.
+A workspace for each product. A clear place for every environment. SQL when you
+need it, direct table editing when you don't.
 
-**Duplicate row** creates an unsaved row from the displayed values, including
-local edits. Identity/generated fields and primary keys with defaults are left
-to PostgreSQL. Manually assigned primary keys start empty and require a new
-value. Other unique fields, such as an email address, are copied and must be
-reviewed before saving. Duplication never writes to the database by itself.
+Opaline brings connections, queries, data, structure, and backups into one focused
+desktop workspace. It is free to use, modify, and self-build under the MIT license.
 
-Pending values stay in memory when switching tabs/connections. They are not
-recovered after a process crash. Review shows original/pending values and offers
-a read-only comparison with the current row. Conflicts retain the draft; an
-unknown commit outcome disables retries until you verify the database.
+## Features
 
-See [the editing plan](docs/inline-table-editing-plan.md) and
-[verification results](docs/inline-table-editing-verification.md), plus the
-[context-menu and duplication checks](docs/table-context-actions-verification.md).
+| Workflow | What you can do |
+| :--- | :--- |
+| **Product workspaces** | Group connections by product, label Local / Staging / Production, and switch between independent sessions without losing your place. |
+| **A focused SQL editor** | Write with schema-aware completion, format with Undo, open SQL files, keep a query library, and cancel long-running queries. Atomic execution by default; explicit autocommit when you need it. |
+| **Direct data editing** | Double-click a cell, stage changes, review the diff, and save together. Add, duplicate, or delete rows with visible drafts and conflict checks. |
+| **Structure at a glance** | Inspect columns, indexes, constraints, foreign keys, and DDL. Browse, filter, sort, copy, and export data to CSV or JSON. |
+| **Backup without tool setup** | Create custom or SQL backups with automatically selected, bundled PostgreSQL clients. Restore a trusted dump into an existing or newly created database. |
+| **Desktop details** | Resizable panels, keyboard shortcuts, contextual actions, adjustable text size, and interface density. Passwords in the system credential store; verified TLS with optional custom CAs. |
 
-## Before beta
+### Edit first. Save deliberately.
 
-The [beta readiness checklist](docs/beta-readiness.md) is the current remaining
-work list, with ordered acceptance gates, scope decisions, and space for product
-feedback. Implemented features are not a substitute for release-package testing.
+1. **Double-click or F2** opens a cell editor.
+2. **Enter** stages the value locally. The table shows what is still unsaved.
+3. **Save changes or ⌘S** writes that table's pending changes in one transaction.
 
-## Stack
+For multiline and JSON values, Enter adds a line; use Apply or ⌘Enter to stage the edit.
 
-- **Desktop shell:** Tauri 2
-- **Database core:** Rust, `tokio-postgres`, Rustls, platform certificate verifier
-- **Interface:** React 19, TypeScript, Vite, CodeMirror 6
-- **Icons:** Lucide
+Duplicating a row creates a draft, not an immediate INSERT. If another client has
+changed the same row, Opaline checks for a conflict instead of silently overwriting it.
 
-The frontend invokes session-scoped Rust commands. Local profile JSON never
-contains passwords; optional saved passwords belong to the OS credential store.
-Stored passwords are resolved in Rust and never returned to the frontend.
-There is no Opaline server, user account, or telemetry.
+[Explore the full feature guide →](docs/features.md)
 
-The code is organized by responsibility: frontend features live under
-`src/features`, shared UI and the typed command boundary under `src/shared`,
-while Rust separates Tauri commands, session state, database models, and the
-PostgreSQL adapter. This keeps the application shell small and gives future
-database providers a clear integration boundary.
+<details>
+<summary><strong>A workspace for every product</strong></summary>
 
-## Development
+<br />
 
-Prerequisites are the standard [Tauri 2 platform dependencies](https://v2.tauri.app/start/prerequisites/),
-Node.js 22.13+ (or 24+), and Rustup. The repository pins Rust 1.88 through
-`rust-toolchain.toml`.
-Building the desktop app also needs the client-build dependencies listed in
-[bundled PostgreSQL clients](docs/bundled-postgres.md). These are developer/CI
-requirements, not end-user requirements. Tauri's dev/build hooks prepare the
-clients automatically; subsequent builds reuse a verified local cache.
+![Connections grouped in an MMO workspace, with Local, Staging, and Production labels](docs/screenshots/connection-home.png)
 
-```bash
-npm install
+Development preview with synthetic endpoints. Each connection keeps its own
+query tabs, results, and table drafts.
+
+</details>
+
+## Project status
+
+> [!IMPORTANT]
+> **Pre-beta stabilization · macOS first.** No public beta has been published yet.
+> CI installers are unsigned test artifacts, not notarized releases.
+> Use disposable or non-production data while testing.
+
+- **First beta:** macOS, with separate Apple Silicon and Intel build jobs.
+  Minimum macOS and final installer acceptance are still being qualified.
+- **Database scope:** PostgreSQL only. Integration checks cover PostgreSQL 14–18;
+  backup and restore are same-major operations, not a cross-version migration tool.
+- **Later:** Windows and Linux. Their project configuration is not a support guarantee.
+
+For testing instructions and known limits, read the [tester guide](docs/tester-guide.md).
+The [stabilization report](docs/beta-stabilization-verification.md) records what has
+actually been verified.
+
+## Getting started
+
+### Build and run on macOS
+
+There is no public beta download yet. To explore the current app, build from source.
+
+You'll need:
+
+- **Node.js 22 (22.13+) or 24+** and npm.
+- **Rustup** — the repository pins Rust **1.88.0**.
+- **Xcode Command Line Tools**, following the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/#macos).
+- **OpenSSL 3** for the bundled PostgreSQL clients, available with `brew install openssl@3`.
+  See the [client build requirements](docs/bundled-postgres.md#developerci-setup--not-end-user-instructions) for alternatives.
+
+```sh
+git clone https://github.com/Kasperekx/opaline.git
+cd opaline
+npm ci
 npm run tauri dev
 ```
 
-Useful checks:
+The first desktop build downloads and compiles the pinned PostgreSQL client tools;
+allow extra time and internet access. Later builds reuse a verified local cache.
+**End users do not need to install PostgreSQL client tools.** Opaline does not
+bundle a database server; connect to an existing PostgreSQL instance.
 
-```bash
-npm test
-npm run build
-cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+To build a local desktop bundle:
+
+```sh
+npm run tauri build
 ```
 
-PostgreSQL integration tests run when `OPALINE_TEST_POSTGRES_PORT` is set. Use a
-disposable server on `127.0.0.1` with database/user `postgres` and password
-`opaline_test`, then run the existing database suite with
-`OPALINE_TEST_POSTGRES_PORT=55432 cargo test` from `src-tauri`.
-The additional session suite is opt-in:
-`OPALINE_TEST_POSTGRES_PORT=55432 cargo test session_tests -- --ignored --test-threads=1`.
-Without that variable, the existing database integration tests are skipped.
-For the self-contained backup/TLS/session matrix on five disposable server versions,
-run `npm run desktop:prepare` followed by `node scripts/test-bundled-postgres.mjs`
-(Docker required only for these development tests). See
-[bundled PostgreSQL clients](docs/bundled-postgres.md).
-The structure test recreates its generated DDL and compares the resulting
-metadata; its test schemas are rolled back after the checks.
+Local builds are not a substitute for signed, notarized release artifacts.
 
-## Workspaces and connections
+### Make your first connection
 
-Choose **Connections → New workspace**, name a product (for example MMO), then
-**New connection**. Choose its environment and access mode, enter the endpoint,
-click **Test connection**, then **Save profile**. Changing settings invalidates
-the test; Rust tests again before persisting the profile.
+Create a workspace → add a connection → choose its environment and access mode →
+test and save → connect.
 
-**Connect** opens a session; the top strip switches between sessions without
-discarding open tabs or drafts. One active session is allowed per saved profile.
-Use **Duplicate** for another independently configured profile (credentials are
-not copied). Disconnect a profile before editing or deleting it.
+Open a table from the explorer or write SQL and press **⌘Enter**. Prefer required,
+verified TLS for remote databases and a least-privileged PostgreSQL role.
 
-Production uses read/write access by default, but opening it requires an explicit
-warning acknowledgment. Choose **Read-only** for a protected session. Environment
-and access are immutable during a session; reconnect after changing the profile.
+<details>
+<summary><strong>Development checks and integration tests</strong></summary>
 
-Profiles and workspace names live in `connections.json` under Tauri's application
-configuration directory. Atomic replacement protects the previous configuration
-when a write fails. Vault cleanup failures remain tracked and visible so they
-can be retried. Linux secure storage requires an unlocked Secret Service desktop
-keyring. There is no fallback to plaintext if secure storage is unavailable.
+Run from the repository root:
 
-SQL drafts/history are stored locally per profile. Earlier unscoped queries are
-still available under **History → Queries from the earlier app version**; opening
-them creates a copy and never executes it. SQL text itself can contain sensitive
-data, so avoid embedding passwords or other secrets in saved queries.
+```sh
+npm run check
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+```
 
-The query library is scoped to a workspace and is also stored locally without
-encryption. Opening a library entry creates a tab in the explicitly named session;
-it never runs SQL. SQL file tabs become local drafts after restart: native file
-access is not silently restored. File Open / Save is limited to 1 MiB UTF-8 SQL.
-If a file changed externally, Save stops; review the other version or use Save as.
+The default Rust suite is not the full database matrix. Some tests are opt-in or
+require a configured disposable server.
 
-Move a disconnected profile from its details panel. Its identity, drafts, history
-and saved credential remain attached to it. Removing a workspace requires moving
-its profiles and query library to another workspace, and disconnecting its sessions.
-It never cascades into profile deletion. Profile import/export is under the
-connection list: imports always create new identities and resolve name collisions
-with a visible suffix. Passwords, vault references and local CA paths are excluded.
-A profile that used its own CA must be configured with a new CA before connecting.
+With Docker installed, run the self-contained PostgreSQL 14–18 matrix:
 
-## Backup / Restore
+```sh
+npm run desktop:prepare
+node scripts/test-bundled-postgres.mjs
+```
 
-Open **Backup / Restore** in the active workspace toolbar. The target connection,
-environment and database remain explicit. Click **Create backup**, choose a file,
-and Opaline selects the matching, integrity-checked bundled client automatically.
-PostgreSQL 14–18 are included (14.24 / 15.19 / 16.15 / 17.11 / 18.6); there is no
-runtime tool download, PATH search, installation or administrator prompt.
-The active connection password is reused in Rust, even when not saved to the OS
-vault. Advanced settings offer an optional password override and trusted custom
-tools; neither is needed for the normal workflow. Engines stay scoped to sessions.
-Dump/restore remain same-major operations, not a cross-version migration wizard.
+The matrix creates disposable servers on random loopback ports. Never point
+integration tests at a real product database. See [Contributing](CONTRIBUTING.md)
+for security checks and review expectations.
 
-Backups support custom archives and plain SQL, the whole database or selected
-schemas/tables, and structure/data/both. Partial dumps may lack dependencies.
-Cluster roles/tablespaces are not included. A native Save dialog approves the
-destination; a private sibling file is published only after success.
+</details>
 
-Restore accepts a trusted custom archive or UTF-8 SQL script into the current
-database, or **Create a new database on this server**. Creating needs CREATEDB
-permission, a fresh name of 1–63 UTF-8 bytes, typed target confirmation and separate
-consent. Existing names are refused. Creation cannot be rolled back with restore;
-if restore fails, the database is kept for inspection and is never automatically
-dropped. The original profile stays unchanged; add a profile for the new database.
-Inspection makes a
-private snapshot (extra disk space needed), shows its inventory or SQL beginning,
-and binds it to the selected session. The preview is not a security audit.
-Read-only sessions cannot restore. Non-empty targets, dropping archive objects
-and production each require explicit, independent consent, plus the target name.
-Custom restore defaults to skipping original ownership and grants.
+## Local-first, with clear boundaries
 
-SQL runs default to Atomic. Explicitly enable Autocommit in a query tab for VACUUM
-or CREATE DATABASE. Only one statement is allowed per run; select it if necessary.
-Writes save immediately, without application rollback. New/reopened tabs and
-reconnect/restart return to Atomic. Read-only sessions cannot enable autocommit;
-manual BEGIN/COMMIT remain unsupported. Verify outcomes before retrying after errors.
+Connections go from the Rust backend directly to PostgreSQL. There is no Opaline
+server, hosted relay, required account, or automatic telemetry.
 
-Custom restore uses one transaction and stops on error. SQL restore uses patched
-psql restricted mode and stops on error; a trusted script can still contain
-transaction commands or invoke server-side code with external effects. Cancellation
-is not proof of rollback. Reconnect affected sessions and inspect the target before
-retrying; queries and writes are never replayed automatically.
+- **Credentials:** profiles contain settings, never passwords. Remembered passwords
+  use the system vault — Keychain on macOS — with no plaintext fallback.
+- **Queries:** SQL drafts, history, and saved-query libraries are local and
+  **not encrypted by Opaline**. Avoid embedding secrets in SQL.
+- **Table drafts:** pending edits and results stay in memory. They survive tab
+  switches, not crashes or Force Quit.
+- **Writes:** production access requires a warning acknowledgment; it is not forced
+  read-only. Autocommit is explicit, per tab, and resets on reconnect or restart.
+- **Database privileges:** read-only mode is an accidental-write safeguard, not
+  a sandbox. Trusted dumps can execute database code. Opaline never retries writes
+  automatically after an uncertain outcome.
 
-Maintenance excludes concurrent local queries/edits, not other applications.
-Encrypted sessions use hostname-verified TLS and the profile CA (client system
-trust may differ from the desktop app), without plaintext fallback. Passwords go
-through a private temporary password file, never command arguments or logs.
-Session passwords are retained only in Rust memory and zeroized when their session
-is dropped. TLS roots are exported to a private temporary PEM for compatible
-hostname-verified TLS with every bundled client version.
-Limits and remaining verification: [P1 report](docs/p1-verification.md).
+Read the [security and privacy policy](SECURITY.md) before connecting sensitive data.
 
-The [design and implementation plan](docs/connection-workspaces.md) describes
-the workspace/profile/session boundaries. `tests/preview.html` is a development-only
-UI fixture with synthetic data, not a database connection or a production entry.
+## Under the hood
 
-## Structure inspector
+**Tauri 2** · **Rust** · **React 19** · **TypeScript** · **CodeMirror 6** · **Rustls**
 
-Open a table and choose **Structure**. Switching between Data and Structure
-preserves the current data page, selection, and row draft within that table tab.
-The inspector loads metadata on first use; **Refresh** retrieves changes made
-elsewhere. Inspecting or copying a definition never executes its DDL.
+The webview handles the interface; session-scoped Rust commands handle database
+access, credentials, files, and background operations. Features are split by
+responsibility, with shared UI and a typed command boundary. The aim is simple:
+small modules, explicit ownership, and abstractions only where they earn their place.
 
-DDL previews cover regular tables, partitioned parent tables, views, and
-materialized views. They include columns, constraints, indexes, and table/column
-comments. PostgreSQL's own [catalog definition functions](https://www.postgresql.org/docs/current/functions-info.html#FUNCTIONS-INFO-CATALOG-TABLE)
-provide expressions and object definitions. Referenced schemas, types,
-sequences, and tables must already exist. Materialized views are created with
-`WITH NO DATA`.
+## Roadmap
 
-This is a structure preview, not a full backup: ownership, grants, triggers,
-policies, and storage placement are not included. Foreign tables, individual
-partitions, and inherited tables expose their metadata but do not yet generate
-CREATE DDL. Use `pg_dump` when a complete schema export is required.
+The next milestone is a dependable **macOS beta**:
 
-## Security notes
+- Complete data-integrity, failure-recovery, security, and accessibility acceptance.
+- Measure large-data performance and finish native desktop QA.
+- Qualify installers, signing, notarization, and the supported macOS versions.
+- Run a small pilot, fix blockers, and publish only after release approval.
 
-Opaline executes SQL using the privileges of the connected PostgreSQL user.
-Use a least-privileged database role when connecting to important data.
-Read-only sessions reject mutation commands and session/transaction-control SQL;
-supported read queries execute in a PostgreSQL READ ONLY transaction that is
-always rolled back. Unsupported parser syntax fails closed. This is an accidental
-write safeguard, not a sandbox for privileged functions/extensions with external
-effects. Database roles are the actual security boundary.
+Windows/Linux, SSH, and potential Kafka, Docker-log, or diagram integrations are
+outside the first beta. They are future directions, not available features or
+release promises.
 
-The desktop webview uses an explicit Content Security Policy and only exposes
-the scoped capabilities needed for window controls and native file dialogs/exports.
+[Follow the ordered beta checklist →](docs/beta-readiness.md)
 
-Exports begin only after the user chooses a destination in the native save
-dialog. Full-table exports are streamed by Rust into a temporary sibling file,
-then safely published at the selected path. Cancelling or failing an export
-removes its incomplete file.
+## Help shape Opaline
 
-TLS `prefer` can fall back to an unencrypted connection. Use `require` for
-remote databases. Encrypted connections verify the certificate and hostname
-against system trust or the selected custom CA. Custom CA mode requires TLS and
-never changes the OS trust store. `disable` is intended for trusted local development.
+Bug reports, thoughtful UX feedback, and focused pull requests are welcome.
+Use synthetic data in screenshots and examples; never include credentials or
+customer records.
 
-## Near-term roadmap
+[Report a bug or suggest an improvement](https://github.com/Kasperekx/opaline/issues/new/choose)
+· [Read the contribution guide](CONTRIBUTING.md)
 
-The ordered [alpha-to-beta plan](docs/beta-plan.md) is the source of truth for
-upcoming work and acceptance criteria:
+For suspected vulnerabilities, follow [SECURITY.md](SECURITY.md), not public Issues.
+Discuss substantial features before implementing them so scope and safety can be
+reviewed together.
 
-1. Protect unsaved work, complete workspace navigation, and harden session/transaction handling.
-2. Verify data correctness, security, performance, and desktop accessibility.
-3. Stabilize the implemented SQL/data workflows and PostgreSQL dump/restore (P1).
-4. Validate native platforms, prepare release installers, and run a beta pilot.
+---
 
-SSH tunnels and advanced database tooling remain post-beta unless explicitly
-promoted into the release scope. Existing verification results are documented
-separately and are not a guarantee of readiness on untested platforms.
-
-## Contributing
-
-Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-before proposing a large change.
-
-## License
-
-MIT © 2026 Opaline contributors
+<p align="center">
+  <strong>Opaline</strong> — a calmer place for your databases.<br />
+  <a href="LICENSE">MIT License</a> · © 2026 Opaline contributors
+</p>

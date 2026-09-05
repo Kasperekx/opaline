@@ -28,6 +28,7 @@
         "theme": "Dark",
         "hiddenTitle": true,
         "titleBarStyle": "Transparent"
+
       }
     ],
     "security": {
