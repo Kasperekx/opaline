@@ -46,7 +46,6 @@ function Application() {
     else setConnecting(profile);
   };
   return (
-    
     <div
       className={
         "application-shell" + (manager.sessions.length ? " has-sessions" : "")
