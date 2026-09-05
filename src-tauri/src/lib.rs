@@ -43,11 +43,7 @@ pub fn run() {
         .manage(app_exit::ExitState::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if !window
-                    .state::<app_exit::ExitState>()
-                    .ready
-                    .load(std::sync::atomic::Ordering::Acquire)
-                {
+                if !window.state::<app_exit::ExitState>().needs_confirmation() {
                     return;
                 }
                 api.prevent_close();
@@ -61,6 +57,8 @@ pub fn run() {
             app.manage(profiles::ProfileStore::new(
                 app.path().app_config_dir()?.join("connections.json"),
             ));
+            #[cfg(target_os = "macos")]
+            app_exit::macos::install(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -112,9 +110,7 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 let state = app.state::<app_exit::ExitState>();
-                if state.ready.load(std::sync::atomic::Ordering::Acquire)
-                    && !state.allowed.load(std::sync::atomic::Ordering::Acquire)
-                {
+                if state.needs_confirmation() {
                     api.prevent_exit();
                     let _ = app.emit("request-app-exit", ());
                 }

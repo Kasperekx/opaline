@@ -85,3 +85,45 @@ it.each([false, true])(
     }
   },
 );
+
+it("repeated native Quit requests cannot bypass a failed save", async () => {
+  let exitRequested!: EventCallback<unknown>;
+  vi.mocked(listen).mockImplementation(async (_event, callback) => {
+    exitRequested = callback as EventCallback<unknown>;
+    return vi.fn();
+  });
+  const save = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  const exit = vi.fn();
+  mockIPC((command) => {
+    if (command === "exit_application") exit();
+  });
+  function SavableDraft() {
+    useWorkRisk({ label: "Native quit table draft", dirty: true, save });
+    return <NativeExitGuard />;
+  }
+  const user = userEvent.setup();
+  render(
+    <WorkSafetyProvider>
+      <SavableDraft />
+    </WorkSafetyProvider>,
+  );
+  await waitFor(() => expect(exitRequested).toBeDefined());
+  const quit = () =>
+    act(() =>
+      exitRequested({ event: "request-app-exit", id: 1, payload: null }),
+    );
+  quit();
+  quit();
+  expect(exit).not.toHaveBeenCalled();
+  await user.click(screen.getByText("Save and continue"));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Save was not completed or confirmed",
+  );
+  expect(exit).not.toHaveBeenCalled();
+  await user.click(screen.getByText("Keep working"));
+  quit();
+  expect(exit).not.toHaveBeenCalled();
+  await user.click(screen.getByText("Save and continue"));
+  await waitFor(() => expect(exit).toHaveBeenCalledOnce());
+  expect(save).toHaveBeenCalledTimes(2);
+});

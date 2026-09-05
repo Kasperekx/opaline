@@ -120,6 +120,9 @@ każdego ujawnionego błędu. Podgląd w przeglądarce nie zastępuje tych test�
 
 - [ ] Natywnie sprawdzić wyjście z aplikacji, zamknięcie karty, rozłączenie oraz
   odświeżenie z lokalnymi zmianami: Save / Discard / Keep working.
+  Lokalny build QA: poprawiono omijanie ochrony przez Cmd+Q; ponowny odbiór
+  Cmd+Q/menu Quit/zamknięcia okna oraz nieudanego zapisu przeszedł. Dock Quit,
+  pozostałe akcje i finalna paczka nadal wymagają pełnego odbioru.
 - [ ] Uśpienie/wybudzenie, utrata sieci, restart PostgreSQL, timeout i anulowanie
   podczas zapisu, odczytu i eksportu. Nie pozostają wiszące blokady/zadania.
 - [ ] Reconnect nie uruchamia SQL samoczynnie, nie zmienia celu karty i nie gubi
@@ -205,6 +208,8 @@ każdego ujawnionego błędu. Podgląd w przeglądarce nie zastępuje tych test�
   oraz wysłać kod po zatwierdzeniu publikacji. Gitleaks: staging i historia bez wykryć.
 - [ ] Uruchomić istniejący workflow na zdalnym CI i naprawić rzeczywiste błędy
   na wszystkich zadeklarowanych systemach. Plik YAML nie oznacza zielonego CI.
+  `ce8bfc4` i `4d616f7`: po 12 zielonych jobów, w tym macOS ARM/Intel.
+  Każdy późniejszy kandydat (w tym poprawka natywnego Quit) wymaga własnego CI.
 - [x] Dołączyć do CI i lokalnej macierzy `database::table_changes` wymagające
   PostgreSQL. Opt-in testy są teraz faktycznie uruchamiane dla wersji 14–18.
 - [ ] Przetestować edycję/duplikowanie na zadeklarowanych wersjach serwera.

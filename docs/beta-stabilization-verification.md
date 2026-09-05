@@ -23,6 +23,11 @@ No release/tag, paid account, certificate purchase or automatic update was creat
   packaging jobs. [Run 33974863022](https://github.com/Kasperekx/opaline/actions/runs/33974863022)
   completed successfully (all 12 jobs, including both macOS packages). This pass
   applies to `ce8bfc4`, not automatically to later feature commits.
+- `4d616f7`: new-database restore, explicit autocommit and beta safeguards.
+  [Run 33976849927](https://github.com/Kasperekx/opaline/actions/runs/33976849927)
+  completed successfully (all 12 jobs, including both macOS packages).
+  The subsequent native Quit fix needs its own CI run; this success is not
+  attributed to that later revision.
 - Current workflow includes actual ignored table-change/session suites, real
   PostgreSQL 14–18 jobs, secret scanning and target dependency audits. macOS artifacts
   carry the commit, version, architecture and SHA-256 in `build-info.json` and Help
@@ -67,7 +72,7 @@ Cancellation is scoped to the random job marker, role and actual target database
 
 ## Automated verification
 
-- Frontend: 106 Vitest tests; TypeScript, ESLint, Prettier and Vite build pass.
+- Frontend: 107 Vitest tests; TypeScript, ESLint, Prettier and Vite build pass.
 - Security-gate unit tests: 3 Node tests pass; a compiled unsafe dependency fails
   while excluded-platform findings remain visible; malformed evidence fails closed.
 - Rust format/Clippy checks pass locally. The default library suite contains
@@ -104,6 +109,47 @@ SQL toolbar, explicit autocommit dialog, new-database restore fields/consents an
 sticky footer reachable; many tabs scroll, reopen action stays compact. The fixture
 cannot execute backup/restore and intentionally throws instead of reporting success.
 This is browser layout verification, not native WebKit, VoiceOver or clean-machine QA.
+
+### Native packaged QA — macOS 26.3, Apple Silicon
+
+A separately identified `Opaline Beta QA.app` was built in release mode and run
+with isolated app configuration and one owned disposable PostgreSQL 17 container.
+It did not use the user's existing profiles or database. This is a local QA variant,
+not the final signed artifact or proof of macOS 15/Intel/clean-machine support.
+
+Verified through native WebKit and system file dialogs:
+
+- First-run workspace/profile creation, connection test, save without password,
+  connection with a session-only password and real SQL results.
+- Double-click editing and Enter leave a local draft: an independent server read
+  confirmed no write until Save changes. Saved values were then visible on the server.
+- Backup automatically selected bundled clients and produced a valid custom archive.
+  Inspection and separately confirmed restore created a new database with the expected
+  records; the original profile/session remained on its original database.
+- VACUUM succeeded with explicitly confirmed autocommit. A new query tab defaulted
+  to Atomic. After restarting/reconnecting, the restored VACUUM text was not executed
+  and its mode was Atomic again.
+- Native QA discovered a real blocker: Cmd+Q exited despite a staged table draft.
+  Tauri's standard macOS Quit bypasses its `ExitRequested` handler, matching the
+  [upstream report](https://github.com/tauri-apps/tauri/issues/9198).
+  A macOS-only AppKit adapter now adds the missing `applicationShouldTerminate:`
+  delegate callback. It cancels native termination and routes to the existing safety
+  dialog; only approved save/discard grants exit. It never replaces the delegate
+  or an existing termination method and refuses setup if that assumption changes.
+- The rebuilt app passed Cmd+Q, repeated Cmd+Q and application-menu Quit, plus
+  window-close protection. Keep working retained the draft. A deliberately induced
+  UNIQUE conflict blocked Save and continue without losing the draft. After resolving
+  that test conflict, confirmed Save and continue wrote the value and exited.
+  A separate Discard changes exited without writing, confirmed by a server read.
+- Exit-state unit coverage and a repeated-Quit/failed-save frontend regression pass.
+  Clippy, release packaging and both target-specific dependency audits pass after
+  the native bridge; the direct Objective-C dependencies were already in the graph.
+
+The Dock surface was unavailable to the UI automation, so **Dock Quit remains a
+manual acceptance check**, despite using the same AppKit callback. Force Quit,
+crashes and OS termination are not protected and memory-only row drafts cannot be
+recovered after them. Native Keychain/VoiceOver, sleep, installation/update and
+resource/performance qualification remain open.
 
 ## What still blocks release
 

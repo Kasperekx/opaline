@@ -2837,6 +2837,8 @@ dependencies = [
  "fs2",
  "futures-util",
  "keyring",
+ "objc2",
+ "objc2-app-kit",
  "rustls",
  "rustls-native-certs",
  "rustls-tokio-postgres",

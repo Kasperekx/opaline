@@ -49,7 +49,9 @@ a role with only the required privileges, not real production data.
   New/reopened tabs and reconnect/restart return to Atomic.
 - If a write response or COMMIT is lost, inspect the database before retrying.
   Opaline never retries writes automatically. Table drafts survive tab switches,
-  but are memory-only and do not survive crashes.
+  but are memory-only and do not survive crashes or Force Quit. Normal window
+  close, Cmd+Q and Quit from the application menu/Dock must offer protection for
+  pending changes; Force Quit and system termination cannot be intercepted.
 - SQL files are at most 1 MiB UTF-8. Cmd+O opens; Cmd+S saves; Cmd+Shift+S saves as.
   Format is undoable and does not execute SQL.
 
@@ -80,7 +82,11 @@ Dump code is trusted code, not sandboxed. Cancellation is not proof of rollback.
 4. Back up a disposable database and restore into a new database; compare rows and structure.
 5. Run VACUUM with explicit autocommit, then reconnect and check Atomic is the default.
 6. Resize to 760 × 560, enlarge the font, and complete tasks using the keyboard.
-7. Restart with saved SQL and verify recovery; test normal exit with pending table changes.
+7. Restart with saved SQL and verify recovery. With pending table changes, test
+   the close button, Cmd+Q, application-menu Quit and Dock Quit separately:
+   Keep working retains the draft; Discard exits without writing; Save and continue
+   exits only after a confirmed save. Repeat Quit while the dialog is open and
+   test a failed save. Use only synthetic records for these checks.
 
 ## Report a problem
 
