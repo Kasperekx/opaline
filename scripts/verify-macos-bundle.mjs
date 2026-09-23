@@ -26,6 +26,14 @@ export async function verifyClients(directory, target, releases) {
   return manifest;
 }
 
+export async function verifySignature(app, release = false) {
+  await execute("codesign", ["--verify", "--deep", "--strict", "--verbose=2", app]);
+  if (release) {
+    await execute("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
+    await execute("xcrun", ["stapler", "validate", app]);
+  }
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   assert.equal(process.platform, "darwin", "Run the installer acceptance check on macOS");
   const app = path.resolve(process.argv[2] ?? "src-tauri/target/release/bundle/macos/Opaline.app");
@@ -41,11 +49,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       assert.ok(stdout.trim().endsWith(item.version), "Packaged tool version mismatch");
     }
   }
-  if (process.argv.includes("--release")) {
-    await execute("codesign", ["--verify", "--deep", "--strict", "--verbose=2", app]);
-    await execute("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
-    await execute("xcrun", ["stapler", "validate", app]);
-  }
+  await verifySignature(app, process.argv.includes("--release"));
   console.log("Packaged clients: integrity, licenses, architecture and clean-environment launch passed.");
-  console.log(process.argv.includes("--release") ? "Signature, Gatekeeper and stapled ticket passed; manual acceptance still required." : "Development check only: signing/notarization NOT verified.");
+  console.log(process.argv.includes("--release") ? "Signature, Gatekeeper and stapled ticket passed; manual acceptance still required." : "Bundle signature verified (ad-hoc allowed); Developer ID, Gatekeeper acceptance and notarization NOT verified.");
 }

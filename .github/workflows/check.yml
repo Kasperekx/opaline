@@ -69,6 +69,7 @@ jobs:
       - run: brew install openssl@3
       - run: npm ci
       - run: npm run desktop:prepare
+      - run: node --test scripts/verify-macos-bundle.test.mjs
       - run: npm run build
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

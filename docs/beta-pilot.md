@@ -18,6 +18,16 @@ No Kafka, Docker logs, SSH or additional providers in this candidate.
 
 ## Preparing the GitHub release draft
 
+The initial draft from commit `12dc925` is rejected: its main executable had only
+a linker ad-hoc signature, without a complete application resource seal. Do not
+distribute its DMG (SHA-256 `195387b863df85b6505d9eac4bb13371c0c2910ab47d62a91bbc327301c1b005`).
+The corrected configuration explicitly signs the application ad-hoc before DMG
+creation. Both macOS CI jobs now verify the full bundle signature, even without
+`--release`, and run a native regression test for missing/tampered resource seals.
+Bundled PostgreSQL hashes must still match; signing must not rewrite those tools.
+Ad-hoc signing is not Developer ID signing or notarization. Browser-downloaded
+installer acceptance remains necessary before replacing the rejected draft.
+
 The first candidate is `0.1.0-beta.1`, Apple Silicon only. In GitHub Actions,
 open **Quality gates → Run workflow**, select `main`, and enable **Prepare an
 unsigned Apple Silicon beta draft after all quality gates pass**.
