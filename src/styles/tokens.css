@@ -1,0 +1,54 @@
+/* Opaline — warm graphite, restrained amber, semantic environments.
+   App text uses the platform font; only database values and SQL use monospace. */
+:root {
+  color-scheme: dark;
+  --bg: #161719;
+  --rail: #1b1c1e;
+  --surface: #1e1f21;
+  --surface-2: #252628;
+  --surface-3: #303133;
+  --line: #ffffff0d;
+  --line-strong: #ffffff1c;
+  --text: #eeede9;
+  --text-soft: #bcbcb7;
+  --muted: #999b97;
+  --accent: #dfbb79;
+  --accent-hover: #edcc91;
+  --accent-ink: #292318;
+  --accent-soft: #dfbb7912;
+  --accent-line: #dfbb7947;
+  --teal: #8bd0bd;
+  --danger: #f1a09b;
+  --radius: 10px;
+  --navigator-width: 224px;
+  --editor-font-size: 15px;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --text-2xs: 11px;
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 14px;
+  --text-lg: 18px;
+  --text-xl: 28px;
+  --font-mono: "SFMono-Regular", "Cascadia Code", ui-monospace, monospace;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+:root[data-font-size="large"] {
+  --text-2xs: 12px;
+  --text-xs: 14px;
+  --text-sm: 15px;
+  --text-md: 15px;
+  --editor-font-size: 17px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff26 transparent;
+}
+::selection {
+  color: var(--text);
+  background: var(--accent-line);
+}

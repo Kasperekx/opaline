@@ -15,12 +15,10 @@ export function TableSelectionBar({
   table,
   tab,
   locked,
-  onExport,
 }: {
   table: TableDataController;
   tab: TableTab;
   locked: boolean;
-  onExport: (format: "csv" | "json") => void;
 }) {
   const { session } = useDatabaseSession();
   const [draft, setDraft] = useState<{
@@ -39,24 +37,18 @@ export function TableSelectionBar({
   if (!table.selectedCount) return null;
   return (
     <>
-      <div className="table-selection-bar">
-        <strong>{table.selectedCount} selected</strong>
-        <span>Changes are staged, not immediately saved</span>
+      <div
+        className="table-selection-bar"
+        role="group"
+        aria-label="Selected row actions"
+      >
+        <strong role="status">
+          {table.selectedCount} {table.selectedCount === 1 ? "row" : "rows"}{" "}
+          selected
+        </strong>
         <div>
           <button
-            disabled={locked || table.changes.summary.rows.length > 0}
-            onClick={() => onExport("csv")}
-          >
-            CSV
-          </button>
-          <button
-            disabled={locked || table.changes.summary.rows.length > 0}
-            onClick={() => onExport("json")}
-          >
-            JSON
-          </button>
-          <button
-            disabled={!editable}
+            disabled={!editable || !writableColumns(columns).length}
             onClick={() => {
               const column = writableColumns(columns)[0];
               if (column)
@@ -81,7 +73,7 @@ export function TableSelectionBar({
             Mark for deletion
           </button>
           <button disabled={locked} onClick={table.clearSelection}>
-            Clear
+            Clear selection
           </button>
         </div>
       </div>

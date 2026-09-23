@@ -1,6 +1,12 @@
 # Beta Opaline — co jeszcze robimy
 
-Data: 2026-09-05. **Stabilizacja w toku, nie zgoda na publikację.**
+Data: 2026-09-23. **Stabilizacja w toku, nie zgoda na publikację.**
+
+Bieżący odbiór: [kandydat bety](beta-candidate.md). Właściciel potwierdził brak
+konta Apple Developer; wybrał najpierw jawnie niepodpisany, prywatny pilot.
+Podpis/notaryzacja pozostają odłożone, nie ukończone. Aktualne wyniki i paczka QA:
+[ENUM-y i przygotowanie pilota](beta-enum-verification-2026-09-23.md).
+Starsze raporty poniżej są historyczne, nie dotyczą automatycznie obecnego kodu.
 
 Decyzje właściciela: pierwsza beta na **macOS**, Windows/Linux później;
 tworzenie bazy przy restore i jawny autocommit **wchodzą przed betą**.
@@ -26,6 +32,9 @@ historię etapów. Checkbox oznacza pełny odbiór, a nie samo istnienie kodu.
 - Menu komórki zamiast stałego paska; kopiowanie zakresu, inspekcja i duplikowanie
   wiersza jako nowego szkicu. PK resetowany, identity/generated uzupełniane przez bazę.
 - Backup/restore z dołączonymi narzędziami PostgreSQL, bez instalowania ich przez użytkownika.
+- Diagram relacji, nawigacja do tabel oraz wspólny edytor struktury z przeglądem DDL.
+- Tworzenie, zmiana i usuwanie tabel; proste indeksy oraz klucze obce.
+- Skróty przełączania/zamykania kart, pusty widok sesji i podgląd JSON w komórkach.
 
 To funkcje wdrożone lokalnie. **Nie jest to jeszcze odbiór podpisanego wydania na
 wszystkich platformach.** Dowody i ograniczenia: [P0](p0-verification.md),
@@ -42,7 +51,7 @@ wszystkich platformach.** Dowody i ograniczenia: [P0](p0-verification.md),
 | D3 | Odtwarzanie do nowej bazy | Potwierdzone: przed betą. Wdrożone i sprawdzone integracyjnie 14–18; pozostaje odbiór finalnej paczki. |
 | D4 | Komendy poza transakcją | Potwierdzone: jawny autocommit przed betą. Wdrożony per karta, z potwierdzeniem i resetem przy reconnect/restart; testy VACUUM/CREATE DATABASE 14–18. |
 | D5 | Pierwsza grupa testerów | Deweloperzy backendu pracujący z PostgreSQL, początkowo na danych testowych/local/staging. Zapisać ich 3 najczęstsze zadania. |
-| D6 | SSH i pozostałe integracje | SSH przed betą tylko jeśli potrzebuje go wybrana grupa. Kafka, logi Dockera i diagramy proponuję zostawić na kolejną iterację. |
+| D6 | SSH i pozostałe integracje | SSH, Kafka i logi Dockera poza pierwszą betą. Diagramy i edytor struktury są już wdrożone i podlegają odbiorowi. |
 | D7 | Repo, nazwa i kanał kontaktu | Repo wybrane: `Kasperekx/opaline`, podłączone przez SSH. Pozostaje ustalić nazwę wydania, kanał błędów i prywatnych zgłoszeń bezpieczeństwa. |
 
 **Twoje uwagi do decyzji:**
@@ -268,7 +277,7 @@ ten plan ich nie uruchamia.
 
 - Logi Dockera skojarzone z produktem/usługą i środowiskiem.
 - Kafka: podgląd topiców, wiadomości i consumer lag jako integracja.
-- Diagram relacji PostgreSQL i nawigacja po powiązaniach.
+- Rozszerzenia diagramu: eksport i porównywanie schematów.
 - Integracje observability i powiązania przez service/environment/trace ID.
 - SSH, wizualny EXPLAIN, rozbudowane filtry, import CSV/JSON i kolejni providerzy.
 

@@ -87,15 +87,17 @@ pub(crate) async fn fetch_page(
     };
     let searchable_columns = searchable_projection(&metadata.columns);
     let order_clause = order_clause(&metadata, request.sort.as_ref())?;
+    let (conditions, values) = super::table_filter::conditions(&metadata, &request.conditions, 4)?;
     let sql = format!(
         "SELECT {selected_columns}{row_version} \
          FROM {qualified_table} \
          WHERE ($1::text IS NULL OR \
            strpos(lower(concat_ws(' ', {searchable_columns})), lower($1::text)) > 0) \
-         {order_clause} LIMIT $2 OFFSET $3"
+         {conditions} {order_clause} LIMIT $2 OFFSET $3"
     );
     let filter_parameter = filter.as_deref();
-    let parameters: [&(dyn ToSql + Sync); 3] = [&filter_parameter, &limit, &offset];
+    let mut parameters: Vec<&(dyn ToSql + Sync)> = vec![&filter_parameter, &limit, &offset];
+    parameters.extend(values.iter().map(|value| value as &(dyn ToSql + Sync)));
     let rows = client
         .query_raw(&sql, parameters)
         .await
@@ -631,6 +633,55 @@ mod tests {
         assert!(normalize_filter(Some(&"x".repeat(MAX_FILTER_CHARACTERS + 1))).is_err());
     }
 
+    #[test]
+    fn structured_filters_quote_columns_and_bind_values() {
+        use crate::database::{
+            models::{FilterOperator, TableFilter},
+            table_filter::conditions,
+        };
+        let metadata = TableMetadata {
+            relation_kind: "r".into(),
+            columns: vec![ColumnInfo {
+                name: "a\"b".into(),
+                data_type: "text".into(),
+                nullable: true,
+                default_value: None,
+                primary_key: false,
+                identity: false,
+                generated: false,
+                enum_values: vec![],
+            }],
+        };
+        let filters = vec![
+            TableFilter {
+                column: "a\"b".into(),
+                operator: FilterOperator::Contains,
+                value: "%' OR true; --".into(),
+            },
+            TableFilter {
+                column: "a\"b".into(),
+                operator: FilterOperator::IsNotNull,
+                value: String::new(),
+            },
+            TableFilter {
+                column: "a\"b".into(),
+                operator: FilterOperator::Eq,
+                value: String::new(),
+            },
+        ];
+        let (sql, values) = conditions(&metadata, &filters, 4).unwrap();
+        assert!(sql.contains("\"a\"\"b\""));
+        assert!(sql.contains("$4::text") && sql.contains("$5::text::text"));
+        assert!(!sql.contains("OR true"));
+        assert_eq!(values, vec!["%' OR true; --", ""]);
+        let bad = vec![TableFilter {
+            column: "missing".into(),
+            operator: FilterOperator::Eq,
+            value: "1".into(),
+        }];
+        assert!(conditions(&metadata, &bad, 1).is_err());
+    }
+
     #[tokio::test]
     async fn browses_and_mutates_rows_when_postgres_is_configured() {
         let Ok(port) = std::env::var("OPALINE_TEST_POSTGRES_PORT") else {
@@ -699,6 +750,7 @@ mod tests {
                 page: 0,
                 page_size: 10,
                 filter: None,
+                conditions: vec![],
                 sort: Some(TableSort {
                     column: "id".into(),
                     direction: SortDirection::Asc,
@@ -712,6 +764,47 @@ mod tests {
         assert!(first_page.has_more);
         assert_eq!(first_page.rows[0].values[0].as_deref(), Some("1"));
 
+        use crate::database::models::{FilterOperator, TableFilter};
+        let mut filtered = TablePageRequest {
+            schema: schema.clone(),
+            table: "opaline_stage_two".into(),
+            page: 0,
+            page_size: 10,
+            filter: None,
+            sort: None,
+            conditions: vec![
+                TableFilter {
+                    column: "id".into(),
+                    operator: FilterOperator::Gt,
+                    value: "9".into(),
+                },
+                TableFilter {
+                    column: "note".into(),
+                    operator: FilterOperator::IsNull,
+                    value: String::new(),
+                },
+            ],
+        };
+        let result = fetch_page(&client, &filtered).await.unwrap();
+        assert_eq!(result.rows.len(), 3);
+        assert_eq!(result.rows[0].values[0].as_deref(), Some("10"));
+        filtered.conditions = vec![TableFilter {
+            column: "name".into(),
+            operator: FilterOperator::Contains,
+            value: "%' OR true; --".into(),
+        }];
+        assert!(fetch_page(&client, &filtered)
+            .await
+            .unwrap()
+            .rows
+            .is_empty());
+        filtered.conditions = vec![TableFilter {
+            column: "id".into(),
+            operator: FilterOperator::Eq,
+            value: "not an integer".into(),
+        }];
+        assert!(fetch_page(&client, &filtered).await.is_err());
+
         let typed_page = fetch_page(
             &client,
             &TablePageRequest {
@@ -720,6 +813,7 @@ mod tests {
                 page: 0,
                 page_size: 10,
                 filter: None,
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -827,6 +921,7 @@ mod tests {
                 page: 0,
                 page_size: 10,
                 filter: Some("must-not-be-written".into()),
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -842,6 +937,7 @@ mod tests {
                 page: 0,
                 page_size: 10,
                 filter: None,
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -884,6 +980,7 @@ mod tests {
                 page: 0,
                 page_size: 10,
                 filter: Some("bulk-updated".into()),
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -924,6 +1021,7 @@ mod tests {
                 page: 0,
                 page_size: 25,
                 filter: Some("row-12".into()),
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -940,6 +1038,7 @@ mod tests {
                 page: 0,
                 page_size: 25,
                 filter: Some("%".into()),
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -955,6 +1054,7 @@ mod tests {
                 page: 0,
                 page_size: 25,
                 filter: None,
+                conditions: vec![],
                 sort: None,
             },
         )
@@ -974,6 +1074,7 @@ mod tests {
                 page: 0,
                 page_size: 25,
                 filter: None,
+                conditions: vec![],
                 sort: None,
             },
         )

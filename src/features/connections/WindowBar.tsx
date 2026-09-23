@@ -1,12 +1,19 @@
-import { Database, LayoutGrid, LockKeyhole, X } from "lucide-react";
+import {
+  Database,
+  FolderOpen,
+  LockKeyhole,
+  X,
+  ShieldCheck,
+} from "lucide-react";
 import { handleWindowDrag } from "../../shared/lib/window-drag";
+import { BrandMark } from "../../shared/components/BrandMark";
 import {
   environmentLabels,
   type ProductWorkspace,
   type SessionInfo,
 } from "./connection-types";
 
-export function SessionStrip({
+export function WindowBar({
   sessions,
   workspaces,
   activeId,
@@ -23,11 +30,15 @@ export function SessionStrip({
 }) {
   return (
     <nav
-      className="session-strip"
+      className="window-bar"
       aria-label="Active connections"
       data-tauri-drag-region
       onMouseDown={handleWindowDrag}
     >
+      <div className="window-brand">
+        <BrandMark />
+        <strong>Opaline</strong>
+      </div>
       <button
         className={
           "session-manager-button " + (activeId === null ? "selected" : "")
@@ -35,8 +46,8 @@ export function SessionStrip({
         aria-pressed={activeId === null}
         onClick={() => onSelect(null)}
       >
-        <LayoutGrid size={16} />
-        Connections
+        <FolderOpen size={18} />
+        <span>Connections</span>
       </button>
       <div className="session-tabs">
         {sessions.map((session) => (
@@ -76,6 +87,12 @@ export function SessionStrip({
           </div>
         ))}
       </div>
+      {sessions.length === 0 && (
+        <span className="window-private">
+          <ShieldCheck size={14} />
+          On your device
+        </span>
+      )}
     </nav>
   );
 }

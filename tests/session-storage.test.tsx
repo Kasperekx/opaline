@@ -14,13 +14,13 @@ it("keeps SQL scoped per profile and flushes the final edit on immediate disconn
   a.unmount();
   const b = renderHook(() => useWorkspaceTabs("production"));
   expect(
-    b.result.current.activeTab.kind === "query" &&
+    b.result.current.activeTab?.kind === "query" &&
       b.result.current.activeTab.sql,
   ).not.toContain("local only");
   b.unmount();
   const restored = renderHook(() => useWorkspaceTabs("local"));
   expect(
-    restored.result.current.activeTab.kind === "query" &&
+    restored.result.current.activeTab?.kind === "query" &&
       restored.result.current.activeTab.sql,
   ).toBe("select 'local only'");
 });
@@ -42,4 +42,27 @@ it("never mixes profile query history", () => {
   const b = renderHook(() => useQueryHistory("prod"));
   expect(b.result.current.entries).toHaveLength(0);
   expect(a.result.current.entries).toHaveLength(1);
+});
+
+it("persists an empty workspace and can reopen the last query", () => {
+  const hook = renderHook(() => useWorkspaceTabs("empty"));
+  act(() =>
+    hook.result.current.updateSql(hook.result.current.activeTabId, "select 42"),
+  );
+  act(() => hook.result.current.closeTab(hook.result.current.activeTabId));
+  expect(hook.result.current.tabs).toHaveLength(0);
+  expect(hook.result.current.activeTab).toBeNull();
+  hook.unmount();
+  const restored = renderHook(() => useWorkspaceTabs("empty"));
+  expect(restored.result.current.activeTab).toBeNull();
+  act(() => restored.result.current.restoreClosedTab());
+  expect(restored.result.current.activeTab).toMatchObject({
+    kind: "query",
+    sql: "select 42",
+  });
+  act(() =>
+    restored.result.current.closeTab(restored.result.current.activeTabId),
+  );
+  act(() => restored.result.current.openDiagram());
+  expect(restored.result.current.activeTab).toMatchObject({ kind: "diagram" });
 });

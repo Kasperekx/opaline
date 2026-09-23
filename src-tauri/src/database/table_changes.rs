@@ -87,10 +87,10 @@ impl TableChangesError {
 
 // Abort the transport if this future is cancelled, times out, or cannot roll back.
 // A pooled/session connection must never escape with an open transaction.
-struct TransactionGuard<'a> {
-    client: &'a DatabaseClient,
-    tls: Option<rustls::ClientConfig>,
-    finished: bool,
+pub(super) struct TransactionGuard<'a> {
+    pub(super) client: &'a DatabaseClient,
+    pub(super) tls: Option<rustls::ClientConfig>,
+    pub(super) finished: bool,
 }
 impl Drop for TransactionGuard<'_> {
     fn drop(&mut self) {

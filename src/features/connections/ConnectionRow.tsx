@@ -10,6 +10,7 @@ export function ConnectionRow({
   onDetails,
   onConnect,
   onEdit,
+  selected = false,
 }: {
   profile: ConnectionProfile;
   active: boolean;
@@ -17,6 +18,7 @@ export function ConnectionRow({
   onDetails: () => void;
   onConnect: () => void;
   onEdit: () => void;
+  selected?: boolean;
 }) {
   const descriptionId = useId();
   return (
@@ -24,12 +26,14 @@ export function ConnectionRow({
       className={
         "connection-row env-" +
         profile.environment +
-        (active ? " is-connected" : "")
+        (active ? " is-connected" : "") +
+        (selected ? " is-inspected" : "")
       }
     >
       <button
         className="connection-row-main"
         aria-label={`View details for ${profile.name}`}
+        aria-pressed={selected}
         aria-describedby={`${descriptionId}-status ${descriptionId}-destination ${descriptionId}-environment`}
         onClick={onDetails}
       >

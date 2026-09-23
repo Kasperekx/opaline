@@ -50,14 +50,16 @@ where
     let searchable_columns = searchable_projection(&metadata.columns);
     let order = order_clause(&metadata, request.sort.as_ref())?;
     let relation = qualified_name(&request.schema, &request.table);
+    let (conditions, values) = super::table_filter::conditions(&metadata, &request.conditions, 2)?;
     let sql = format!(
         "SELECT {selected_columns} FROM {relation} \
          WHERE ($1::text IS NULL OR \
            strpos(lower(concat_ws(' ', {searchable_columns})), lower($1::text)) > 0) \
-         {order}"
+         {conditions} {order}"
     );
     let filter_parameter = filter.as_deref();
-    let parameters: [&(dyn ToSql + Sync); 1] = [&filter_parameter];
+    let mut parameters: Vec<&(dyn ToSql + Sync)> = vec![&filter_parameter];
+    parameters.extend(values.iter().map(|value| value as &(dyn ToSql + Sync)));
     let stream = client
         .query_raw(&sql, parameters)
         .await
@@ -272,9 +274,10 @@ mod tests {
         let result = export_table(
             &client,
             &ExportTableDataRequest {
-                schema,
+                schema: schema.clone(),
                 table: "opaline_export_target".into(),
                 filter: None,
+                conditions: vec![],
                 sort: None,
                 format: TableExportFormat::Csv,
                 path: destination.to_string_lossy().into_owned(),
@@ -294,13 +297,42 @@ mod tests {
         assert!(contents.starts_with('\u{FEFF}'));
         assert!(contents.contains("\"quoted, value\""));
 
+        let filtered = export_table(
+            &client,
+            &ExportTableDataRequest {
+                schema,
+                table: "opaline_export_target".into(),
+                filter: None,
+                conditions: vec![super::super::models::TableFilter {
+                    column: "id".into(),
+                    operator: super::super::models::FilterOperator::Eq,
+                    value: "3".into(),
+                }],
+                sort: None,
+                format: TableExportFormat::Csv,
+                path: destination.to_string_lossy().into_owned(),
+            },
+            |_| {},
+        )
+        .await
+        .unwrap();
+        assert_eq!(filtered.rows_exported, 1);
+        let filtered_text = tokio::fs::read_to_string(&destination).await.unwrap();
+        assert!(filtered_text.contains("\"quoted, value\""));
+        assert!(!filtered_text.contains("row-4"));
+        let _ = tokio::fs::remove_file(&destination).await;
+
         let cancelled_destination = destination.with_file_name(format!(
             "opaline-cancelled-export-{}.csv",
             std::process::id()
         ));
         let cancel_token = client.cancel_token();
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let mut started = Some(started);
         let cancellation = tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(35)).await;
+            ready
+                .await
+                .expect("export should start before cancellation");
             postgres::cancel_query(&cancel_token, SslMode::Disable)
                 .await
                 .expect("the slow export should accept cancellation");
@@ -311,11 +343,16 @@ mod tests {
                 schema: schema_for_relation(&client, "opaline_slow_export").await,
                 table: "opaline_slow_export".into(),
                 filter: None,
+                conditions: vec![],
                 sort: None,
                 format: TableExportFormat::Csv,
                 path: cancelled_destination.to_string_lossy().into_owned(),
             },
-            |_| {},
+            |_| {
+                if let Some(started) = started.take() {
+                    let _ = started.send(());
+                }
+            },
         )
         .await
         .expect_err("the slow export should be cancelled");

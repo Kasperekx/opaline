@@ -5,6 +5,7 @@ use crate::database::models::ColumnInfo;
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RelationStructure {
+    pub(crate) relation_oid: u32,
     pub(crate) schema: String,
     pub(crate) name: String,
     pub(crate) object_type: String,

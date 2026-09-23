@@ -170,7 +170,7 @@ try {
       OPALINE_TEST_BUNDLED_ROOT: bundle,
       OPALINE_TEST_CA_PATH: ca,
     };
-    for (const filter of ["backup::tests", "tls_tests", "session_tests", "database::table_changes", "database::"]) {
+    for (const filter of ["backup::tests", "tls_tests", "session_tests", "database::table_changes", "diagram_catalog_integration", "schema_crud_is_atomic_checks_snapshots_and_restricts_dependencies", "database::"]) {
       const output = await run(
         "cargo",
         [

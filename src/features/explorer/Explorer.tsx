@@ -10,10 +10,14 @@ import {
   RefreshCw,
   Search,
   Table2,
+  Network,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { databaseObjectKey } from "../../shared/lib/database-object";
 import { primaryModifierLabel } from "../../shared/lib/platform";
+import { ActionMenu } from "../../shared/components/ActionMenu";
 import type {
   ColumnInfo,
   ConnectionInfo,
@@ -21,6 +25,9 @@ import type {
 } from "../../shared/types/database";
 
 type ExplorerProps = {
+  onCreateTable?: () => void;
+  onEditTable?: (object: DatabaseObject, drop?: boolean) => void;
+  onDiagram?: (object: DatabaseObject) => void;
   id: string;
   active: boolean;
   onSwitchConnection: () => void;
@@ -42,6 +49,9 @@ type ExplorerProps = {
 };
 
 export function Explorer({
+  onCreateTable,
+  onEditTable,
+  onDiagram,
   id,
   active,
   onSwitchConnection,
@@ -140,13 +150,24 @@ export function Explorer({
       </div>
       <div className="explorer-label">
         <span>Database objects</span>
-        <button
-          onClick={onRefresh}
-          aria-label="Refresh database objects"
-          disabled={loading}
-        >
-          <RefreshCw className={loading ? "spin" : ""} size={13} />
-        </button>
+        <div className="explorer-actions">
+          {onCreateTable && (
+            <button
+              onClick={onCreateTable}
+              aria-label="New table"
+              title="New table"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+          <button
+            onClick={onRefresh}
+            aria-label="Refresh database objects"
+            disabled={loading}
+          >
+            <RefreshCw className={loading ? "spin" : ""} size={13} />
+          </button>
+        </div>
       </div>
       <div className="tree-scroll">
         {error ? (
@@ -207,6 +228,33 @@ export function Explorer({
                             {isView ? <Eye size={14} /> : <Table2 size={14} />}
                             <span>{object.name}</span>
                           </button>
+                          {onDiagram && !isView && (
+                            <ActionMenu
+                              label={`Actions for ${object.schema}.${object.name}`}
+                              actions={[
+                                ...(onEditTable
+                                  ? [
+                                      {
+                                        label: "Edit structure",
+                                        icon: Columns3,
+                                        onSelect: () => onEditTable(object),
+                                      },
+                                      {
+                                        label: "Drop table…",
+                                        icon: Trash2,
+                                        onSelect: () =>
+                                          onEditTable(object, true),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "Show in diagram",
+                                  icon: Network,
+                                  onSelect: () => onDiagram(object),
+                                },
+                              ]}
+                            />
+                          )}
                         </div>
                         {isExpanded && (
                           <div className="column-list">

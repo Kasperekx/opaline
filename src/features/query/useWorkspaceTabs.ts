@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { databaseObjectKey } from "../../shared/lib/database-object";
 import {
   markUnreadableStorage,
@@ -10,7 +10,15 @@ import type {
   QueryExecutionError,
   QueryResult,
 } from "../../shared/types/database";
-import type { QueryTab, TableTab, WorkspaceTab } from "./query-types";
+import type {
+  DiagramTab,
+  SchemaTab,
+  QueryTab,
+  TableTab,
+  WorkspaceTab,
+} from "./query-types";
+import { validFilters } from "../table/table-view-state";
+import type { OpenRelatedTable } from "../table/table-relations";
 
 const storageKey = (profileId: string) =>
   "opaline.query-session.v2." + profileId;
@@ -24,16 +32,20 @@ type StoredQueryTab = Pick<
   "id" | "title" | "sql" | "lastExecutedSql"
 >;
 
-type StoredTab = StoredQueryTab | TableTab;
+type StoredTab = StoredQueryTab | TableTab | DiagramTab | SchemaTab;
 const serializeTab = (tab: WorkspaceTab): StoredTab =>
-  tab.kind === "table"
-    ? tab
-    : {
-        id: tab.id,
-        title: tab.title,
-        sql: tab.sql,
-        lastExecutedSql: tab.lastExecutedSql,
-      };
+  tab.kind === "diagram"
+    ? { kind: "diagram", id: tab.id, title: tab.title }
+    : tab.kind === "schema"
+      ? { ...tab, drop: false }
+      : tab.kind === "table"
+        ? tab
+        : {
+            id: tab.id,
+            title: tab.title,
+            sql: tab.sql,
+            lastExecutedSql: tab.lastExecutedSql,
+          };
 
 type StoredQuerySession = {
   version?: 2 | 3;
@@ -97,20 +109,41 @@ const loadSession = (key: string): WorkspaceSession => {
         tab &&
         typeof tab.id === "string" &&
         typeof tab.title === "string" &&
-        ("kind" in tab && tab.kind === "table"
-          ? typeof tab.schema === "string" &&
-            typeof tab.table === "string" &&
-            typeof tab.objectType === "string"
-          : "sql" in tab && typeof tab.sql === "string"),
+        ("kind" in tab && tab.kind === "diagram"
+          ? true
+          : "kind" in tab && tab.kind === "schema"
+            ? typeof tab.schema === "string" &&
+              (tab.table === null || typeof tab.table === "string")
+            : "kind" in tab && tab.kind === "table"
+              ? typeof tab.schema === "string" &&
+                typeof tab.table === "string" &&
+                typeof tab.objectType === "string" &&
+                (tab.initialFilters === undefined ||
+                  validFilters(tab.initialFilters))
+              : "sql" in tab && typeof tab.sql === "string"),
     )
     .map<WorkspaceTab>((storedTab) => {
-      if ("kind" in storedTab && storedTab.kind === "table")
-        return createTableTab({
+      if ("kind" in storedTab && storedTab.kind === "schema")
+        return { ...storedTab, drop: false };
+      if ("kind" in storedTab && storedTab.kind === "diagram") {
+        return { kind: "diagram", id: "database-diagram", title: "Diagram" };
+      }
+      if ("kind" in storedTab && storedTab.kind === "table") {
+        const tab = createTableTab({
           schema: storedTab.schema,
           name: storedTab.table,
           objectType: storedTab.objectType,
           estimatedRows: 0,
         });
+        return storedTab.initialFilters
+          ? {
+              ...tab,
+              id: storedTab.id,
+              title: `${tab.title} · related`,
+              initialFilters: storedTab.initialFilters,
+            }
+          : tab;
+      }
       const tab = storedTab as StoredQueryTab;
       return {
         kind: "query",
@@ -136,7 +169,7 @@ const loadSession = (key: string): WorkspaceSession => {
         )
         .slice(0, 20)
     : [];
-  if (tabs.length === 0) return { ...initialSession(), closedTabs };
+  if (tabs.length === 0) return { tabs: [], activeTabId: "", closedTabs };
   const activeTabId =
     typeof stored.activeTabId === "string" &&
     tabs.some((tab) => tab.id === stored.activeTabId)
@@ -149,12 +182,14 @@ export function useWorkspaceTabs(profileId: string) {
   const key = storageKey(profileId);
   const [session] = useState(() => loadSession(key));
   const [tabs, setTabs] = useState<WorkspaceTab[]>(session.tabs);
+  const latestTabs = useRef(tabs);
+  latestTabs.current = tabs;
   const [activeTabId, setActiveTabId] = useState(session.activeTabId);
   const [closedTabs, setClosedTabs] = useState(session.closedTabs ?? []);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const activeTab = useMemo(
-    () => tabs.find((tab) => tab.id === activeTabId) ?? tabs[0]!,
+  const activeTab = useMemo<WorkspaceTab | null>(
+    () => tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null,
     [activeTabId, tabs],
   );
 
@@ -233,12 +268,34 @@ export function useWorkspaceTabs(profileId: string) {
     [tabs, activeTabId],
   );
 
+  const openRelatedTable: OpenRelatedTable = (schema, table, filters) => {
+    if (tabs.length >= 30) {
+      setNotice(
+        "30 open tabs per connection. Close a tab before opening another.",
+      );
+      return;
+    }
+    const tab: TableTab = {
+      kind: "table",
+      id: `related:${createId()}`,
+      title: `${table} · related`,
+      schema,
+      table,
+      objectType: "table",
+      initialFilters: filters,
+    };
+    setTabs((current) => [...current, tab]);
+    setActiveTabId(tab.id);
+  };
   const closeTab = useCallback(
     (id: string) => {
-      if (tabs.length === 1) return;
       const index = tabs.findIndex((tab) => tab.id === id);
       if (index < 0) return;
       const nextTabs = tabs.filter((tab) => tab.id !== id);
+      const nextActiveId =
+        activeTabId === id
+          ? (nextTabs[Math.min(index, nextTabs.length - 1)]?.id ?? "")
+          : activeTabId;
       const closing = tabs[index];
       const nextClosed =
         closing.kind === "query"
@@ -255,7 +312,7 @@ export function useWorkspaceTabs(profileId: string) {
       if (
         !writeLocalJson(key, {
           version: 3,
-          activeTabId,
+          activeTabId: nextActiveId,
           tabs: nextTabs.map(serializeTab),
           closedTabs: nextClosed,
         })
@@ -272,9 +329,7 @@ export function useWorkspaceTabs(profileId: string) {
       }
       setClosedTabs(nextClosed);
       setTabs(nextTabs);
-      if (activeTabId === id) {
-        setActiveTabId(nextTabs[Math.min(index, nextTabs.length - 1)].id);
-      }
+      setActiveTabId(nextActiveId);
     },
     [activeTabId, tabs, closedTabs, key],
   );
@@ -353,7 +408,87 @@ export function useWorkspaceTabs(profileId: string) {
     updateSql,
     updateQueryTab,
     addQueryTab,
+    openDiagram: (object?: { schema: string; name: string }) => {
+      const id = "database-diagram";
+      if (tabs.length >= 30 && !tabs.some((tab) => tab.id === id)) {
+        setNotice(
+          "30 open tabs per connection. Close a tab before opening another.",
+        );
+        return;
+      }
+      const tab: DiagramTab = {
+        kind: "diagram",
+        id,
+        title: "Diagram",
+        focus: object ? { ...object, request: Date.now() } : undefined,
+      };
+      setTabs((current) =>
+        current.some((item) => item.id === id)
+          ? current.map((item) => (item.id === id ? tab : item))
+          : [...current, tab],
+      );
+      setActiveTabId(id);
+    },
     openTable,
+    openSchema: (
+      schema = "public",
+      table: string | null = null,
+      drop = false,
+    ) => {
+      const id = `schema:${JSON.stringify([schema, table])}`;
+      if (tabs.some((tab) => tab.id === id)) {
+        setActiveTabId(id);
+        return;
+      }
+      if (tabs.length >= 30) {
+        setNotice("Close a tab before opening another structure editor.");
+        return;
+      }
+      setTabs((current) => [
+        ...current,
+        {
+          kind: "schema",
+          id,
+          title: table ? `${table} · structure` : "New table",
+          schema,
+          table,
+          drop,
+        },
+      ]);
+      setActiveTabId(id);
+    },
+    schemaApplied: (
+      editorId: string,
+      schema: string,
+      original: string | null,
+      table: string,
+      dropped: boolean,
+    ) => {
+      const remaining = latestTabs.current.filter(
+        (tab) =>
+          tab.id !== editorId &&
+          !(
+            tab.kind === "table" &&
+            tab.schema === schema &&
+            tab.table === original
+          ),
+      );
+      if (!dropped) {
+        const next = createTableTab({
+          schema,
+          name: table,
+          objectType: "table",
+          estimatedRows: 0,
+        });
+        const withoutDuplicate = remaining.filter((tab) => tab.id !== next.id);
+        setTabs([...withoutDuplicate, next]);
+        setActiveTabId(next.id);
+      } else {
+        setTabs(remaining);
+        setActiveTabId(remaining[remaining.length - 1]?.id ?? "");
+      }
+    },
+    openRelatedTable,
     closeTab,
     renameQueryTab,
     setExecution,

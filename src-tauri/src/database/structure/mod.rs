@@ -34,6 +34,7 @@ pub(crate) async fn inspect(
     }
     .into();
     Ok(RelationStructure {
+        relation_oid: metadata.oid,
         schema: schema.into(),
         name: table.into(),
         object_type,

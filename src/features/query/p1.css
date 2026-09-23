@@ -110,34 +110,6 @@
 .p1-command:hover {
   background: var(--surface-3);
 }
-.p1-library-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  padding: 8px 0;
-  gap: 8px;
-}
-.p1-library-row > button:first-child {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 8px;
-  padding: 8px;
-}
-.p1-library-row code {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-  color: var(--text-soft);
-}
-.p1-library-row small {
-  color: var(--text-soft);
-}
 .editor-actions {
   flex-wrap: wrap;
 }
@@ -253,15 +225,6 @@
 .interactive-grid td {
   max-width: none;
 }
-.p1-library-row > button:first-child {
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  color: var(--text);
-}
-.p1-library-row > button:first-child:hover {
-  background: var(--surface-3);
-}
 .p1-command {
   border: 0;
   background: transparent;
@@ -285,4 +248,33 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+.workspace-empty {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vw, 64px);
+}
+.workspace-empty-content {
+  width: min(100%, 520px);
+  color: var(--muted);
+}
+.workspace-empty h1 {
+  font-size: 22px;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin: 20px 0 8px;
+}
+.workspace-empty p {
+  margin: 0;
+  line-height: 1.6;
+}
+.workspace-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0 12px;
 }

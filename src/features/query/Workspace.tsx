@@ -2,8 +2,10 @@ import {
   Check,
   Copy,
   Loader2,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelsTopLeft,
+  ChevronDown,
+  CircleHelp,
+  X,
   Play,
   Square,
   SquareTerminal,
@@ -15,18 +17,24 @@ import {
   Command,
   HardDriveDownload,
   RotateCcw,
+  Clock3,
+  Settings2,
+  Database,
+  Network,
 } from "lucide-react";
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
+  lazy,
+  Suspense,
   type CSSProperties,
 } from "react";
 import { Explorer } from "../explorer/Explorer";
-import { AppRail, type RailItem } from "../../shared/components/AppRail";
+import { HelpDialog } from "../../shared/components/HelpDialog";
 import { ResizeHandle } from "../../shared/components/ResizeHandle";
-import { TopBar } from "../../shared/components/TopBar";
+import { ActionMenu } from "../../shared/components/ActionMenu";
 import { useMediaQuery } from "../../shared/hooks/useMediaQuery";
 import { primaryModifierLabel } from "../../shared/lib/platform";
 import type {
@@ -52,6 +60,9 @@ import { useWorkspaceCommands } from "./useWorkspaceCommands";
 import "./p1.css";
 import { BackupDialog } from "../backup/BackupDialog";
 import { QueryExecutionControl } from "./QueryExecutionControl";
+import { SchemaEditor } from "../structure/SchemaEditor";
+
+const DiagramWorkspace = lazy(() => import("../diagram/DiagramWorkspace"));
 
 type WorkspaceProps = {
   connection: SessionInfo;
@@ -65,7 +76,7 @@ type WorkspaceProps = {
   onDisconnect: () => void;
 };
 
-type WorkspacePanel = Extract<RailItem, "history" | "settings">;
+type WorkspacePanel = "history" | "settings";
 
 export function Workspace({
   connection,
@@ -87,13 +98,15 @@ export function Workspace({
     busy: workspace.runningTabId !== null,
   });
   const layout = useWorkspaceLayout();
-  const compactLayout = useMediaQuery("(max-width: 980px)");
+  const compactWindow = useMediaQuery("(max-width: 1080px)");
   const editorRef = useRef<SqlEditorHandle>(null);
   const documents = useSqlDocuments(workspace.tabs, connection.id, editorRef);
   const completions = useSqlCompletions(workspace.objects);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [schemaRevision, setSchemaRevision] = useState(0);
+  const [schemaApplying, setSchemaApplying] = useState(false);
   const [dirtyTableIds, setDirtyTableIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -107,10 +120,12 @@ export function Workspace({
     });
   }, []);
   const querySplitRef = useRef<HTMLDivElement>(null);
-  const [explorerVisible, setExplorerVisible] = useState(() => !compactLayout);
+  const [explorerVisible, setExplorerVisible] = useState(!compactWindow);
+  const navigatorTrigger = useRef<HTMLButtonElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<WorkspacePanel | null>(null);
   const activeTab = workspace.tabs.activeTab;
-  const activeQueryTab = activeTab.kind === "query" ? activeTab : null;
+  const activeQueryTab = activeTab?.kind === "query" ? activeTab : null;
   const activeResult = activeQueryTab?.result ?? null;
   const activeSet =
     activeResult?.resultSets[workspace.activeResultIndex] ?? null;
@@ -121,6 +136,15 @@ export function Workspace({
     activeQueryTab.sql !== activeQueryTab.lastExecutedSql;
 
   const commands = useWorkspaceCommands({
+    onCloseTab: (id) =>
+      safety.request(() => workspace.tabs.closeTab(id), {
+        sessionId: connection.id,
+        tabId: id,
+      }),
+    onSelectTab: (id) => {
+      workspace.tabs.setActiveTabId(id);
+      workspace.setActiveResultIndex(0);
+    },
     active,
     hasQuery: activeQueryTab !== null,
     workspace,
@@ -132,7 +156,27 @@ export function Workspace({
     onOpenBackup: () => setBackupOpen(true),
     onOpenCommands: () => setCommandsOpen(true),
   });
-  useEffect(() => setExplorerVisible(!compactLayout), [compactLayout]);
+  useEffect(() => {
+    if (!active || !explorerVisible) return;
+    const frame = requestAnimationFrame(() =>
+      document
+        .getElementById(`database-explorer-${connection.id}`)
+        ?.querySelector<HTMLInputElement>("input")
+        ?.focus(),
+    );
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || document.querySelector("dialog[open]"))
+        return;
+      event.preventDefault();
+      setExplorerVisible(false);
+      navigatorTrigger.current?.focus();
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", dismiss);
+    };
+  }, [active, explorerVisible, connection.id]);
 
   const togglePanel = (panel: WorkspacePanel) => {
     setOpenPanel((current) => (current === panel ? null : panel));
@@ -140,15 +184,12 @@ export function Workspace({
 
   const resizeEditor = useCallback(
     (delta: number) => {
-      const height = querySplitRef.current?.clientHeight ?? 0;
-      if (height > 0) layout.resizeEditor((delta / height) * 100);
+      const extent = querySplitRef.current?.clientHeight;
+      if (extent) layout.resizeEditor((delta / extent) * 100);
     },
     [layout],
   );
 
-  const shellStyle = {
-    "--explorer-width": `${layout.explorerWidth}px`,
-  } as CSSProperties;
   const splitStyle = {
     "--editor-ratio": `${layout.editorRatio}fr`,
     "--results-ratio": `${100 - layout.editorRatio}fr`,
@@ -156,118 +197,91 @@ export function Workspace({
 
   return (
     <div
-      className={`workspace-shell ${explorerVisible ? "" : "explorer-hidden"}`}
-      style={shellStyle}
+      className={`workbench ${explorerVisible ? "navigator-open" : ""} ${compactWindow ? "navigator-overlay" : ""}`}
     >
       {workspace.tabs.tabs
         .filter((tab) => tab.kind === "query")
         .map((tab) => (
           <FileWorkRisk key={tab.id} tab={tab} sessionId={connection.id} />
         ))}
-      <AppRail
-        connected={status === "active" || status === "busy"}
-        activeItem={openPanel ?? "connections"}
-        onConnections={onManageConnections}
-        onHistory={() => togglePanel("history")}
-        onSettings={() => togglePanel("settings")}
-      />
-      <Explorer
-        id={`database-explorer-${connection.id}`}
-        active={active}
-        onSwitchConnection={onSwitchConnection}
-        onReveal={() => setExplorerVisible(true)}
-        connection={connection}
-        objects={workspace.objects}
-        selected={workspace.selected}
-        expandedObjectKey={workspace.expandedObjectKey}
-        columns={workspace.columns}
-        filter={workspace.filter}
-        loading={workspace.explorerBusy}
-        columnsLoading={workspace.columnsBusy}
-        error={workspace.explorerError}
-        columnsError={workspace.columnsError}
-        onFilter={workspace.setFilter}
-        onRefresh={() => {
-          completions.refresh();
-          void workspace.refreshObjects();
-        }}
-        onSelect={(object) => {
-          workspace.selectObject(object);
-          if (compactLayout) setExplorerVisible(false);
-        }}
-        onToggle={workspace.toggleObject}
-      />
-      <ResizeHandle
-        className="explorer-resize-handle"
-        label="Resize database explorer"
-        minimum={240}
-        maximum={440}
-        orientation="vertical"
-        value={layout.explorerWidth}
-        onResize={layout.resizeExplorer}
-        onReset={layout.resetExplorer}
-      />
-      {compactLayout && explorerVisible && (
+      <div className="object-navigator" hidden={!explorerVisible}>
+        <Explorer
+          onCreateTable={() => workspace.tabs.openSchema()}
+          onEditTable={(object, drop) =>
+            workspace.tabs.openSchema(object.schema, object.name, drop)
+          }
+          onDiagram={workspace.tabs.openDiagram}
+          id={`database-explorer-${connection.id}`}
+          active={active}
+          onSwitchConnection={onSwitchConnection}
+          onReveal={() => setExplorerVisible(true)}
+          connection={connection}
+          objects={workspace.objects}
+          selected={workspace.selected}
+          expandedObjectKey={workspace.expandedObjectKey}
+          columns={workspace.columns}
+          filter={workspace.filter}
+          loading={workspace.explorerBusy}
+          columnsLoading={workspace.columnsBusy}
+          error={workspace.explorerError}
+          columnsError={workspace.columnsError}
+          onFilter={workspace.setFilter}
+          onRefresh={() => {
+            completions.refresh();
+            void workspace.refreshObjects();
+          }}
+          onSelect={(object) => {
+            workspace.selectObject(object);
+            if (compactWindow) {
+              setExplorerVisible(false);
+              requestAnimationFrame(() => navigatorTrigger.current?.focus());
+            }
+          }}
+          onToggle={workspace.toggleObject}
+        />
         <button
-          className="explorer-backdrop"
+          className="icon-button navigator-close"
           aria-label="Close database explorer"
-          onClick={() => setExplorerVisible(false)}
+          onClick={() => {
+            setExplorerVisible(false);
+            navigatorTrigger.current?.focus();
+          }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+      {explorerVisible && compactWindow && (
+        <button
+          className="navigator-backdrop"
+          aria-label="Dismiss database explorer"
+          onClick={() => {
+            setExplorerVisible(false);
+            navigatorTrigger.current?.focus();
+          }}
         />
       )}
-      <main className="query-workspace">
-        <TopBar
-          title={connection.database}
-          subtitle={`${connection.username}@${connection.host}`}
-          action={
-            <div className="workspace-actions" data-no-drag>
-              <button
-                className="toolbar-button"
-                title="Backup / Restore database"
-                onClick={() => setBackupOpen(true)}
-              >
-                <HardDriveDownload size={17} />
-                Backup / Restore
-              </button>
-              <button
-                className="icon-button"
-                title={`Commands · ${primaryModifierLabel} ⇧ P`}
-                aria-label="Open command palette"
-                onClick={() => setCommandsOpen(true)}
-              >
-                <Command size={17} />
-              </button>
-              <button
-                className="icon-button"
-                title="Query library"
-                aria-label="Query library"
-                onClick={() => setLibraryOpen(true)}
-              >
-                <BookMarked size={17} />
-              </button>
-              <EnvironmentBadge
-                environment={connection.environment}
-                readOnly={connection.readOnly}
-              />
-              <button
-                className="icon-button"
-                title={
-                  workspace.runningTabId
-                    ? "Wait for the query to finish"
-                    : "Disconnect"
-                }
-                aria-label="Disconnect"
-                disabled={workspace.runningTabId !== null}
-                onClick={onDisconnect}
-              >
-                <Unplug size={17} />
-              </button>
-            </div>
-          }
-        />
+      <main
+        className="workbench-canvas"
+        data-environment={connection.environment}
+      >
         <WorkspaceTabs
+          startAction={
+            <button
+              ref={navigatorTrigger}
+              className="navigator-trigger"
+              aria-label="Browse database tables"
+              aria-expanded={explorerVisible}
+              aria-controls={`database-explorer-${connection.id}`}
+              onClick={() => setExplorerVisible((visible) => !visible)}
+            >
+              <PanelsTopLeft size={18} />
+              <span>Browse tables</span>
+              <ChevronDown size={13} />
+            </button>
+          }
           dirtyTableIds={dirtyTableIds}
           tabs={workspace.tabs.tabs}
-          activeTabId={activeTab.id}
+          activeTabId={workspace.tabs.activeTabId}
           runningTabId={workspace.runningTabId}
           onAddQuery={() => workspace.tabs.addQueryTab()}
           onClose={(id) =>
@@ -294,19 +308,76 @@ export function Workspace({
                 </button>
               )}
               <button
-                className="icon-button subtle explorer-toggle"
-                aria-label={`${explorerVisible ? "Hide" : "Show"} database explorer`}
-                aria-controls={`database-explorer-${connection.id}`}
-                aria-pressed={explorerVisible}
-                title={`${explorerVisible ? "Hide" : "Show"} database explorer`}
-                onClick={() => setExplorerVisible((visible) => !visible)}
+                className="icon-button"
+                title={`Commands · ${primaryModifierLabel} ⇧ P`}
+                aria-label="Open command palette"
+                onClick={() => setCommandsOpen(true)}
               >
-                {explorerVisible ? (
-                  <PanelLeftClose size={17} />
-                ) : (
-                  <PanelLeftOpen size={17} />
-                )}
+                <Command size={17} />
               </button>
+              <EnvironmentBadge
+                environment={connection.environment}
+                readOnly={connection.readOnly}
+              />
+              <ActionMenu
+                label="Connection actions"
+                actions={[
+                  {
+                    label: "New table…",
+                    icon: Database,
+                    disabled: connection.readOnly,
+                    onSelect: () => workspace.tabs.openSchema(),
+                  },
+                  {
+                    label: "Database diagram",
+                    icon: Network,
+                    onSelect: () => workspace.tabs.openDiagram(),
+                  },
+                  {
+                    label: "Switch connection",
+                    icon: Database,
+                    onSelect: onSwitchConnection,
+                  },
+                  {
+                    label: "Connection library",
+                    icon: Database,
+                    onSelect: onManageConnections,
+                  },
+                  {
+                    label: "Bookmarks",
+                    icon: BookMarked,
+                    onSelect: () => setLibraryOpen(true),
+                  },
+                  {
+                    label: "Query history",
+                    icon: Clock3,
+                    onSelect: () => togglePanel("history"),
+                  },
+                  {
+                    label: "Backup / Restore",
+                    icon: HardDriveDownload,
+                    onSelect: () => setBackupOpen(true),
+                    separator: true,
+                  },
+                  {
+                    label: "Preferences",
+                    icon: Settings2,
+                    onSelect: () => togglePanel("settings"),
+                  },
+                  {
+                    label: "Help",
+                    icon: CircleHelp,
+                    onSelect: () => setHelpOpen(true),
+                  },
+                  {
+                    label: "Disconnect",
+                    icon: Unplug,
+                    disabled: workspace.runningTabId !== null,
+                    separator: true,
+                    onSelect: onDisconnect,
+                  },
+                ]}
+              />
             </>
           }
         />
@@ -359,8 +430,54 @@ export function Workspace({
               </div>
             )}
           </div>
-          {activeTab.kind === "query" ? (
-            <div className="query-split" ref={querySplitRef} style={splitStyle}>
+          {!activeTab && (
+            <section className="workspace-empty" aria-label="No open tabs">
+              <div className="workspace-empty-content">
+                <PanelsTopLeft size={28} strokeWidth={1.3} aria-hidden="true" />
+                <h1>Your workspace is clear</h1>
+                <p>No open tabs. Your connection stays here.</p>
+                <div className="workspace-empty-actions">
+                  <button
+                    autoFocus={active}
+                    className="button primary"
+                    onClick={() => workspace.tabs.addQueryTab()}
+                  >
+                    <SquareTerminal size={16} />
+                    New query
+                  </button>
+                  <button
+                    className="button secondary"
+                    onClick={() => setExplorerVisible(true)}
+                  >
+                    <Database size={16} />
+                    Browse tables
+                  </button>
+                  <button
+                    className="button ghost"
+                    onClick={() => workspace.tabs.openDiagram()}
+                  >
+                    <Network size={16} />
+                    Database diagram
+                  </button>
+                </div>
+                {workspace.tabs.canRestore && (
+                  <button
+                    className="button ghost"
+                    onClick={workspace.tabs.restoreClosedTab}
+                  >
+                    <RotateCcw size={15} />
+                    Reopen closed query
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+          {activeTab?.kind === "query" ? (
+            <div
+              className="sql-workbench"
+              ref={querySplitRef}
+              style={splitStyle}
+            >
               <section className="editor-pane" aria-label="SQL editor">
                 <div className="editor-toolbar">
                   <div className="query-path">
@@ -404,41 +521,35 @@ export function Workspace({
                     <button
                       className="toolbar-button"
                       disabled={documents.busy}
-                      onClick={() => void documents.open()}
-                      title="Open .sql file"
-                    >
-                      <FolderOpen size={15} />
-                      Open
-                    </button>
-                    <button
-                      className="toolbar-button"
-                      disabled={documents.busy}
-                      onClick={() => void documents.save()}
-                      title="Save .sql file"
-                    >
-                      <Save size={15} />
-                      Save
-                    </button>
-                    <button
-                      className="toolbar-button"
-                      disabled={documents.busy}
                       onClick={() => void documents.format()}
                       title="Format SQL · Undo restores the original"
                     >
                       <Wand2 size={15} />
                       Format
                     </button>
-                    <button
-                      className="toolbar-button"
-                      onClick={() => void workspace.copyQuery()}
-                    >
-                      {workspace.copied ? (
-                        <Check size={15} />
-                      ) : (
-                        <Copy size={15} />
-                      )}
-                      {workspace.copied ? "Copied" : "Copy"}
-                    </button>
+                    <ActionMenu
+                      label="Query actions"
+                      actions={[
+                        {
+                          label: "Open SQL file…",
+                          icon: FolderOpen,
+                          disabled: documents.busy,
+                          onSelect: () => void documents.open(),
+                        },
+                        {
+                          label: "Save SQL file…",
+                          icon: Save,
+                          disabled: documents.busy,
+                          onSelect: () => void documents.save(),
+                        },
+                        {
+                          label: workspace.copied ? "Copied" : "Copy SQL",
+                          icon: workspace.copied ? Check : Copy,
+                          separator: true,
+                          onSelect: () => void workspace.copyQuery(),
+                        },
+                      ]}
+                    />
                     {workspace.runningTabId ? (
                       <button
                         className="cancel-button"
@@ -487,7 +598,7 @@ export function Workspace({
                 </div>
               </section>
               <ResizeHandle
-                className="query-resize-handle"
+                className="sql-resize-handle"
                 label="Resize SQL editor and results"
                 minimum={25}
                 maximum={75}
@@ -551,15 +662,91 @@ export function Workspace({
             </div>
           ) : null}
           {workspace.tabs.tabs
-            .filter((tab) => tab.kind === "table")
+            .filter((tab) => tab.kind === "schema")
             .map((tab) => (
               <div
                 className="retained-table-workspace"
                 key={tab.id}
-                hidden={tab.id !== activeTab.id}
+                hidden={tab.id !== activeTab?.id}
+              >
+                <SchemaEditor
+                  onApplyingChange={setSchemaApplying}
+                  key={connection.id}
+                  tab={tab}
+                  online={status === "active"}
+                  onDirtyChange={onTableDirtyChange}
+                  canApply={() =>
+                    !safety.hasRisks({
+                      sessionId: connection.id,
+                      excludeTabId: tab.id,
+                    })
+                  }
+                  onApplied={(input) => {
+                    workspace.tabs.schemaApplied(
+                      tab.id,
+                      input.schema,
+                      input.original,
+                      input.table,
+                      input.dropTable,
+                    );
+                    setSchemaRevision((value) => value + 1);
+                    workspace.clearSelection();
+                    completions.refresh();
+                    void workspace.refreshObjects();
+                  }}
+                />
+              </div>
+            ))}
+          {workspace.tabs.tabs
+            .filter((tab) => tab.kind === "diagram")
+            .map((tab) => (
+              <div
+                className="retained-table-workspace"
+                key={tab.id}
+                hidden={tab.id !== activeTab?.id}
+              >
+                <Suspense
+                  fallback={
+                    <div className="tree-empty" role="status">
+                      Loading diagram…
+                    </div>
+                  }
+                >
+                  <DiagramWorkspace
+                    schemaRevision={schemaRevision}
+                    onCreateTable={() => workspace.tabs.openSchema()}
+                    onEditTable={(object, drop) =>
+                      workspace.tabs.openSchema(
+                        object.schema,
+                        object.name,
+                        drop,
+                      )
+                    }
+                    key={connection.id}
+                    tab={tab}
+                    active={active && tab.id === activeTab?.id}
+                    status={status}
+                    onOpenTable={workspace.selectObject}
+                  />
+                </Suspense>
+              </div>
+            ))}
+          {workspace.tabs.tabs
+            .filter((tab) => tab.kind === "table")
+            .map((tab) => (
+              <div
+                className="retained-table-workspace"
+                inert={schemaApplying}
+                key={tab.id}
+                hidden={tab.id !== activeTab?.id}
               >
                 <TableWorkspace
-                  active={active && tab.id === activeTab.id}
+                  key={schemaRevision}
+                  onEditStructure={() =>
+                    workspace.tabs.openSchema(tab.schema, tab.table)
+                  }
+                  onOpenRelated={workspace.tabs.openRelatedTable}
+                  active={active && tab.id === activeTab?.id && !schemaApplying}
                   onDirtyChange={onTableDirtyChange}
                   tab={tab}
                   onOpenQuery={(sql, title) =>
@@ -577,7 +764,7 @@ export function Workspace({
               </div>
             ))}
         </div>
-        <footer className="status-bar">
+        <footer className="status-bar" data-session-status={status}>
           <span>
             <i />{" "}
             {status === "active"
@@ -588,37 +775,50 @@ export function Workspace({
                   ? "Disconnected"
                   : "Status unavailable"}
           </span>
-          <span>{connection.database}</span>
+          <span
+            className="session-destination"
+            title={`${workspaceName ?? "Workspace"} / ${connection.name} · ${connection.username}@${connection.host}:${connection.port}/${connection.database}`}
+          >
+            {connection.host}:{connection.port} / {connection.database}
+          </span>
           <span className={"session-access env-" + connection.environment}>
             {connection.environment === "production" ? "PRODUCTION · " : ""}
             {connection.readOnly ? "Read-only" : "Read & write"}
           </span>
           <span className="status-spacer" />
           <span>
-            {activeTab.kind === "query"
+            {activeTab?.kind === "query"
               ? `${workspace.queryPreferences.preferences.maxRows} row limit`
-              : "Table browse mode"}
+              : activeTab?.kind === "diagram"
+                ? "Schema diagram"
+                : activeTab?.kind === "schema"
+                  ? "Structure draft"
+                  : activeTab
+                    ? "Table browse mode"
+                    : "No open tabs"}
           </span>
           <span>UTF-8</span>
-          <span
-            className={
-              activeTab.kind === "query" &&
+          {(activeTab?.kind === "table" || activeTab?.kind === "query") && (
+            <span
+              className={
+                activeTab?.kind === "query" &&
+                activeTab.executionMode === "autocommit"
+                  ? "autocommit-status"
+                  : ""
+              }
+              title={
+                activeTab?.kind === "query" &&
+                activeTab.executionMode === "autocommit"
+                  ? "One statement per Run. Saves immediately; no application rollback."
+                  : "Each Run commits on success or rolls back on error. Manual transaction controls are not supported."
+              }
+            >
+              {activeTab?.kind === "query" &&
               activeTab.executionMode === "autocommit"
-                ? "autocommit-status"
-                : ""
-            }
-            title={
-              activeTab.kind === "query" &&
-              activeTab.executionMode === "autocommit"
-                ? "One statement per Run. Saves immediately; no application rollback."
-                : "Each Run commits on success or rolls back on error. Manual transaction controls are not supported."
-            }
-          >
-            {activeTab.kind === "query" &&
-            activeTab.executionMode === "autocommit"
-              ? "Autocommit · saves immediately"
-              : "Atomic run"}
-          </span>
+                ? "Autocommit · saves immediately"
+                : "Atomic run"}
+            </span>
+          )}
         </footer>
       </main>
       {openPanel === "history" && (
@@ -659,6 +859,7 @@ export function Workspace({
           onClose={() => setCommandsOpen(false)}
         />
       )}
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       {backupOpen && (
         <BackupDialog
           objects={workspace.objects}

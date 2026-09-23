@@ -45,6 +45,8 @@ desktop workspace. It is free to use, modify, and self-build under the MIT licen
 | **A focused SQL editor** | Write with schema-aware completion, format with Undo, open SQL files, keep a query library, and cancel long-running queries. Atomic execution by default; explicit autocommit when you need it. |
 | **Direct data editing** | Double-click a cell, stage changes, review the diff, and save together. Add, duplicate, or delete rows with visible drafts and conflict checks. |
 | **Structure at a glance** | Inspect columns, indexes, constraints, foreign keys, and DDL. Browse, filter, sort, copy, and export data to CSV or JSON. |
+| **Database diagrams** | Automatically map accessible tables and declared foreign keys. Search, focus on related tables, inspect relationships, and keep your layout. [Diagram guide](docs/database-diagrams.md). |
+| **Table structure editing** | Create tables, rename tables and columns, add/remove columns, and drop tables from the explorer or diagram. Review generated SQL before applying; destructive changes require confirmation. [Scope and safeguards](docs/table-structure-editor.md). |
 | **Backup without tool setup** | Create custom or SQL backups with automatically selected, bundled PostgreSQL clients. Restore a trusted dump into an existing or newly created database. |
 | **Desktop details** | Resizable panels, keyboard shortcuts, contextual actions, adjustable text size, and interface density. Passwords in the system credential store; verified TLS with optional custom CAs. |
 

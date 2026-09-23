@@ -17,7 +17,10 @@ use commands::{
         delete_profile, disconnect_postgres, save_profile, save_workspace, test_profile,
     },
     query::{cancel_query, run_query},
-    schema::{inspect_relation, list_columns, list_database_objects, sql_completion_catalog},
+    schema::{
+        apply_schema_change, database_diagram, inspect_relation, list_columns,
+        list_database_objects, list_enum_types, preview_schema_change, sql_completion_catalog,
+    },
     table::{
         apply_table_changes, delete_table_row, delete_table_rows, export_table_data,
         insert_table_row, load_table_page, load_table_row, save_text_export, update_table_row,
@@ -51,6 +54,45 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu, WINDOW_SUBMENU_ID};
+                let menu = Menu::default(app.handle())?;
+                // Replace the native Close Window accelerator, which AppKit consumes before JS.
+                let window = menu.get(WINDOW_SUBMENU_ID).ok_or("Missing Window menu")?;
+                let position = menu
+                    .items()?
+                    .iter()
+                    .position(|item| item.id() == window.id())
+                    .ok_or("Missing Window menu position")?;
+                menu.remove(&window)?;
+                menu.insert(
+                    &Submenu::with_id_and_items(
+                        app,
+                        WINDOW_SUBMENU_ID,
+                        "Window",
+                        true,
+                        &[
+                            &PredefinedMenuItem::minimize(app, None)?,
+                            &PredefinedMenuItem::maximize(app, None)?,
+                            &MenuItem::with_id(
+                                app,
+                                "close-active-tab",
+                                "Close Tab",
+                                true,
+                                Some("CmdOrCtrl+W"),
+                            )?,
+                        ],
+                    )?,
+                    position,
+                )?;
+                app.set_menu(menu)?;
+                app.on_menu_event(|app, event| {
+                    if event.id().as_ref() == "close-active-tab" {
+                        let _ = app.emit("request-close-tab", ());
+                    }
+                });
+            }
             app.manage(instance_lock::InstanceLock::acquire(
                 &app.path().app_config_dir()?,
             )?);
@@ -92,6 +134,10 @@ pub fn run() {
             sql_completion_catalog,
             list_columns,
             inspect_relation,
+            database_diagram,
+            preview_schema_change,
+            list_enum_types,
+            apply_schema_change,
             load_table_page,
             load_table_row,
             apply_table_changes,

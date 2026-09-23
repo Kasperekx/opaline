@@ -4,7 +4,7 @@ import { ConnectionDetails } from "./ConnectionDetails";
 import { ConnectionDialog } from "./ConnectionDialog";
 import { ProfileEditor } from "./ProfileEditor";
 import { WorkspaceEditor } from "./WorkspaceEditor";
-import { ProductSidebar } from "./ProductSidebar";
+import { WorkspaceShelf } from "./WorkspaceShelf";
 import { ConnectionList } from "./ConnectionList";
 import { ProfileOrganization } from "./ProfileOrganization";
 import { ProfileTransferDialog } from "./ProfileTransferDialog";
@@ -95,7 +95,7 @@ export function ConnectionManager({
   };
   return (
     <main className="connection-manager">
-      <ProductSidebar
+      <WorkspaceShelf
         workspaces={catalog.workspaces}
         profiles={catalog.profiles}
         workspace={workspace}
@@ -103,59 +103,62 @@ export function ConnectionManager({
         onSelect={selectWorkspace}
         onCreate={() => setWorkspaceEditor({ workspace: null })}
       />
-      <ConnectionList
-        workspace={workspace}
-        visible={visible}
-        profileCount={profiles.length}
-        sessions={sessions}
-        loading={loading}
-        available={available}
-        search={search}
-        environment={environment}
-        onSearch={setSearch}
-        onEnvironment={setEnvironment}
-        onSelect={setSelectedId}
-        onConnect={onConnect}
-        onEdit={(profile) => setEditor(profileInput(profile))}
-        onRename={() => setWorkspaceEditor({ workspace })}
-        onCreate={createConnection}
-        onTransfer={() => setTransferOpen(true)}
-        onRemoveWorkspace={() => setOrganizing({})}
-      />
-      {selected && (
-        <ConnectionDialog
-          title={selected.name}
-          subtitle={`${workspace?.name ?? ""} / PostgreSQL`}
-          onClose={() => setSelectedId(null)}
-        >
-          <ConnectionDetails
-            profile={selected}
-            active={sessions.some((s) => s.profileId === selected.id)}
-            busy={busy}
-            onConnect={() => {
-              setSelectedId(null);
-              onConnect(selected);
-            }}
-            onEdit={() => {
-              setSelectedId(null);
-              setEditor(profileInput(selected));
-            }}
-            onDuplicate={() => {
-              setSelectedId(null);
-              setEditor(profileInput(selected, true));
-            }}
-            onMove={() => {
-              setOrganizing({ profile: selected });
-              setSelectedId(null);
-            }}
-            onDelete={() => {
-              setSelectedId(null);
-              setDeleteError(null);
-              setDeleting(selected);
-            }}
-          />
-        </ConnectionDialog>
-      )}
+      <div className="library-layout">
+        <ConnectionList
+          workspace={workspace}
+          visible={visible}
+          profileCount={profiles.length}
+          sessions={sessions}
+          loading={loading}
+          available={available}
+          search={search}
+          environment={environment}
+          onSearch={setSearch}
+          onEnvironment={setEnvironment}
+          onSelect={setSelectedId}
+          onConnect={onConnect}
+          onEdit={(profile) => setEditor(profileInput(profile))}
+          onRename={() => setWorkspaceEditor({ workspace })}
+          onCreate={createConnection}
+          onTransfer={() => setTransferOpen(true)}
+          onRemoveWorkspace={() => setOrganizing({})}
+          selectedId={selected?.id}
+        />
+        {selected && (
+          <ConnectionDialog
+            title={selected.name}
+            subtitle={`${workspace?.name ?? ""} / PostgreSQL`}
+            onClose={() => setSelectedId(null)}
+          >
+            <ConnectionDetails
+              profile={selected}
+              active={sessions.some((s) => s.profileId === selected.id)}
+              busy={!available}
+              onConnect={() => {
+                setSelectedId(null);
+                onConnect(selected);
+              }}
+              onEdit={() => {
+                setSelectedId(null);
+                setEditor(profileInput(selected));
+              }}
+              onDuplicate={() => {
+                setSelectedId(null);
+                setEditor(profileInput(selected, true));
+              }}
+              onMove={() => {
+                setOrganizing({ profile: selected });
+                setSelectedId(null);
+              }}
+              onDelete={() => {
+                setSelectedId(null);
+                setDeleteError(null);
+                setDeleting(selected);
+              }}
+            />
+          </ConnectionDialog>
+        )}
+      </div>
       {workspaceEditor && (
         <WorkspaceEditor
           workspace={workspaceEditor.workspace}

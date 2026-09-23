@@ -6,8 +6,12 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  ListFilter,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TableFilters } from "./TableFilters";
+import { useRelationStructure } from "../structure/useRelationStructure";
+import type { OpenRelatedTable } from "./table-relations";
 import { qualifiedRelationName } from "../../shared/lib/database-object";
 import type { TableTab } from "../query/query-types";
 import { TableDataGrid } from "./TableDataGrid";
@@ -20,22 +24,32 @@ import { TablePagination } from "./TablePagination";
 import { TableSelectionBar } from "./TableSelectionBar";
 import { TableExportStatus } from "./TableExportStatus";
 import "./inline-editing.css";
+import { TableErrorNotice } from "./TableErrorNotice";
 
 type Props = {
   tab: TableTab;
   active: boolean;
   onDirtyChange: (id: string, dirty: boolean) => void;
   onOpenQuery: (sql: string, title: string) => void;
+  onOpenRelated?: OpenRelatedTable;
 };
 export function TableDataView({
   tab,
   active,
   onDirtyChange,
   onOpenQuery,
+  onOpenRelated,
 }: Props) {
   const table = useTableData(tab),
     { data, changes } = table;
   const qualifiedName = qualifiedRelationName(tab.schema, tab.table);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersButton = useRef<HTMLButtonElement>(null);
+  const structure = useRelationStructure(
+    tab.schema,
+    tab.table,
+    Boolean(onOpenRelated),
+  );
   const exporter = useTableExport({
     schema: tab.schema,
     table: tab.table,
@@ -44,6 +58,7 @@ export function TableDataView({
     selectedRows: table.selectedRows,
     filter: table.filter,
     sort: table.sort,
+    conditions: table.conditions,
   });
   const locked = table.busy || changes.disabled || exporter.busy;
   const dirty = changes.summary.rows.length > 0;
@@ -88,6 +103,7 @@ export function TableDataView({
   return (
     <section
       className="table-data-view inline-editing-view"
+      data-table-density={table.density}
       aria-label={"Data in " + qualifiedName}
     >
       <header className="table-data-toolbar">
@@ -136,6 +152,19 @@ export function TableDataView({
         </form>
         <div className="table-toolbar-actions">
           <button
+            aria-label="Column filters"
+            ref={filtersButton}
+            aria-expanded={filtersOpen}
+            disabled={!data || locked}
+            onClick={() => setFiltersOpen((value) => !value)}
+          >
+            <ListFilter size={15} />
+            <span>
+              Filters
+              {table.conditions.length ? ` · ${table.conditions.length}` : ""}
+            </span>
+          </button>
+          <button
             disabled={
               !data?.insertable || locked || changes.summary.rows.length >= 500
             }
@@ -175,24 +204,55 @@ export function TableDataView({
         </div>
       </header>
       <div className="table-context-stack">
-        {(table.error || capabilityReason) && (
-          <div
-            className={"table-notice " + (table.error ? "error" : "")}
-            role={table.error ? "alert" : "status"}
-          >
-            <span>{table.error || capabilityReason}</span>
-            {table.error && <button onClick={table.refresh}>Retry</button>}
+        {onOpenRelated && structure.error && (
+          <div className="table-notice" role="status">
+            Relationship navigation unavailable.{" "}
+            <button onClick={structure.refresh}>Retry relationships</button>
+            <span title={structure.error}>{structure.error}</span>
           </div>
         )}
-        <TableExportStatus exporter={exporter} />
-        <TableSelectionBar
+        <TableFilters
           table={table}
-          tab={tab}
           locked={locked}
-          onExport={(format) => void exporter.exportRows(format)}
+          open={filtersOpen}
+          onClose={() => {
+            setFiltersOpen(false);
+            filtersButton.current?.focus();
+          }}
+          onEdit={() => setFiltersOpen(true)}
         />
+        {table.error ? (
+          <TableErrorNotice
+            title={data ? "Could not refresh table" : "Could not load table"}
+            message={table.error}
+            hint={
+              data
+                ? "Showing previously loaded values. Retry refresh to get current data."
+                : "Check the connection and filter values, then retry."
+            }
+          >
+            <button
+              className="button ghost"
+              disabled={locked}
+              onClick={table.refresh}
+            >
+              Retry
+            </button>
+          </TableErrorNotice>
+        ) : capabilityReason ? (
+          <div className="table-notice" role="status">
+            <span>{capabilityReason}</span>
+          </div>
+        ) : null}
+        <TableExportStatus exporter={exporter} />
+        <TableSelectionBar table={table} tab={tab} locked={locked} />
       </div>
-      <TableDataGrid table={table} locked={locked} />
+      <TableDataGrid
+        table={table}
+        locked={locked}
+        relations={structure.data?.foreignKeys ?? []}
+        onOpenRelated={onOpenRelated}
+      />
       <TableChangesBar table={table} tab={tab} />
       <TablePagination
         table={table}

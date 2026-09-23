@@ -22,12 +22,14 @@ type StructureSection =
   "columns" | "indexes" | "foreign-keys" | "constraints" | "ddl";
 
 type StructureInspectorProps = {
+  onEditStructure?: () => void;
   tab: TableTab;
   onOpenQuery: (sql: string, title: string) => void;
   onOpenTable: (schema: string, table: string) => void;
 };
 
 export function StructureInspector({
+  onEditStructure,
   tab,
   onOpenQuery,
   onOpenTable,
@@ -84,6 +86,11 @@ export function StructureInspector({
           </p>
         </div>
         <div className="structure-header-actions">
+          {onEditStructure && data?.objectType === "Table" && (
+            <button className="button secondary" onClick={onEditStructure}>
+              Edit structure
+            </button>
+          )}
           {data && (
             <span className="structure-owner">
               Owner <strong>{data.owner}</strong>

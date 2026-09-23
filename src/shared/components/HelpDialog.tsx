@@ -22,6 +22,12 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
         </p>
         <h3>Keyboard</h3>
         <p>
+          <kbd>{primaryModifierLabel} W</kbd> closes the active document, never
+          the application. <kbd>{primaryModifierLabel} Shift [ / ]</kbd>{" "}
+          switches documents left / right, including while editing text. Closing
+          the last document leaves an empty workspace without disconnecting.
+        </p>
+        <p>
           <kbd>{primaryModifierLabel} Enter</kbd> runs selected SQL or the whole
           editor. <kbd>{primaryModifierLabel} K</kbd> focuses the current
           explorer. Escape closes dialogs without discarding changes.

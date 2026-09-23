@@ -14,6 +14,15 @@ include its installation requirements; do not disable Gatekeeper or system secur
 to test an unverified package. No PostgreSQL, Docker, Node or Rust installation is
 needed by the packaged app: PostgreSQL client tools are included.
 
+For an explicitly agreed **unsigned private pilot**, first verify the supplied
+checksum and source with the maintainer. macOS cannot verify this developer or
+notarization. If you trust that specific build and accept the risk, try opening
+it, then use System Settings → Privacy & Security → Open Anyway for that app.
+See [Apple's instructions](https://support.apple.com/en-gb/102445).
+Never disable Gatekeeper globally or remove quarantine recursively. If macOS
+reports malware/damage, or no per-app exception is available, stop and report it;
+do not force the app to launch. This path still needs independent installation QA.
+
 There is currently no in-app updater. Before replacing a test build, finish or
 discard table changes, save important SQL to files and export connection profiles.
 Profile export does not include passwords, CA files, query libraries or history.
@@ -54,6 +63,16 @@ a role with only the required privileges, not real production data.
   pending changes; Force Quit and system termination cannot be intercepted.
 - SQL files are at most 1 MiB UTF-8. Cmd+O opens; Cmd+S saves; Cmd+Shift+S saves as.
   Format is undoable and does not execute SQL.
+- Cmd+Shift+[ / Cmd+Shift+] switch document tabs; Cmd+W closes the active tab,
+  subject to draft protection. Closing the last document leaves an empty session.
+- Diagram shows catalog relationships. Table structure edits share a DDL review;
+  review the target and destructive changes before applying. Diagram animations
+  do not represent live data traffic.
+- JSON/JSONB cells have a bounded syntax-colored preview. Inspect opens the full
+  value; preview truncation never truncates the stored value.
+- Enum types can be selected, created, and have labels renamed/appended in the
+  structure editor. Changes affect all uses of that type and require SQL review.
+  See [enum behavior and limitations](enum-types.md).
 
 ## Backup and restore
 
@@ -98,7 +117,9 @@ For suspected vulnerabilities follow [SECURITY.md](../SECURITY.md), not public I
 
 ## Remaining release gates
 
-See [beta readiness](beta-readiness.md). Signing/notarization, exact minimum macOS,
+See [beta readiness](beta-readiness.md) and [private pilot](beta-pilot.md).
+Signing/notarization remain deferred for the explicitly unsigned private pilot,
+not claimed as complete. Exact minimum macOS,
 clean-machine installation/update, extended failure/performance/accessibility checks,
 private security reporting and owner-approved pilot/release are still required.
 Windows, Linux, SSH, Kafka and Docker-log integrations are outside the first beta.

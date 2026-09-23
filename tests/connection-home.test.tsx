@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import { render } from "./render-with-safety";
 import userEvent from "@testing-library/user-event";
@@ -21,6 +21,103 @@ const catalog = {
   workspaces: [{ id: "mmo", name: "MMO" }],
   profiles: [profile],
 };
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("wide connection library", () => {
+  function renderWideLibrary() {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(min-width: 1100px)",
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    mockIPC(() => {
+      throw new Error("Inspecting profiles must not invoke database commands");
+    });
+    const staging = {
+      ...profile,
+      id: "staging",
+      name: "Staging database",
+      environment: "staging" as const,
+    };
+    const onConnect = vi.fn();
+    render(
+      <ConnectionManager
+        catalog={{
+          ...catalog,
+          workspaces: [
+            ...catalog.workspaces,
+            { id: "empty", name: "Analytics" },
+          ],
+          profiles: [profile, staging],
+        }}
+        sessions={[]}
+        loading={false}
+        busy={false}
+        onCatalog={vi.fn()}
+        onConnect={onConnect}
+      />,
+    );
+    return { user: userEvent.setup(), onConnect, staging };
+  }
+
+  it("opens details only on demand, also in a wide window", async () => {
+    const { user, onConnect, staging } = renderWideLibrary();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.queryByRole("complementary", { name: "Connection details" }),
+    ).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "View details for Staging database" }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).getByRole("heading", {
+        name: staging.name,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "View details for Staging database" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(onConnect).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Connect",
+      }),
+    );
+    expect(onConnect).toHaveBeenCalledExactlyOnceWith(staging);
+  });
+
+  it("keeps filtering and workspace changes free of automatic details panels", async () => {
+    const { user } = renderWideLibrary();
+    const search = screen.getByRole("textbox", { name: "Search connections" });
+    await user.type(search, "Staging");
+    expect(
+      screen.getByRole("button", { name: "Connect to Staging database" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.type(search, " missing");
+    expect(
+      screen.queryByRole("complementary", { name: "Connection details" }),
+    ).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await user.click(
+      within(screen.getByRole("navigation", { name: "Workspaces" })).getByRole(
+        "button",
+        { name: /Analytics/ },
+      ),
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "Connection details" }),
+    ).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Connect to Local database" }),
+    ).toBeNull();
+  });
+});
 
 function renderHome(
   options: {

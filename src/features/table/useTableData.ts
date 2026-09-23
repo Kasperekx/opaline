@@ -5,6 +5,7 @@ import type {
   TableChangesResult,
   TableDataPage,
   TableSort,
+  TableFilter,
 } from "../../shared/types/database";
 import type { TableTab } from "../query/query-types";
 import { useWorkSafety } from "../../shared/safety/WorkSafety";
@@ -27,18 +28,50 @@ export function useTableData(tab: TableTab) {
   const viewKey = tableViewKey(session.profileId, tab.schema, tab.table);
   const [initial] = useState(() => readTableView(viewKey));
   const [data, setData] = useState<TableDataPage | null>(null);
-  const [page, setPageState] = useState(initial.page);
+  const [page, setPageState] = useState(tab.initialFilters ? 0 : initial.page);
   const [pageSize, setPageSizeState] = useState(initial.pageSize);
-  const [filter, setFilter] = useState(initial.filter);
-  const [filterDraft, setFilterDraft] = useState(initial.filter);
+  const [filter, setFilter] = useState(
+    tab.initialFilters ? "" : initial.filter,
+  );
+  const [filterDraft, setFilterDraft] = useState(
+    tab.initialFilters ? "" : initial.filter,
+  );
+  const [conditions, setConditions] = useState<TableFilter[]>(
+    tab.initialFilters ?? initial.conditions,
+  );
+  const [widths, setWidths] = useState(initial.widths);
+  const [pinnedColumn, setPinnedColumn] = useState(initial.pinnedColumn);
+  const [density, setDensity] = useState(initial.density);
   const [sort, setSort] = useState<TableSort | null>(initial.sort);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const selection = useTableSelection(data);
   useEffect(() => {
-    writeLocalJson(viewKey, { page, pageSize, filter, sort });
-  }, [viewKey, page, pageSize, filter, sort]);
+    // Related tabs do not replace the normal table's remembered search.
+    if (!tab.initialFilters)
+      writeLocalJson(viewKey, {
+        page,
+        pageSize,
+        filter,
+        sort,
+        conditions,
+        widths,
+        pinnedColumn,
+        density,
+      });
+  }, [
+    viewKey,
+    page,
+    pageSize,
+    filter,
+    sort,
+    conditions,
+    widths,
+    pinnedColumn,
+    density,
+    tab.initialFilters,
+  ]);
   const load = useCallback(async () => {
     const id = ++requestId.current;
     setBusy(true);
@@ -50,6 +83,7 @@ export function useTableData(tab: TableTab) {
         page,
         pageSize,
         filter: filter || null,
+        conditions,
         sort,
       });
       if (id === requestId.current) setData(result);
@@ -58,7 +92,7 @@ export function useTableData(tab: TableTab) {
     } finally {
       if (id === requestId.current) setBusy(false);
     }
-  }, [api, tab.schema, tab.table, page, pageSize, filter, sort]);
+  }, [api, tab.schema, tab.table, page, pageSize, filter, sort, conditions]);
   useEffect(() => {
     void load();
     const generation = requestId.current;
@@ -103,13 +137,18 @@ export function useTableData(tab: TableTab) {
     setRevision((value) => value + 1);
   };
   const changes = useTableChanges(tab, data, saved);
-  const navigate = (action: () => void, clearSelection = true) => {
+  const navigate = (
+    action: () => void = () => undefined,
+    clearSelection = true,
+  ) => {
     if (busy || changes.busy) return;
     safety.request(
       () => {
         changes.clear();
         if (clearSelection) selection.clearSelection();
+        setData(null);
         action();
+        setRevision((value) => value + 1);
       },
       { sessionId: session.id, tabId: tab.id },
     );
@@ -121,6 +160,18 @@ export function useTableData(tab: TableTab) {
     filter,
     filterDraft,
     sort,
+    conditions,
+    widths,
+    setWidths,
+    pinnedColumn,
+    setPinnedColumn,
+    density,
+    setDensity,
+    applyConditions: (next: TableFilter[]) =>
+      navigate(() => {
+        setConditions(next);
+        setPageState(0);
+      }),
     busy,
     error,
     changes,
@@ -130,12 +181,12 @@ export function useTableData(tab: TableTab) {
       navigate(() => {
         setPageState(0);
         setFilter(filterDraft.trim());
-        setRevision((value) => value + 1);
       }),
     clearFilter: () =>
       navigate(() => {
         setFilterDraft("");
         setFilter("");
+        setConditions([]);
         setPageState(0);
       }),
     setPage: (next: number) =>
@@ -156,7 +207,7 @@ export function useTableData(tab: TableTab) {
         );
         setPageState(0);
       }),
-    refresh: () => navigate(() => setRevision((value) => value + 1)),
+    refresh: () => navigate(),
   };
 }
 export type TableDataController = ReturnType<typeof useTableData>;

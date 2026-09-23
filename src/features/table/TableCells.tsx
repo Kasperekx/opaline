@@ -3,6 +3,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ColumnInfo } from "../../shared/types/database";
 import { columnEditorKind, databaseValue, inputValue } from "./column-editor";
 import type { InsertCellValue } from "./table-types";
+import { JsonCellValue } from "./JsonCellValue";
 
 type EditableCellProps = {
   column: ColumnInfo;
@@ -185,7 +186,7 @@ export function TypedValueControl({
       step={
         kind === "integer"
           ? "1"
-          : kind === "number" || kind === "time"
+          : kind === "number" || kind === "time" || kind === "datetime"
             ? "any"
             : undefined
       }
@@ -261,9 +262,21 @@ export function InsertCell({
   );
 }
 
-export function CellValue({ value }: { value: string | null }) {
+export function CellValue({
+  value,
+  dataType,
+}: {
+  value: string | null;
+  dataType?: string;
+}) {
   return value === null ? (
     <span className="table-null">NULL</span>
+  ) : value === "" ? (
+    <span className="table-empty-value" title="Empty string (not NULL)">
+      empty
+    </span>
+  ) : dataType === "json" || dataType === "jsonb" ? (
+    <JsonCellValue value={value} />
   ) : (
     <span className="table-cell-value" title={value}>
       {value}

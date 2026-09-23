@@ -91,6 +91,44 @@ describe("connection profiles", () => {
     expect(save.disabled).toBe(true);
     expect(test).toHaveBeenCalledOnce();
   });
+  it("keeps security choices explicit in the redesigned form and invalidates verification", async () => {
+    const user = userEvent.setup();
+    mockIPC(() => ({ serverVersion: "PostgreSQL 17" }));
+    render(
+      <ProfileEditor
+        initial={{
+          ...newProfile("mmo"),
+          name: "Production",
+          environment: "production",
+        }}
+        workspaces={workspaces}
+        onSaved={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("region", { name: "Server and credentials" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: "Connection security" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/confirm write access each time/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    const save = screen.getByRole("button", {
+      name: "Save profile",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    await user.selectOptions(
+      screen.getByLabelText("TLS", { exact: true }),
+      "require",
+    );
+    expect(save.disabled).toBe(true);
+    expect(
+      screen.getByText(
+        /Verified TLS checks the server certificate and hostname/,
+      ),
+    ).toBeTruthy();
+  });
   it("production keeps write mode but cannot connect without the warning acknowledgment", async () => {
     const user = userEvent.setup();
     const connect = vi.fn().mockResolvedValue(true);

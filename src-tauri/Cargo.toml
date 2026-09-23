@@ -34,7 +34,7 @@ rustls-native-certs = "0.8"
 base64 = "0.22"
 tokio-postgres = "0.7"
 rustls-tokio-postgres = { version = "0.5", default-features = false, features = ["platform-verifier", "ring", "tls12", "channel-binding"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 uuid = { version = "1", features = ["v4"] }
 tempfile = "3"
 fs2 = "0.4.3"

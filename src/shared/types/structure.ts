@@ -48,6 +48,7 @@ export type StructureForeignKey = {
 };
 
 export type RelationStructure = {
+  relationOid?: number;
   schema: string;
   name: string;
   objectType: string;
@@ -60,3 +61,52 @@ export type RelationStructure = {
   ddl: string | null;
   ddlNotes: string[];
 };
+
+export type ColumnDraft = {
+  original: string | null;
+  name: string;
+  dataType: string;
+  enumType?: { schema: string; name: string } | null;
+  nullable: boolean;
+  primaryKey: boolean;
+  defaultValue: string | null;
+  defaultMode?: "keep" | "literal" | "drop" | "currentTimestamp" | "randomUuid";
+  identity: boolean;
+  removed: boolean;
+};
+export type SchemaChange = {
+  schema: string;
+  table: string;
+  original: string | null;
+  expected: RelationStructure | null;
+  columns: ColumnDraft[];
+  dropTable: boolean;
+  constraints?: ConstraintChange[];
+  enumChanges?: EnumDraft[];
+};
+export type EnumType = {
+  schema: string;
+  name: string;
+  oid: number;
+  values: string[];
+};
+export type EnumDraft = {
+  schema: string;
+  name: string;
+  original: EnumType | null;
+  values: string[];
+};
+export type ConstraintChange =
+  | { kind: "createIndex"; name: string; columns: string[]; unique: boolean }
+  | { kind: "dropIndex" | "dropForeignKey"; name: string }
+  | {
+      kind: "addForeignKey";
+      name: string;
+      columns: string[];
+      targetSchema: string;
+      targetTable: string;
+      targetColumns: string[];
+      onDelete: string;
+      onUpdate: string;
+    };
+export type SchemaPlan = { sql: string; destructive: boolean };

@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { Maximize2 } from "lucide-react";
 import type { ColumnInfo } from "../../shared/types/database";
 import { TypedValueControl } from "./TableCells";
 import { columnEditorKind } from "./column-editor";
@@ -39,13 +40,15 @@ export function InlineCellEditor({
 }: Props) {
   const errorId = useId();
   const ref = useRef<HTMLDivElement>(null);
-  const [expanded] = useState(
+  const [expanded, setExpanded] = useState(
     () =>
       columnEditorKind(column) === "json" ||
       (typeof value === "string" &&
         (value.length > 140 || value.includes("\n"))),
   );
   const [position, setPosition] = useState<CSSProperties>({});
+  const expanding = useRef(false);
+  const emptyMode = value === null || value === undefined;
   useLayoutEffect(() => {
     if (!expanded || !anchor) return;
     const update = () => {
@@ -66,11 +69,15 @@ export function InlineCellEditor({
     };
   }, [expanded, anchor]);
   useLayoutEffect(() => {
-    const input = ref.current?.querySelector<HTMLElement>(
-      "input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button",
-    );
+    const input =
+      ref.current?.querySelector<HTMLElement>(
+        "input:not(:disabled),textarea:not(:disabled),select:not(:disabled)",
+      ) ??
+      ref.current?.querySelector<HTMLElement>("button[aria-pressed]") ??
+      ref.current?.querySelector<HTMLElement>("button");
     input?.focus();
-  }, []);
+    expanding.current = false;
+  }, [expanded, emptyMode]);
   const keyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.nativeEvent.isComposing) return;
     if (
@@ -109,8 +116,17 @@ export function InlineCellEditor({
       aria-label={`Edit ${column.name}`}
       aria-describedby={error ? errorId : undefined}
       onKeyDown={keyDown}
+      onMouseDown={(event) => {
+        // WebKit may blur to the document when clicking a button, staging
+        // the cell before its NULL/DEFAULT/expand action can complete.
+        if (event.target instanceof Element && event.target.closest("button"))
+          event.preventDefault();
+      }}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+        if (
+          !expanding.current &&
+          !event.currentTarget.contains(event.relatedTarget as Node | null)
+        )
           onBlur();
       }}
     >
@@ -130,6 +146,18 @@ export function InlineCellEditor({
         rawNumeric
       />
       <div className="inline-value-options">
+        {!expanded && columnEditorKind(column) === "text" && (
+          <button
+            aria-label="Expand value editor"
+            title="Expand value editor"
+            onClick={() => {
+              expanding.current = true;
+              setExpanded(true);
+            }}
+          >
+            <Maximize2 size={13} />
+          </button>
+        )}
         {value === undefined && (
           <button onClick={() => onChange("")}>DEFAULT · Override</button>
         )}
@@ -153,10 +181,10 @@ export function InlineCellEditor({
       )}
       {expanded && (
         <footer>
-          <span>Changes stay local until saved</span>
+          <span>Stage with ⌘/Ctrl + Enter · save from the table</span>
           <button onClick={onCancel}>Cancel</button>
           <button disabled={Boolean(error)} onClick={onCommit}>
-            Apply
+            Stage value
           </button>
         </footer>
       )}

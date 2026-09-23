@@ -6,6 +6,62 @@ use crate::{
     state::AppState,
 };
 
+#[tauri::command]
+pub(crate) async fn list_enum_types(
+    session_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<crate::database::schema_changes::enums::EnumType>, String> {
+    let client = state.client(&session_id).await?;
+    client
+        .bounded(crate::database::schema_changes::enums::catalog(&client))
+        .await
+}
+
+#[tauri::command]
+pub(crate) fn preview_schema_change(
+    input: crate::database::schema_changes::SchemaChange,
+) -> Result<crate::database::schema_changes::Plan, String> {
+    crate::database::schema_changes::plan(&input)
+}
+
+#[tauri::command]
+pub(crate) async fn apply_schema_change(
+    session_id: String,
+    input: crate::database::schema_changes::SchemaChange,
+    confirmation: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), crate::database::schema_changes::ChangeError> {
+    use crate::database::schema_changes::{apply, ChangeError};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let (client, _, lease) = state
+        .begin_operation(&session_id, true)
+        .await
+        .map_err(|e| ChangeError::rejected(e.message))?;
+    let committing = AtomicBool::new(false);
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        apply(
+            &client,
+            &input,
+            &confirmation,
+            &committing,
+            lease.session.tls.clone(),
+        ),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            lease.invalidate();
+            if committing.load(Ordering::SeqCst) {
+                Err(ChangeError::unknown())
+            } else {
+                Err(ChangeError::rejected("Schema change timed out before commit. Nothing was committed. Reconnect before trying again."))
+            }
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 pub(crate) struct CompletionColumn {
     schema: String,
@@ -45,6 +101,17 @@ pub(crate) async fn inspect_relation(
     let client = state.client(&session_id).await?;
     client
         .bounded(structure::inspect(&client, &schema, &table))
+        .await
+}
+
+#[tauri::command]
+pub(crate) async fn database_diagram(
+    session_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let client = state.client(&session_id).await?;
+    client
+        .bounded(crate::database::diagram::inspect(&client))
         .await
 }
 

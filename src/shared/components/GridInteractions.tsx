@@ -49,14 +49,16 @@ export function useGridInteractions(
   rows: (string | null)[][],
   identity: unknown,
   onEditCell?: (row: number, column: number) => boolean,
+  columnLabels?: string[],
 ) {
   const [stored, setStored] = useState<{
     identity: unknown;
     selection: Selection;
   } | null>(null);
-  const [inspecting, setInspecting] = useState<{ value: string | null } | null>(
-    null,
-  );
+  const [inspecting, setInspecting] = useState<{
+    value: string | null;
+    label?: string;
+  } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
   useEffect(() => {
@@ -98,6 +100,7 @@ export function useGridInteractions(
     if (selection)
       setInspecting({
         value: rows[selection.focus.row]?.[selection.focus.column] ?? null,
+        label: columnLabels?.[selection.focus.column],
       });
   };
   return {
@@ -115,7 +118,8 @@ export function useGridInteractions(
     },
     copy,
     inspect,
-    inspectValue: (value: string | null) => setInspecting({ value }),
+    inspectValue: (value: string | null, label?: string) =>
+      setInspecting({ value, label }),
     closeInspector: () => setInspecting(null),
     cell: (row: number, column: number) => {
       const selected = includesCell(selection, row, column);
@@ -136,7 +140,10 @@ export function useGridInteractions(
           select({ row, column }, event.shiftKey),
         onDoubleClick: () => {
           if (!onEditCell?.(row, column))
-            setInspecting({ value: rows[row]?.[column] ?? null });
+            setInspecting({
+              value: rows[row]?.[column] ?? null,
+              label: columnLabels?.[column],
+            });
         },
         onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
           if (event.target !== event.currentTarget) return;
@@ -153,7 +160,10 @@ export function useGridInteractions(
           if (event.key === "Enter" || event.key === "F2") {
             event.preventDefault();
             if (!onEditCell?.(row, column) && event.key === "Enter")
-              setInspecting({ value: rows[row]?.[column] ?? null });
+              setInspecting({
+                value: rows[row]?.[column] ?? null,
+                label: columnLabels?.[column],
+              });
           }
           const delta: Record<string, Point> = {
             ArrowLeft: { row: 0, column: -1 },
@@ -233,10 +243,12 @@ export function GridColumnResize({
   name,
   width,
   onChange,
+  onFit,
 }: {
   name: string;
   width: number;
   onChange: (width: number) => void;
+  onFit?: () => void;
 }) {
   const current = useRef(width);
   current.current = width;
@@ -255,7 +267,7 @@ export function GridColumnResize({
         );
         onChange(current.current);
       }}
-      onReset={() => onChange(200)}
+      onReset={onFit ?? (() => onChange(200))}
     />
   );
 }

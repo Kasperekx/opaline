@@ -177,7 +177,7 @@ export function useWorkspace(
     async (submission?: QuerySubmission) => {
       if (queryInFlight.current) return;
       const tab = tabs.activeTab;
-      if (tab.kind !== "query") return;
+      if (tab?.kind !== "query") return;
       const querySubmission = submission ?? {
         sql: tab.sql,
         offset: 0,
@@ -266,7 +266,7 @@ export function useWorkspace(
   }, [databaseApi, cancelling]);
 
   const copyQuery = useCallback(async () => {
-    if (tabs.activeTab.kind !== "query") return;
+    if (tabs.activeTab?.kind !== "query") return;
     await navigator.clipboard.writeText(tabs.activeTab.sql);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
@@ -276,6 +276,7 @@ export function useWorkspace(
     objects,
     columns,
     selected,
+    clearSelection: () => setSelected(null),
     expandedObjectKey,
     filter,
     activeResultIndex,

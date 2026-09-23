@@ -307,8 +307,8 @@
 }
 .structure-badge.accent {
   color: var(--accent);
-  border-color: rgba(200, 242, 106, 0.13);
-  background: rgba(200, 242, 106, 0.045);
+  border-color: rgba(223, 187, 121, 0.13);
+  background: rgba(223, 187, 121, 0.045);
 }
 .structure-badge.warning {
   color: #edc98e;
@@ -421,7 +421,7 @@
   cursor: pointer;
 }
 .structure-relationship > button:hover {
-  border-color: rgba(200, 242, 106, 0.35);
+  border-color: rgba(223, 187, 121, 0.35);
   background: var(--surface-3);
 }
 .structure-relationship button > span {
@@ -477,7 +477,7 @@
   padding: 12px 24px;
   border-bottom: 1px solid var(--line);
   color: var(--text-soft);
-  background: rgba(200, 242, 106, 0.025);
+  background: rgba(223, 187, 121, 0.025);
   font-size: var(--text-xs);
   line-height: 1.6;
 }

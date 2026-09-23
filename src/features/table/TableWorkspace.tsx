@@ -4,21 +4,26 @@ import { ViewTabs } from "../../shared/components/ViewTabs";
 import type { TableTab } from "../query/query-types";
 import { StructureInspector } from "../structure/StructureInspector";
 import { TableDataView } from "./TableDataView";
+import type { OpenRelatedTable } from "./table-relations";
 
 type TableWorkspaceProps = {
+  onEditStructure?: () => void;
   tab: TableTab;
   active: boolean;
   onDirtyChange: (id: string, dirty: boolean) => void;
   onOpenQuery: (sql: string, title: string) => void;
   onOpenTable: (schema: string, table: string) => void;
+  onOpenRelated: OpenRelatedTable;
 };
 
 export function TableWorkspace({
+  onEditStructure,
   tab,
   active,
   onDirtyChange,
   onOpenQuery,
   onOpenTable,
+  onOpenRelated,
 }: TableWorkspaceProps) {
   const id = useId();
   const [view, setView] = useState<"data" | "structure">("data");
@@ -50,6 +55,7 @@ export function TableWorkspace({
           active={active && view === "data"}
           onDirtyChange={onDirtyChange}
           onOpenQuery={onOpenQuery}
+          onOpenRelated={onOpenRelated}
         />
       </div>
       <div
@@ -61,6 +67,7 @@ export function TableWorkspace({
       >
         {structureVisited && (
           <StructureInspector
+            onEditStructure={onEditStructure}
             tab={tab}
             onOpenQuery={onOpenQuery}
             onOpenTable={onOpenTable}

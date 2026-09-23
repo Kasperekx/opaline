@@ -18,10 +18,7 @@
 .application-shell {
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-}
-.application-shell.has-sessions {
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 50px minmax(0, 1fr);
 }
 .application-content,
 .session-content {
@@ -32,20 +29,6 @@
 }
 .session-content[hidden] {
   display: none;
-}
-.session-strip {
-  display: flex;
-  gap: 10px;
-  min-width: 0;
-  align-items: stretch;
-  padding: 4px 12px 0;
-  background: #0a0d0f;
-  border-bottom: 1px solid var(--line);
-}
-.session-strip button {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
 }
 .session-manager-button {
   display: flex;
@@ -174,8 +157,8 @@
   max-height: calc(100dvh - 40px);
   padding: 0;
   color: var(--text);
-  background: #14191c;
-  border: 1px solid #414a45;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
   box-shadow: 0 32px 120px #0009;
   overflow-y: auto;
@@ -194,7 +177,7 @@
 }
 .connections-dialog > header p {
   margin: 0 0 8px;
-  color: #a4ada5;
+  color: var(--text-soft);
   font-size: var(--text-xs);
 }
 .connections-dialog h2 {
@@ -221,7 +204,7 @@
   gap: 9px;
   min-width: 0;
   font-size: var(--text-sm);
-  color: #c6d0c9;
+  color: var(--text);
 }
 .profile-fields input:not([type="checkbox"]),
 .profile-fields select {
@@ -231,13 +214,13 @@
   height: 42px;
   padding: 0 12px;
   color: var(--text);
-  background: #0e1215;
-  border: 1px solid #38413d;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   font-size: var(--text-md);
 }
 .profile-fields input::placeholder {
-  color: #8d9a92;
+  color: var(--text-soft);
 }
 .profile-form-grid {
   display: grid;
@@ -266,7 +249,7 @@
 .check-field small {
   display: block;
   margin-top: 4px;
-  color: #a4ada5;
+  color: var(--text-soft);
   font-size: var(--text-xs);
   line-height: 1.6;
 }
@@ -312,7 +295,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #a4ada5;
+  color: var(--text-soft);
   line-height: 1.6;
 }
 .connection-dialog-footer > div {
@@ -337,7 +320,7 @@
   background: #ffc4b7;
 }
 .form-help {
-  color: #a4ada5;
+  color: var(--text-soft);
   font-size: var(--text-xs);
   line-height: 1.7;
   margin: 0;
@@ -350,7 +333,7 @@
   gap: 12px;
   align-items: center;
   padding: 10px;
-  background: #0e1215;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
@@ -358,7 +341,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: var(--text-xs);
-  color: #c6d0c9;
+  color: var(--text);
   user-select: text;
 }
 .ca-path button {
@@ -382,7 +365,7 @@
 .connect-destination {
   overflow-wrap: anywhere;
   font-size: var(--text-md);
-  color: #c6d0c9;
+  color: var(--text);
   user-select: text;
   line-height: 1.7;
   margin: 0;

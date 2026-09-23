@@ -8,18 +8,49 @@ import { TableGridCell, type DisplayRow } from "./TableGridCell";
 import { TableCellMenu, type CellMenuAction } from "./TableCellMenu";
 import { tableRowKey } from "./table-change-set";
 import type { TableDataController } from "./useTableData";
+import { defaultColumnWidth, fitColumnWidth } from "./table-grid-layout";
+import type { StructureForeignKey } from "../../shared/types/structure";
+import type { OpenRelatedTable } from "./table-relations";
+import { TableRecordInspector } from "./TableRecordInspector";
 
 export function TableDataGrid({
   table,
   locked,
+  relations = [],
+  onOpenRelated,
 }: {
   table: TableDataController;
   locked: boolean;
+  relations?: StructureForeignKey[];
+  onOpenRelated?: OpenRelatedTable;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const data = table.data,
     changes = table.changes;
-  const [widths, setWidths] = useState<Record<string, number>>({});
+  const [record, setRecord] = useState<{
+    key: string;
+    data: typeof data;
+  } | null>(null);
+  const { widths, setWidths } = table;
+  const pinnedThrough =
+    data?.columns.findIndex((column) => column.name === table.pinnedColumn) ??
+    -1;
+  const columnWidths = Object.fromEntries(
+    (data?.columns ?? []).map((column) => [
+      column.name,
+      Object.prototype.hasOwnProperty.call(widths, column.name)
+        ? widths[column.name]
+        : defaultColumnWidth(column),
+    ]),
+  );
+  const leftOffsets = (data?.columns ?? []).map(
+    (_, index) =>
+      44 +
+      (data?.columns.slice(0, index) ?? []).reduce(
+        (sum, column) => sum + columnWidths[column.name],
+        0,
+      ),
+  );
   const [menu, setMenu] = useState<{
     x: number;
     y: number;
@@ -79,6 +110,7 @@ export function TableDataGrid({
       rows.map((row) => [row.key, row.original?.rowVersion]),
     ]),
     start,
+    data?.columns.map((column) => `${column.name} · ${column.dataType}`),
   );
   const move = (row: number, column: number, direction: number) => {
     const count = data?.columns.length ?? 0;
@@ -93,116 +125,190 @@ export function TableDataGrid({
     }
     return false;
   };
+  const recordIndex =
+    record?.data === data && !grid.inspecting
+      ? rows.findIndex((row) => row.key === record?.key)
+      : -1;
+  const closeInspector = () => {
+    setRecord(null);
+    grid.closeInspector();
+    viewportRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus();
+  };
   useEffect(() => {
     viewportRef.current?.scrollTo({ top: 0, left: 0 });
-  }, [data?.page, table.filter, table.pageSize, table.sort]);
+  }, [data?.page, table.filter, table.conditions, table.pageSize, table.sort]);
+  const fit = (index: number) => {
+    const column = data?.columns[index];
+    if (!column) return;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    const cell = viewportRef.current?.querySelector(
+      `[data-grid-column="${index}"]`,
+    );
+    if (!context || !cell) return;
+    context.font = getComputedStyle(cell).font;
+    const width = fitColumnWidth(
+      column.name,
+      rows.map((row) => row.values[index]),
+      (text) => context.measureText(text).width,
+    );
+    setWidths((current) => ({ ...current, [column.name]: width }));
+  };
   return (
     <>
-      <div ref={viewportRef} className="table-data-grid-wrap">
-        <GridFeedback grid={grid} quiet />
-        {table.busy && !data ? (
-          <div className="table-data-state" role="status">
-            <Loader2 className="spin" size={21} />
-            Loading table data…
-          </div>
-        ) : data && rows.length ? (
-          <table
-            className="table-data-grid interactive-grid inline-table-grid"
-            role="grid"
-            aria-label="Table data"
-            style={{
-              tableLayout: "fixed",
-              width:
-                44 +
-                data.columns.reduce(
-                  (sum, column) => sum + (widths[column.name] ?? 200),
-                  0,
-                ),
-            }}
-          >
-            <TableGridHeader
-              table={table}
-              widths={widths}
-              locked={locked}
-              onWidth={(column, width) =>
-                setWidths((current) => ({ ...current, [column]: width }))
-              }
-            />
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr
-                  key={row.key}
-                  className={[
-                    row.change?.deleted ? "pending-delete" : "",
-                    !row.original ? "pending-insert" : "",
-                    table.isRowSelected(row.index) ? "selected" : "",
-                  ].join(" ")}
-                >
-                  <td className="table-row-selection">
-                    {row.original ? (
-                      <SelectionCheckbox
-                        checked={table.isRowSelected(row.index)}
-                        disabled={locked}
-                        label={"Select row " + (row.index + 1)}
-                        onChange={() => table.toggleRowSelection(row.index)}
+      <div
+        className={`table-grid-region ${grid.inspecting || recordIndex >= 0 ? "with-value-inspector" : ""}`}
+      >
+        <div ref={viewportRef} className="table-data-grid-wrap">
+          {table.busy && !data ? (
+            <div className="table-data-state" role="status">
+              <Loader2 className="spin" size={21} />
+              Loading table data…
+            </div>
+          ) : data && rows.length ? (
+            <table
+              className="table-data-grid interactive-grid inline-table-grid"
+              role="grid"
+              aria-label="Table data"
+              style={{
+                tableLayout: "fixed",
+                width: "100%",
+                minWidth:
+                  44 +
+                  data.columns.reduce(
+                    (sum, column) => sum + columnWidths[column.name],
+                    0,
+                  ),
+              }}
+            >
+              <TableGridHeader
+                table={table}
+                widths={columnWidths}
+                pinnedThrough={pinnedThrough}
+                leftOffsets={leftOffsets}
+                onPin={(index) =>
+                  table.setPinnedColumn(data.columns[index]?.name ?? null)
+                }
+                onFit={fit}
+                locked={locked}
+                onWidth={(column, width) =>
+                  setWidths((current) => ({ ...current, [column]: width }))
+                }
+              />
+              <tbody>
+                {rows.map((row, rowIndex) => (
+                  <tr
+                    key={row.key}
+                    className={[
+                      row.change?.deleted ? "pending-delete" : "",
+                      !row.original ? "pending-insert" : "",
+                      table.isRowSelected(row.index) ? "selected" : "",
+                    ].join(" ")}
+                  >
+                    <td className="table-row-selection">
+                      {row.original ? (
+                        <SelectionCheckbox
+                          checked={table.isRowSelected(row.index)}
+                          disabled={locked}
+                          label={"Select row " + (row.index + 1)}
+                          onChange={() => table.toggleRowSelection(row.index)}
+                        />
+                      ) : (
+                        <Plus size={15} aria-label="New row — not saved" />
+                      )}
+                      {row.change?.deleted && (
+                        <span
+                          className="row-deletion-marker"
+                          aria-label="Marked for deletion"
+                        >
+                          −
+                        </span>
+                      )}
+                    </td>
+                    {data.columns.map((column, columnIndex) => (
+                      <TableGridCell
+                        key={column.name}
+                        row={row}
+                        rowIndex={rowIndex}
+                        column={column}
+                        columnIndex={columnIndex}
+                        table={table}
+                        grid={grid}
+                        locked={locked}
+                        relations={relations.filter(
+                          (relation) =>
+                            relation.direction === "outgoing" &&
+                            relation.sourceColumns.includes(column.name),
+                        )}
+                        onOpenRelated={onOpenRelated}
+                        onInspectRecord={() => {
+                          grid.closeInspector();
+                          setRecord({ key: row.key, data });
+                        }}
+                        pinnedLeft={
+                          columnIndex <= pinnedThrough
+                            ? leftOffsets[columnIndex]
+                            : undefined
+                        }
+                        onMove={move}
+                        onMenu={(x, y, actions, returnFocus) =>
+                          setMenu({ x, y, actions, returnFocus })
+                        }
                       />
-                    ) : (
-                      <Plus size={15} aria-label="New row — not saved" />
-                    )}
-                    {row.change?.deleted && (
-                      <span
-                        className="row-deletion-marker"
-                        aria-label="Marked for deletion"
-                      >
-                        −
-                      </span>
-                    )}
-                  </td>
-                  {data.columns.map((column, columnIndex) => (
-                    <TableGridCell
-                      key={column.name}
-                      row={row}
-                      rowIndex={rowIndex}
-                      column={column}
-                      columnIndex={columnIndex}
-                      table={table}
-                      grid={grid}
-                      locked={locked}
-                      onMove={move}
-                      onMenu={(x, y, actions, returnFocus) =>
-                        setMenu({ x, y, actions, returnFocus })
-                      }
-                    />
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : data ? (
-          <div className="table-data-state">
-            <Search size={20} />
-            <strong>
-              {table.filter ? "No matching rows" : "This table is empty"}
-            </strong>
-            {table.filter ? (
-              <button onClick={table.clearFilter}>Clear filter</button>
-            ) : (
-              data.insertable && (
-                <button disabled={locked} onClick={changes.insert}>
-                  <Plus size={14} />
-                  Add first row
-                </button>
-              )
-            )}
-          </div>
-        ) : null}
-        {table.busy && data && (
-          <div
-            className="table-loading-overlay"
-            aria-label="Refreshing table data"
-          >
-            <Loader2 className="spin" size={20} />
-          </div>
+                    ))}
+                    <td className="table-grid-fill" aria-hidden="true" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : data ? (
+            <div className="table-data-state">
+              <Search size={20} />
+              <strong>
+                {table.filter || table.conditions.length
+                  ? "No matching rows"
+                  : "This table is empty"}
+              </strong>
+              {table.filter || table.conditions.length ? (
+                <button onClick={table.clearFilter}>Clear filter</button>
+              ) : (
+                data.insertable && (
+                  <button disabled={locked} onClick={changes.insert}>
+                    <Plus size={14} />
+                    Add first row
+                  </button>
+                )
+              )}
+            </div>
+          ) : null}
+          {table.busy && data && (
+            <div
+              className="table-loading-overlay"
+              aria-label="Refreshing table data"
+            >
+              <Loader2 className="spin" size={20} />
+            </div>
+          )}
+        </div>
+        <GridFeedback
+          grid={{
+            ...grid,
+            closeInspector,
+          }}
+          quiet
+          sidePanel
+        />
+        {recordIndex >= 0 && data && (
+          <TableRecordInspector
+            row={rows[recordIndex]}
+            columns={data.columns}
+            index={recordIndex}
+            count={rows.length}
+            onClose={closeInspector}
+            onMove={(offset) =>
+              setRecord({ key: rows[recordIndex + offset].key, data })
+            }
+          />
         )}
       </div>
       {menu && (

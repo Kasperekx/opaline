@@ -1,0 +1,164 @@
+.profile-editor-dialog {
+  width: min(880px, calc(100vw - 32px));
+}
+.profile-editor-dialog .profile-fields {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+.profile-identity-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+}
+.profile-provider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.profile-provider > svg {
+  color: var(--accent);
+}
+.profile-provider div {
+  display: grid;
+  gap: 4px;
+}
+.profile-provider strong {
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+.profile-provider small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.profile-identity-section .profile-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.profile-summary {
+  margin-top: auto;
+}
+.profile-summary p {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+.profile-editor-dialog .production-notice {
+  font-size: var(--text-xs);
+  padding: 10px;
+}
+.profile-connection-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px;
+  gap: 24px;
+}
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.profile-section header h3 {
+  font-size: var(--text-md);
+  font-weight: 550;
+  margin: 0 0 6px;
+}
+.profile-section header p,
+.profile-section .form-help {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  margin: 0;
+}
+.profile-editor-dialog .destination-fields {
+  padding: 0;
+  border: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.profile-editor-dialog .destination-fields .host-field {
+  grid-column: span 3;
+}
+.profile-editor-dialog .destination-fields label:nth-child(n + 3) {
+  grid-column: span 2;
+}
+.profile-editor-dialog .profile-fields input:not([type="checkbox"]),
+.profile-editor-dialog .profile-fields select {
+  height: 38px;
+  font-size: var(--text-sm);
+  background: var(--bg);
+}
+.profile-editor-dialog .profile-fields label {
+  font-size: var(--text-xs);
+  gap: 7px;
+}
+.profile-editor-dialog .check-field {
+  font-size: var(--text-xs);
+}
+.profile-editor-dialog .check-field small {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.profile-security-section {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.profile-security-section .profile-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.profile-security-section .ca-field {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+}
+.profile-security-section .button {
+  min-height: 32px;
+  font-size: var(--text-xs);
+  padding: 6px 10px;
+}
+.profile-editor-dialog .profile-validation {
+  padding: 0 24px;
+  border-top: 1px solid var(--line);
+}
+.profile-test-hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.profile-editor-dialog .connection-dialog-footer {
+  z-index: 2;
+  padding: 14px 24px;
+  background: var(--surface);
+}
+.profile-editor-dialog .connection-dialog-footer > span {
+  font-size: 11px;
+}
+@media (max-width: 700px) {
+  .profile-editor-dialog .profile-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profile-identity-section {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 18px;
+  }
+  .profile-identity-section .profile-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-summary {
+    display: none;
+  }
+  .profile-connection-section {
+    padding: 18px;
+  }
+}

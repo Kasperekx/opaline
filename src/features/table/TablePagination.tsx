@@ -14,8 +14,24 @@ export function TablePagination({
           Page {table.page + 1}
           {table.data && ` · ${table.data.rows.length} rows`}
         </span>
-        {table.filter && <span className="filter-active">Filtered</span>}
+        {(table.filter || table.conditions.length > 0) && (
+          <span className="filter-active">Filtered</span>
+        )}
       </div>
+      <label>
+        Density
+        <select
+          aria-label="Table density"
+          value={table.density}
+          onChange={(event) =>
+            table.setDensity(event.target.value as typeof table.density)
+          }
+        >
+          <option value="default">Use app setting</option>
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select>
+      </label>
       <label>
         Rows per page
         <select

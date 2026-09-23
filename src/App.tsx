@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { ConnectionManager } from "./features/connections/ConnectionManager";
 import { ConnectProfileDialog } from "./features/connections/ConnectProfileDialog";
 import { SessionProvider } from "./features/connections/SessionContext";
-import { SessionStrip } from "./features/connections/SessionStrip";
+import { WindowBar } from "./features/connections/WindowBar";
 import { useConnectionManager } from "./features/connections/useConnectionManager";
 import type { ConnectionProfile } from "./features/connections/connection-types";
 import { Workspace } from "./features/query/Workspace";
@@ -20,6 +20,10 @@ import "./App.css";
 import "./features/connections/connections.css";
 import "./features/connections/connection-home.css";
 import "./shared/safety/safety.css";
+import "./styles/controls.css";
+import "./styles/studio.css";
+import "./features/table/table-grid.css";
+import "./features/connections/profile-editor.css";
 
 function Application() {
   const safety = useWorkSafety();
@@ -46,28 +50,17 @@ function Application() {
     else setConnecting(profile);
   };
   return (
-    <div
-      className={
-        "application-shell" + (manager.sessions.length ? " has-sessions" : "")
-      }
-    >
-      {manager.sessions.length > 0 && (
-        <SessionStrip
-          sessions={manager.sessions}
-          workspaces={manager.catalog.workspaces}
-          activeId={manager.activeId}
-          busy={manager.busy}
-          onSelect={manager.setActiveId}
-          onClose={(id) =>
-            safety.request(
-              () => {
-                void manager.disconnect(id);
-              },
-              { sessionId: id },
-            )
-          }
-        />
-      )}
+    <div className="application-shell">
+      <WindowBar
+        sessions={manager.sessions}
+        workspaces={manager.catalog.workspaces}
+        activeId={manager.activeId}
+        busy={manager.busy}
+        onSelect={manager.setActiveId}
+        onClose={(id) =>
+          safety.request(() => void manager.disconnect(id), { sessionId: id })
+        }
+      />
       <div className="application-content">
         <div className="session-content" hidden={manager.activeId !== null}>
           <ConnectionManager

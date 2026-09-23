@@ -77,14 +77,26 @@ export function TableExportMenu({
       <button
         ref={triggerRef}
         type="button"
-        aria-label={busy ? "Exporting table data" : "Export table data"}
+        aria-label={
+          busy
+            ? "Exporting table data"
+            : selectedCount > 0
+              ? "Export selected rows"
+              : "Export table data"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
         disabled={disabled || busy}
         onClick={() => setOpen((current) => !current)}
       >
         {busy ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
-        <span>{busy ? "Exporting" : "Export"}</span>
+        <span>
+          {busy
+            ? "Exporting"
+            : selectedCount > 0
+              ? "Export selected"
+              : "Export"}
+        </span>
         <ChevronDown size={12} />
       </button>
       {open && (

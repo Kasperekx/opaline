@@ -59,7 +59,7 @@ export function useSqlDocuments(
   });
   const operate = (action: () => Promise<void>) =>
     lock(async () => {
-      setBusyId(tabs.activeTab.id);
+      setBusyId(tabs.activeTab?.id ?? "opening-file");
       setMessage(null);
       try {
         await action();
@@ -99,7 +99,7 @@ export function useSqlDocuments(
     save: (saveAs = false) =>
       operate(async () => {
         const tab = tabs.activeTab;
-        if (tab.kind !== "query") return;
+        if (tab?.kind !== "query") return;
         const document = await sqlDocumentApi.save(tab.sql, tab.file, saveAs);
         if (!document) return;
         tabs.updateQueryTab(tab.id, (current) => ({
@@ -118,10 +118,10 @@ export function useSqlDocuments(
     format: () =>
       operate(async () => {
         const tab = tabs.activeTab;
-        if (tab.kind !== "query") return;
+        if (tab?.kind !== "query") return;
         const formatted = await sqlDocumentApi.format(tab.sql);
         if (
-          latest.current.id !== tab.id ||
+          latest.current?.id !== tab.id ||
           latest.current.kind !== "query" ||
           latest.current.sql !== tab.sql
         )

@@ -1,10 +1,11 @@
-import { Check, Loader2, PencilLine } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { useDatabaseSession } from "../connections/SessionContext";
 import { EnvironmentBadge } from "../connections/EnvironmentBadge";
 import { useWorkSafety } from "../../shared/safety/WorkSafety";
 import { primaryModifierLabel } from "../../shared/lib/platform";
 import type { TableTab } from "../query/query-types";
 import type { TableDataController } from "./useTableData";
+import { TableErrorNotice } from "./TableErrorNotice";
 
 export function TableChangesBar({
   table,
@@ -17,16 +18,18 @@ export function TableChangesBar({
   const safety = useWorkSafety();
   const { changes } = table;
   const { summary } = changes;
+  const count = summary.fields + summary.inserted + summary.deleted;
+  const target = `${session.name} · ${session.host}:${session.port}/${session.database} · ${tab.schema}.${tab.table}`;
   if (!summary.rows.length && !changes.saved && !changes.error) return null;
   return (
     <div className={`table-changes-bar ${changes.error ? "has-error" : ""}`}>
-      <div className="table-change-summary" role="status">
+      <div className="table-change-summary" role="status" title={target}>
         {changes.busy ? (
           <Loader2 size={17} className="spin" />
         ) : changes.saved ? (
           <Check size={17} />
         ) : (
-          <PencilLine size={17} />
+          <span className="table-change-dot" aria-hidden="true" />
         )}
         <span>
           <strong>
@@ -34,33 +37,21 @@ export function TableChangesBar({
               ? "Saving changes…"
               : changes.saved
                 ? "Changes saved"
-                : [
-                    summary.updated &&
-                      `${summary.fields} changed ${summary.fields === 1 ? "field" : "fields"} in ${summary.updated} ${summary.updated === 1 ? "row" : "rows"}`,
-                    summary.inserted && `${summary.inserted} new`,
-                    summary.deleted && `${summary.deleted} to delete`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                : changes.error?.kind === "unknown"
+                  ? "Save not confirmed"
+                  : `${count} unsaved ${count === 1 ? "change" : "changes"}`}
           </strong>
-          <small>
-            {changes.saved
-              ? "Confirmed by PostgreSQL"
-              : `${session.name} / ${tab.schema}.${tab.table} · ${changes.error?.kind === "unknown" ? "Save not confirmed — verify database" : "Not saved to the database"}`}
-          </small>
-          {summary.inserted > 0 && !changes.saved && (
-            <small>
-              New rows: review primary and unique keys before saving.
-            </small>
-          )}
+          <small>· {tab.table}</small>
         </span>
       </div>
       {!changes.saved && (
         <>
-          <EnvironmentBadge
-            environment={session.environment}
-            readOnly={session.readOnly}
-          />
+          {session.environment === "production" && (
+            <EnvironmentBadge
+              environment={session.environment}
+              readOnly={session.readOnly}
+            />
+          )}
           <div className="table-change-actions">
             <button
               className="button ghost"
@@ -95,22 +86,40 @@ export function TableChangesBar({
               }
               onClick={() => void changes.save()}
             >
-              Save changes <kbd>{primaryModifierLabel} S</kbd>
+              {session.environment === "production"
+                ? "Save changes to production"
+                : "Save changes"}{" "}
+              <kbd>{primaryModifierLabel} S</kbd>
             </button>
           </div>
         </>
       )}
+      {session.environment === "production" && !changes.saved && (
+        <small className="table-change-context">{target}</small>
+      )}
+      {summary.inserted > 0 && !changes.saved && (
+        <small className="table-change-context">
+          New rows: review primary and unique keys before saving.
+        </small>
+      )}
       {changes.error && (
-        <p className="table-save-error" role="alert">
-          <strong>
-            {changes.error.kind === "unknown"
+        <TableErrorNotice
+          title={
+            changes.error.kind === "unknown"
               ? "Save outcome unknown. "
               : changes.saved
                 ? "View refresh failed. "
-                : "Could not save. "}
-          </strong>
-          {changes.error.message}
-        </p>
+                : "Could not save. "
+          }
+          hint={
+            changes.error.kind === "unknown"
+              ? "Do not retry the write. Verify the database state first; your local changes are preserved."
+              : changes.saved
+                ? "The save was confirmed. Refresh the table without repeating the write."
+                : "Your local changes are preserved. Review the details and correct the affected values before saving again."
+          }
+          message={changes.error.message}
+        />
       )}
     </div>
   );

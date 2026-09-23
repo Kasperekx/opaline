@@ -3,13 +3,18 @@ import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "../../shared/lib/database-api";
 import type { RelationStructure } from "../../shared/types/structure";
 
-export function useRelationStructure(schema: string, table: string) {
+export function useRelationStructure(
+  schema: string,
+  table: string,
+  enabled = true,
+) {
   const { api: databaseApi } = useDatabaseSession();
   const [data, setData] = useState<RelationStructure | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     setBusy(true);
     setError(null);
@@ -27,7 +32,7 @@ export function useRelationStructure(schema: string, table: string) {
     return () => {
       active = false;
     };
-  }, [databaseApi, schema, table, revision]);
+  }, [databaseApi, schema, table, revision, enabled]);
   const refresh = useCallback(() => setRevision((current) => current + 1), []);
   return { data, busy, error, refresh };
 }

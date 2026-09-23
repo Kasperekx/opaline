@@ -1,4 +1,13 @@
-import { Database, Folder, Pencil, Plus, Search, X } from "lucide-react";
+import {
+  Database,
+  Pencil,
+  Plus,
+  Search,
+  X,
+  ArrowDownUp,
+  Trash2,
+} from "lucide-react";
+import { ActionMenu } from "../../shared/components/ActionMenu";
 import { ConnectionRow } from "./ConnectionRow";
 import { handleWindowDrag } from "../../shared/lib/window-drag";
 import {
@@ -27,6 +36,7 @@ export function ConnectionList({
   onCreate,
   onTransfer,
   onRemoveWorkspace,
+  selectedId,
 }: {
   workspace?: ProductWorkspace;
   visible: ConnectionProfile[];
@@ -45,6 +55,7 @@ export function ConnectionList({
   onCreate: () => void;
   onTransfer?: () => void;
   onRemoveWorkspace?: () => void;
+  selectedId?: string;
 }) {
   const filtered = search.length > 0 || environment !== "all";
   const activeProfileIds = new Set(
@@ -65,14 +76,6 @@ export function ConnectionList({
         data-tauri-drag-region
       >
         <div className="workspace-heading">
-          {workspace && (
-            <div className="workspace-context">
-              <Folder size={15} />
-              <span>Workspace</span>
-              <span>/</span>
-              <span>Connections</span>
-            </div>
-          )}
           <div className="workspace-heading-title">
             <h1>{workspace?.name ?? "Connections"}</h1>
             {workspace && (
@@ -87,8 +90,13 @@ export function ConnectionList({
               </button>
             )}
           </div>
+          <p className="workspace-description">
+            {workspace
+              ? "Connection library"
+              : "Organize your connections by project."}
+          </p>
         </div>
-        {workspace && (
+        {workspace && profileCount > 0 && (
           <button
             className="button primary"
             disabled={!available}
@@ -143,35 +151,42 @@ export function ConnectionList({
       <div className="connection-list-content" aria-busy={loading}>
         {visible.length > 0 ? (
           <>
-            <div className="connection-list-columns" aria-hidden="true">
-              <span>Connection</span>
-              <span>Destination</span>
-              <span>Environment</span>
-              <span />
-            </div>
-            <ul className="connection-list">
-              {visible.map((profile) => (
-                <ConnectionRow
-                  key={profile.id}
-                  profile={profile}
-                  active={activeProfileIds.has(profile.id)}
-                  available={available}
-                  onDetails={() => onSelect(profile.id)}
-                  onConnect={() => onConnect(profile)}
-                  onEdit={() => onEdit(profile)}
-                />
-              ))}
-            </ul>
-            {!filtered && (
-              <button
-                className="connection-add-row"
-                disabled={!available}
-                onClick={onCreate}
-              >
-                <Plus size={16} />
-                Add connection to {workspace?.name}
-              </button>
-            )}
+            {environments.map((env) => {
+              const group = visible.filter(
+                (profile) => profile.environment === env,
+              );
+              if (!group.length) return null;
+              return (
+                <section
+                  className={`connection-environment-group env-${env}`}
+                  key={env}
+                  aria-label={`${environmentLabels[env]} connections`}
+                >
+                  <header className="environment-group-heading">
+                    <i aria-hidden="true" />
+                    <h2>{environmentLabels[env]}</h2>
+                    <span>{group.length}</span>
+                    {env === "production" && (
+                      <small>Live data · use with care</small>
+                    )}
+                  </header>
+                  <ul className="connection-list">
+                    {group.map((profile) => (
+                      <ConnectionRow
+                        key={profile.id}
+                        profile={profile}
+                        active={activeProfileIds.has(profile.id)}
+                        selected={selectedId === profile.id}
+                        available={available}
+                        onDetails={() => onSelect(profile.id)}
+                        onConnect={() => onConnect(profile)}
+                        onEdit={() => onEdit(profile)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
           </>
         ) : (
           <div className="connection-list-empty">
@@ -215,30 +230,39 @@ export function ConnectionList({
       </div>
       <footer className="connection-list-footer">
         {workspace && (
-          <div className="p1-inline">
-            <button
-              className="toolbar-button"
-              disabled={!available}
-              onClick={onTransfer}
-            >
-              Import / export profiles
-            </button>
-            <button
-              className="toolbar-button"
-              disabled={!available}
-              onClick={onRemoveWorkspace}
-            >
-              Remove workspace
-            </button>
-          </div>
+          <ActionMenu
+            label="Workspace actions"
+            disabled={!available}
+            actions={[
+              { label: "Rename workspace", icon: Pencil, onSelect: onRename },
+              ...(onTransfer
+                ? [
+                    {
+                      label: "Import / export profiles",
+                      icon: ArrowDownUp,
+                      onSelect: onTransfer,
+                    },
+                  ]
+                : []),
+              ...(onRemoveWorkspace
+                ? [
+                    {
+                      label: "Remove workspace",
+                      icon: Trash2,
+                      danger: true,
+                      separator: true,
+                      onSelect: onRemoveWorkspace,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         )}
         <span>
           <Database size={14} />
           PostgreSQL
         </span>
-        <span>
-          Select a connection for details · Connect to open the SQL editor
-        </span>
+        <span>Connection details stay on this device</span>
       </footer>
     </section>
   );

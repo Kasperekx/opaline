@@ -58,6 +58,29 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </WorkSafetyProvider>
 );
 
+it("excludes only the current schema draft, not session-wide operations", () => {
+  const hook = renderHook(() => useWorkSafety(), { wrapper });
+  const unregisterEditor = hook.result.current.register("editor", () => ({
+    sessionId: "s",
+    tabId: "schema",
+    label: "Structure",
+    dirty: true,
+  }));
+  expect(
+    hook.result.current.hasRisks({ sessionId: "s", excludeTabId: "schema" }),
+  ).toBe(false);
+  const unregisterTask = hook.result.current.register("task", () => ({
+    sessionId: "s",
+    label: "Export",
+    busy: true,
+  }));
+  expect(
+    hook.result.current.hasRisks({ sessionId: "s", excludeTabId: "schema" }),
+  ).toBe(true);
+  unregisterTask();
+  unregisterEditor();
+});
+
 function Probe({
   busy = false,
   action,

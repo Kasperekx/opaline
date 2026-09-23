@@ -79,6 +79,8 @@ pub(crate) struct TablePageRequest {
     pub(crate) page: u64,
     pub(crate) page_size: u16,
     pub(crate) filter: Option<String>,
+    #[serde(default)]
+    pub(crate) conditions: Vec<TableFilter>,
     pub(crate) sort: Option<TableSort>,
 }
 
@@ -180,9 +182,33 @@ pub(crate) struct ExportTableDataRequest {
     pub(crate) schema: String,
     pub(crate) table: String,
     pub(crate) filter: Option<String>,
+    #[serde(default)]
+    pub(crate) conditions: Vec<TableFilter>,
     pub(crate) sort: Option<TableSort>,
     pub(crate) format: TableExportFormat,
     pub(crate) path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TableFilter {
+    pub(crate) column: String,
+    pub(crate) operator: FilterOperator,
+    pub(crate) value: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum FilterOperator {
+    Eq,
+    Ne,
+    Contains,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    IsNull,
+    IsNotNull,
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -12,7 +12,11 @@ import {
 } from "react";
 import { ConnectionDialog } from "../../features/connections/ConnectionDialog";
 
-export type WorkScope = { sessionId?: string; tabId?: string };
+export type WorkScope = {
+  sessionId?: string;
+  tabId?: string;
+  excludeTabId?: string;
+};
 type WorkRisk = WorkScope & {
   label: string;
   dirty?: boolean;
@@ -39,6 +43,7 @@ type Safety = {
 const Context = createContext<Safety | null>(null);
 const matches = (risk: WorkRisk, scope: WorkScope) =>
   (!scope.sessionId || risk.sessionId === scope.sessionId) &&
+  (!scope.excludeTabId || risk.tabId !== scope.excludeTabId) &&
   (!scope.tabId || risk.tabId === scope.tabId);
 
 export function WorkSafetyProvider({ children }: { children: ReactNode }) {

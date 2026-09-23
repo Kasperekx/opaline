@@ -7,11 +7,11 @@ export const editorTheme = EditorView.theme(
     "&": {
       height: "100%",
       backgroundColor: "transparent",
-      color: "#dfe6dc",
+      color: "var(--text)",
       fontSize: "var(--editor-font-size, clamp(15px, 0.95vw, 17px))",
     },
     ".cm-content": {
-      caretColor: "#c8f26a",
+      caretColor: "var(--accent)",
       padding: "25px 0",
       fontFamily:
         '"SFMono-Regular", "Cascadia Code", "Roboto Mono", ui-monospace, monospace',
@@ -20,30 +20,30 @@ export const editorTheme = EditorView.theme(
     ".cm-line": { padding: "0 clamp(18px, 1.7vw, 28px)" },
     ".cm-gutters": {
       backgroundColor: "transparent",
-      color: "#626b64",
+      color: "var(--muted)",
       border: "none",
       paddingLeft: "9px",
     },
     ".cm-activeLine": { backgroundColor: "rgba(255,255,255,.027)" },
     ".cm-activeLineGutter": {
       backgroundColor: "transparent",
-      color: "#a4afa5",
+      color: "var(--text-soft)",
     },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-      backgroundColor: "rgba(200,242,106,.13)",
+      backgroundColor: "var(--accent-line)",
     },
-    ".cm-cursor": { borderLeftColor: "#c8f26a" },
+    ".cm-cursor": { borderLeftColor: "var(--accent)" },
   },
   { dark: true },
 );
 
 export const sqlHighlighting = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: tags.keyword, color: "#c8f26a" },
-    { tag: tags.string, color: "#edc98e" },
-    { tag: tags.number, color: "#8ed7c6" },
-    { tag: tags.comment, color: "#687169", fontStyle: "italic" },
-    { tag: tags.operator, color: "#9eaaa0" },
-    { tag: tags.name, color: "#dfe6dc" },
+    { tag: tags.keyword, color: "var(--accent)" },
+    { tag: tags.string, color: "var(--teal)" },
+    { tag: tags.number, color: "#a9becd" },
+    { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
+    { tag: tags.operator, color: "var(--text-soft)" },
+    { tag: tags.name, color: "var(--text)" },
   ]),
 );

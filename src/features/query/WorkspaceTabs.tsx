@@ -1,5 +1,14 @@
-import { FileCode2, Loader2, Plus, Table2, X } from "lucide-react";
+import {
+  FileCode2,
+  Loader2,
+  Plus,
+  Table2,
+  X,
+  Network,
+  Columns3,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { handleWindowDrag } from "../../shared/lib/window-drag";
 import type { QueryTab, WorkspaceTab } from "./query-types";
 
 type WorkspaceTabsProps = {
@@ -8,6 +17,7 @@ type WorkspaceTabsProps = {
   runningTabId: string | null;
   dirtyTableIds?: ReadonlySet<string>;
   endAction: ReactNode;
+  startAction?: ReactNode;
   onAddQuery: () => void;
   onClose: (id: string) => void;
   onRenameQuery: (id: string, title: string) => void;
@@ -20,6 +30,7 @@ export function WorkspaceTabs({
   runningTabId,
   dirtyTableIds,
   endAction,
+  startAction,
   onAddQuery,
   onClose,
   onRenameQuery,
@@ -62,7 +73,12 @@ export function WorkspaceTabs({
   };
 
   return (
-    <div className="tab-bar">
+    <div
+      className="tab-bar"
+      data-tauri-drag-region
+      onMouseDown={handleWindowDrag}
+    >
+      {startAction}
       <div
         className="query-tabs-scroll"
         role="tablist"
@@ -117,7 +133,13 @@ export function WorkspaceTabs({
                   title={
                     tab.kind === "query"
                       ? `${tab.title} · Double-click or F2 to rename`
-                      : `${tab.schema}.${tab.table}`
+                      : tab.kind === "diagram"
+                        ? "Database diagram"
+                        : tab.kind === "schema"
+                          ? tab.table
+                            ? `Edit ${tab.schema}.${tab.table}`
+                            : "Create a database table"
+                          : `${tab.schema}.${tab.table}`
                   }
                   onClick={() => onSelect(tab.id)}
                   onKeyDown={(event) => {
@@ -154,6 +176,10 @@ export function WorkspaceTabs({
                 >
                   {running ? (
                     <Loader2 className="spin" size={14} />
+                  ) : tab.kind === "diagram" ? (
+                    <Network size={14} />
+                  ) : tab.kind === "schema" ? (
+                    <Columns3 size={14} />
                   ) : tab.kind === "table" ? (
                     <Table2 size={14} />
                   ) : (
@@ -175,7 +201,7 @@ export function WorkspaceTabs({
               <button
                 className="tab-close"
                 aria-label={`Close ${tab.title}`}
-                disabled={tabs.length === 1 || running}
+                disabled={running}
                 tabIndex={active ? 0 : -1}
                 onClick={() => onClose(tab.id)}
               >

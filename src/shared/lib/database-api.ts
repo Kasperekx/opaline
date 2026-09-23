@@ -1,5 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
-import type { RelationStructure } from "../types/structure";
+import type {
+  RelationStructure,
+  SchemaChange,
+  SchemaPlan,
+  EnumType,
+} from "../types/structure";
+import type { DatabaseDiagram } from "../types/diagram";
 import type {
   ColumnInfo,
   TableChangesRequest,
@@ -48,6 +54,12 @@ export const createDatabaseApi = (sessionId: string) => {
     args: Record<string, unknown> = {},
   ) => invoke<T>(command, { ...args, sessionId });
   return {
+    listEnumTypes: () => scopedInvoke<EnumType[]>("list_enum_types"),
+    previewSchemaChange: (input: SchemaChange) =>
+      scopedInvoke<SchemaPlan>("preview_schema_change", { input }),
+    applySchemaChange: (input: SchemaChange, confirmation: string) =>
+      scopedInvoke<void>("apply_schema_change", { input, confirmation }),
+    diagram: () => scopedInvoke<DatabaseDiagram>("database_diagram"),
     completionCatalog: () =>
       scopedInvoke<{ schema: string; table: string; column: string }[]>(
         "sql_completion_catalog",

@@ -1,4 +1,10 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -6,13 +12,43 @@ import { WorkSafetyProvider } from "../src/shared/safety/WorkSafety";
 import { SessionProvider } from "../src/features/connections/SessionContext";
 import { newProfile } from "../src/features/connections/connection-types";
 import { TableDataView } from "../src/features/table/TableDataView";
+import { InlineCellEditor } from "../src/features/table/InlineCellEditor";
 import type {
   TableChangesRequest,
   TableRowSnapshot,
+  TablePageRequest,
 } from "../src/shared/types/database";
 import { applyFixtureChanges, tableChangePage } from "./table-change-fixture";
 
-function mount(readOnly = false, identity = false) {
+it("keeps value-option clicks inside the editor and focuses the enabled value", () => {
+  const props = {
+    column: { ...tableChangePage.columns[1], nullable: true },
+    error: null,
+    anchor: null,
+    isNew: true,
+    onChange: vi.fn(),
+    onCommit: vi.fn(),
+    onCancel: vi.fn(),
+    onBlur: vi.fn(),
+    onMove: vi.fn(() => false),
+  };
+  const view = render(<InlineCellEditor {...props} value={null} />);
+  const toggle = screen.getByRole("button", { name: /to a value/ });
+  expect(fireEvent.mouseDown(toggle)).toBe(false);
+  fireEvent.click(toggle);
+  expect(props.onChange).toHaveBeenCalledWith("");
+  expect(props.onBlur).not.toHaveBeenCalled();
+  view.rerender(<InlineCellEditor {...props} value="" />);
+  expect(document.activeElement).toBe(
+    screen.getByLabelText(`Value for ${props.column.name}`),
+  );
+});
+
+function mount(
+  readOnly = false,
+  identity = false,
+  environment: "local" | "production" = "local",
+) {
   const page = structuredClone(tableChangePage);
   if (identity) {
     page.columns[0].identity = true;
@@ -23,9 +59,9 @@ function mount(readOnly = false, identity = false) {
   const save = vi.fn(async (input: TableChangesRequest) =>
     applyFixtureChanges(page, input),
   );
-  const load = vi.fn(async (pageNumber: number) => ({
+  const load = vi.fn(async (input: TablePageRequest) => ({
     ...structuredClone(page),
-    page: pageNumber,
+    page: input.page,
   }));
   const compare = vi.fn(async (): Promise<TableRowSnapshot> => ({
     columns: page.columns.map((column) => column.name),
@@ -36,7 +72,7 @@ function mount(readOnly = false, identity = false) {
   }));
   mockIPC((command, args) => {
     if (command === "load_table_page")
-      return load((args as { input: { page: number } }).input.page);
+      return load((args as { input: TablePageRequest }).input);
     if (command === "load_table_row") return compare();
     if (command === "apply_table_changes")
       return save((args as { input: TableChangesRequest }).input);
@@ -61,6 +97,7 @@ function mount(readOnly = false, identity = false) {
     profileId: "profile",
     serverVersion: "test",
     readOnly,
+    environment,
   };
   const view = render(
     <WorkSafetyProvider>
@@ -79,6 +116,278 @@ async function editName(value = "Ada edited") {
   await user.type(field, value);
   return user;
 }
+
+it("fills the table viewport without adding interactive data cells", async () => {
+  mount();
+  await screen.findByRole("gridcell", { name: "Ada" });
+  const grid = screen.getByRole("grid", { name: "Table data" });
+  expect(grid.style.width).toBe("100%");
+  expect(grid.querySelectorAll(".table-grid-fill")).toHaveLength(3);
+  expect(within(grid).getAllByRole("gridcell")).toHaveLength(12);
+  grid.querySelectorAll(".table-grid-fill").forEach((cell) => {
+    expect(cell.getAttribute("aria-hidden")).toBe("true");
+    expect(cell.hasAttribute("tabindex")).toBe(false);
+  });
+});
+
+it("keeps selection separate from unsaved changes and uses the existing export menu", async () => {
+  const { save } = mount();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Select row 1" }),
+  );
+  const bar = screen.getByRole("group", { name: "Selected row actions" });
+  expect(within(bar).getByText("1 row selected")).toBeTruthy();
+  expect(
+    screen.queryByText("Changes are staged, not immediately saved"),
+  ).toBeNull();
+  expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
+  expect(within(bar).queryByRole("button", { name: "CSV" })).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Export selected rows" }),
+  );
+  expect(screen.getByText("1 selected")).toBeTruthy();
+  expect(
+    screen.getByRole("menuitem", { name: /CSV Spreadsheet/ }),
+  ).toBeTruthy();
+  await user.keyboard("{Escape}");
+  await user.click(
+    within(bar).getByRole("button", { name: "Clear selection" }),
+  );
+  expect(
+    screen.queryByRole("group", { name: "Selected row actions" }),
+  ).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Export table data" }),
+  ).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("inspects complete records without numeric conversion and restores keyboard focus", async () => {
+  const { save } = mount(true);
+  const user = userEvent.setup();
+  const cell = await screen.findByRole("gridcell", { name: "Ada" });
+  fireEvent.contextMenu(cell);
+  await user.click(screen.getByRole("menuitem", { name: "Inspect record" }));
+  const panel = screen.getByRole("complementary", { name: "Record inspector" });
+  expect(
+    within(panel).getByLabelText("Record value for counter").textContent,
+  ).toBe("9007199254740993");
+  expect(
+    within(panel).getByLabelText("Record value for note").textContent,
+  ).toBe("NULL");
+  expect(
+    within(panel).getByRole("button", { name: "Previous record" }),
+  ).toHaveProperty("disabled", true);
+  await user.click(within(panel).getByRole("button", { name: "Next record" }));
+  expect(
+    within(panel).getByLabelText("Record value for name").textContent,
+  ).toBe("Grace");
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  expect(document.activeElement).toBe(cell);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("shows staged and original values in the record inspector without saving", async () => {
+  const { save } = mount();
+  const user = await editName("Changed locally");
+  await user.keyboard("{Enter}");
+  fireEvent.contextMenu(
+    screen.getByRole("gridcell", { name: /Changed locally/ }),
+  );
+  await user.click(screen.getByRole("menuitem", { name: "Inspect record" }));
+  const panel = screen.getByRole("complementary", { name: "Record inspector" });
+  expect(within(panel).getByText("Local changes · not saved")).toBeTruthy();
+  expect(
+    within(panel).getByLabelText("Record value for name").textContent,
+  ).toBe("Changed locally");
+  expect(within(panel).getByText("Ada")).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("identifies the production destination before a staged write", async () => {
+  const { save } = mount(false, false, "production");
+  const user = await editName();
+  await user.keyboard("{Enter}");
+  expect(
+    screen.getByRole("button", { name: /Save changes to production/ }),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(/localhost:5432\/postgres · public.users/),
+  ).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("opens the original JSON from its cell without editing or numeric conversion", async () => {
+  const { save } = mount();
+  const user = userEvent.setup();
+  const cell = await screen.findByRole("gridcell", {
+    name: '{"id":9007199254740993}',
+  });
+  await user.click(
+    within(cell).getByRole("button", { name: "Inspect JSON in payload" }),
+  );
+  expect(
+    (
+      screen.getByRole("textbox", {
+        name: "Full cell value",
+      }) as HTMLTextAreaElement
+    ).value,
+  ).toBe('{"id":9007199254740993}');
+  expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("keeps the local changes bar compact and the edited cell marked after Enter", async () => {
+  const { save } = mount();
+  const user = await editName();
+  await user.keyboard("{Enter}");
+  expect(screen.getByText("1 unsaved change")).toBeTruthy();
+  expect(screen.queryByText("Not saved to the database")).toBeNull();
+  const cell = screen.getByRole("gridcell", { name: /Ada edited/ });
+  expect(cell.classList.contains("pending-cell")).toBe(true);
+  expect(within(cell).getByLabelText("Unsaved change")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Discard…" }));
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Keep working" }));
+  expect(screen.getByText("1 unsaved change")).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("offers a read retry with technical details after a load error", async () => {
+  const { load, save } = mount();
+  const user = userEvent.setup();
+  await screen.findByText("Ada");
+  load.mockRejectedValueOnce(new Error("Synthetic connection unavailable"));
+  await user.click(screen.getByRole("button", { name: "Refresh table data" }));
+  const notice = await screen.findByRole("alert");
+  expect(within(notice).getByText("Could not load table")).toBeTruthy();
+  await user.click(within(notice).getByText("Technical details"));
+  expect(
+    within(notice).getByText("Synthetic connection unavailable"),
+  ).toBeTruthy();
+  await user.click(within(notice).getByRole("button", { name: "Retry" }));
+  await screen.findByText("Ada");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("restores widths, pinned columns and density per table", async () => {
+  const first = mount();
+  const user = userEvent.setup();
+  await screen.findByText("Ada");
+  fireEvent.keyDown(
+    screen.getByRole("separator", { name: "Resize name column" }),
+    { key: "ArrowRight" },
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Column options for name" }),
+  );
+  await user.click(
+    screen.getByRole("menuitem", { name: "Pin columns through name" }),
+  );
+  await user.selectOptions(screen.getByLabelText("Table density"), "compact");
+  first.view.unmount();
+  mount();
+  const cell = await screen.findByRole("gridcell", { name: "Ada" });
+  expect(cell.classList.contains("pinned-column")).toBe(true);
+  expect(
+    screen
+      .getByRole("separator", { name: "Resize name column" })
+      .getAttribute("aria-valuenow"),
+  ).toBe("232");
+  expect(
+    (screen.getByLabelText("Table density") as HTMLSelectElement).value,
+  ).toBe("compact");
+});
+
+it("applies and removes typed filters through the paged API and restores them", async () => {
+  const first = mount();
+  const user = userEvent.setup();
+  await screen.findByText("Ada");
+  await user.click(screen.getByRole("button", { name: "Column filters" }));
+  await user.selectOptions(screen.getByLabelText("Filter 1 column"), "counter");
+  await user.type(screen.getByLabelText("Filter 1 value"), "9007199254740993");
+  await user.click(screen.getByRole("button", { name: "Apply filters" }));
+  await waitFor(() =>
+    expect(first.load).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        page: 0,
+        conditions: [
+          { column: "counter", operator: "eq", value: "9007199254740993" },
+        ],
+      }),
+    ),
+  );
+  first.view.unmount();
+  const next = mount();
+  await screen.findByText("Ada");
+  expect(next.load).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      conditions: [
+        { column: "counter", operator: "eq", value: "9007199254740993" },
+      ],
+    }),
+  );
+  await user.click(screen.getByRole("button", { name: "Remove filter 1" }));
+  await waitFor(() =>
+    expect(next.load).toHaveBeenLastCalledWith(
+      expect.objectContaining({ conditions: [] }),
+    ),
+  );
+});
+
+it("sizes by type, fits loaded values and freezes a prefix without changing edit coordinates", async () => {
+  const { save } = mount();
+  const user = userEvent.setup();
+  await screen.findByRole("gridcell", { name: "Ada" });
+  expect(
+    screen
+      .getByRole("separator", { name: "Resize id column" })
+      .getAttribute("aria-valuenow"),
+  ).toBe("156");
+  expect(
+    screen
+      .getByRole("separator", { name: "Resize enabled column" })
+      .getAttribute("aria-valuenow"),
+  ).toBe("124");
+  await user.click(
+    screen.getByRole("button", { name: "Column options for name" }),
+  );
+  await user.click(
+    screen.getByRole("menuitem", { name: "Pin columns through name" }),
+  );
+  const cell = screen.getByRole("gridcell", { name: "Ada" });
+  expect(cell.classList.contains("pinned-column")).toBe(true);
+  expect(cell.style.left).toBe("200px");
+  const context = vi
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockReturnValue({
+      font: "",
+      measureText: (text: string) => ({ width: text.length * 8 }),
+    } as never);
+  fireEvent.doubleClick(
+    screen.getByRole("separator", { name: "Resize name column" }),
+  );
+  expect(
+    screen
+      .getByRole("separator", { name: "Resize name column" })
+      .getAttribute("aria-valuenow"),
+  ).toBe("112");
+  context.mockRestore();
+  await user.dblClick(cell);
+  expect(screen.getByRole("textbox", { name: "Value for name" })).toBeTruthy();
+  await user.keyboard("{Escape}");
+  await user.click(
+    screen.getByRole("button", { name: "Column options for name" }),
+  );
+  await user.click(screen.getByRole("menuitem", { name: "Unpin all columns" }));
+  expect(cell.classList.contains("pinned-column")).toBe(false);
+  expect(save).not.toHaveBeenCalled();
+});
 
 it("double-click edits one cell, Enter stages it, and the row action column is gone", async () => {
   const { save, onDirtyChange } = mount();
@@ -340,11 +649,28 @@ it("JSON editor keeps exact numeric text and Enter only adds a line", async () =
   expect(
     screen.getByRole("textbox", { name: "Value for payload" }),
   ).toBeTruthy();
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(screen.getByRole("button", { name: "Stage value" }));
   expect(save).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: /Save changes/ }));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
   expect(JSON.stringify(save.mock.calls[0][0])).toContain("9007199254740995");
+});
+it("expands short text without committing and stages multiline text explicitly", async () => {
+  const { save } = mount();
+  const user = await editName("First line");
+  await user.click(screen.getByRole("button", { name: "Expand value editor" }));
+  const field = screen.getByRole("textbox", { name: "Value for name" });
+  expect(field.tagName).toBe("TEXTAREA");
+  expect((field as HTMLTextAreaElement).value).toBe("First line");
+  await user.keyboard("{End}{Enter}Second line");
+  expect((field as HTMLTextAreaElement).value).toBe("First line\nSecond line");
+  await user.click(screen.getByRole("button", { name: "Stage value" }));
+  expect(save).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: /Save changes/ }));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(JSON.stringify(save.mock.calls[0][0])).toContain(
+    "First line\\nSecond line",
+  );
 });
 it("comparison fetches current values without changing the draft or original version", async () => {
   const { save, compare } = mount();
@@ -407,6 +733,14 @@ it("removes the permanent tools and instructions while keeping contextual inspec
       }) as HTMLTextAreaElement
     ).value,
   ).toBe("Ada");
+  expect(
+    screen.getByRole("complementary", { name: "Value inspector" }),
+  ).toBeTruthy();
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("complementary", { name: "Value inspector" }),
+  ).toBeNull();
+  expect(document.activeElement).toBe(cell);
 });
 it("context Copy uses the clicked cell without needing an earlier selection", async () => {
   mount();

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Check, FileKey2, Loader2, ShieldCheck } from "lucide-react";
+import { Check, Database, FileKey2, Loader2, ShieldCheck } from "lucide-react";
+import { EnvironmentBadge } from "./EnvironmentBadge";
 import { errorMessage } from "../../shared/lib/database-api";
 import { ConnectionDialog } from "./ConnectionDialog";
 import { useFormSafety } from "../../shared/safety/useFormSafety";
@@ -106,192 +107,240 @@ export function ProfileEditor({
     <ConnectionDialog
       title={initial.id ? "Edit connection" : "New connection"}
       subtitle="PostgreSQL · Connection profile"
+      className="profile-editor-dialog"
       busy={!!busy}
       onClose={() => closeSafely(onClose)}
     >
       <form onSubmit={(event) => void test(event)}>
         <fieldset disabled={!!busy} className="profile-fields">
-          <div className="profile-form-grid">
-            <label>
-              Connection name
-              <input
-                data-initial-focus={true}
-                required
-                maxLength={255}
-                value={value.name}
-                placeholder="e.g. MMO · Local"
-                onChange={(e) => update("name", e.target.value)}
-              />
-            </label>
-            <label>
-              Workspace
-              <select
-                value={value.workspaceId}
-                onChange={(e) => update("workspaceId", e.target.value)}
-              >
-                {workspaces.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Environment
-              <select
-                value={value.environment}
-                onChange={(e) =>
-                  update(
-                    "environment",
-                    e.target.value as ProfileInput["environment"],
-                  )
-                }
-              >
-                {environments.map((env) => (
-                  <option key={env} value={env}>
-                    {environmentLabels[env]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Access
-              <select
-                value={value.readOnly ? "read" : "write"}
-                onChange={(e) => update("readOnly", e.target.value === "read")}
-              >
-                <option value="write">Read & write</option>
-                <option value="read">Read-only</option>
-              </select>
-            </label>
-          </div>
-          {value.environment === "production" && (
-            <p className="connection-notice production-notice">
-              Production connection.{" "}
-              {value.readOnly
-                ? "Writes will be blocked."
-                : "You will be asked to confirm write access each time you connect."}
-            </p>
-          )}
-          <div className="profile-form-grid destination-fields">
-            <label className="host-field">
-              Host
-              <input
-                required
-                maxLength={255}
-                value={value.host}
-                spellCheck={false}
-                onChange={(e) => update("host", e.target.value)}
-              />
-            </label>
-            <label>
-              Port
-              <input
-                required
-                type="number"
-                min={1}
-                max={65535}
-                value={value.port || ""}
-                onChange={(e) => update("port", Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Database
-              <input
-                required
-                maxLength={255}
-                value={value.database}
-                onChange={(e) => update("database", e.target.value)}
-              />
-            </label>
-            <label>
-              Username
-              <input
-                required
-                maxLength={255}
-                value={value.username}
-                autoComplete="off"
-                onChange={(e) => update("username", e.target.value)}
-              />
-            </label>
-          </div>
-          <label>
-            Password
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={value.password ?? ""}
-              placeholder={
-                initial.passwordAction === "keep"
-                  ? "Saved in system vault — leave unchanged"
-                  : "Optional"
-              }
-              onChange={(e) => update("password", e.target.value)}
-            />
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => {
-                setRemember(e.target.checked);
-                setTested(false);
-              }}
-            />
-            <span>
-              Save password in the system credential store
-              <small>
-                {remember
-                  ? "Keychain on macOS · Credential Manager on Windows · Secret Service on Linux"
-                  : "The profile will not contain a password. Enter it when connecting."}
-              </small>
-            </span>
-          </label>
-          <div className="profile-form-grid">
-            <label>
-              TLS
-              <select
-                value={value.sslMode}
-                onChange={(e) => {
-                  update("sslMode", e.target.value as ProfileInput["sslMode"]);
-                  if (e.target.value !== "require") update("caPath", null);
-                }}
-              >
-                <option value="prefer">
-                  Prefer — allow unencrypted fallback
-                </option>
-                <option value="require">Require — verified TLS</option>
-                <option value="disable">Disable — unencrypted</option>
-              </select>
-            </label>
-            <div className="ca-field">
-              <span>Custom CA certificate</span>
-              <button
-                className="button ghost"
-                type="button"
-                onClick={() => void chooseCa()}
-              >
-                <FileKey2 size={16} />
-                {value.caPath ? "Change certificate" : "Choose PEM file"}
-              </button>
+          <section
+            className="profile-identity-section"
+            aria-label="Profile identity"
+          >
+            <div className="profile-provider">
+              <Database size={22} />
+              <div>
+                <strong>PostgreSQL</strong>
+                <small>Database connection</small>
+              </div>
             </div>
-          </div>
-          {value.caPath && (
-            <div className="ca-path">
-              <code>{value.caPath}</code>
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => update("caPath", null)}
-              >
-                Remove
-              </button>
+            <div className="profile-form-grid">
+              <label>
+                Connection name
+                <input
+                  data-initial-focus={true}
+                  required
+                  maxLength={255}
+                  value={value.name}
+                  placeholder="e.g. MMO · Local"
+                  onChange={(e) => update("name", e.target.value)}
+                />
+              </label>
+              <label>
+                Workspace
+                <select
+                  value={value.workspaceId}
+                  onChange={(e) => update("workspaceId", e.target.value)}
+                >
+                  {workspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Environment
+                <select
+                  value={value.environment}
+                  onChange={(e) =>
+                    update(
+                      "environment",
+                      e.target.value as ProfileInput["environment"],
+                    )
+                  }
+                >
+                  {environments.map((env) => (
+                    <option key={env} value={env}>
+                      {environmentLabels[env]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Access
+                <select
+                  value={value.readOnly ? "read" : "write"}
+                  onChange={(e) =>
+                    update("readOnly", e.target.value === "read")
+                  }
+                >
+                  <option value="write">Read & write</option>
+                  <option value="read">Read-only</option>
+                </select>
+              </label>
             </div>
-          )}
-          <p className="form-help">
-            A custom CA requires verified TLS, including hostname verification.
-            SSH tunnelling is planned for a later release.
-          </p>
+            {value.environment === "production" && (
+              <p className="connection-notice production-notice">
+                Production connection.{" "}
+                {value.readOnly
+                  ? "Writes will be blocked."
+                  : "You will be asked to confirm write access each time you connect."}
+              </p>
+            )}
+            <div className="profile-summary">
+              <EnvironmentBadge environment={value.environment} />
+              <p>
+                {value.readOnly
+                  ? "Read-only access. Changes to data are blocked."
+                  : "Read & write access. Table edits stay local until saved."}
+              </p>
+            </div>
+          </section>
+          <div className="profile-connection-section">
+            <section
+              className="profile-section"
+              aria-label="Server and credentials"
+            >
+              <header>
+                <h3>Server & credentials</h3>
+                <p>Where should Opaline connect?</p>
+              </header>
+              <div className="profile-form-grid destination-fields">
+                <label className="host-field">
+                  Host
+                  <input
+                    required
+                    maxLength={255}
+                    value={value.host}
+                    placeholder="localhost or db.example.com"
+                    spellCheck={false}
+                    onChange={(e) => update("host", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Port
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={value.port || ""}
+                    onChange={(e) => update("port", Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  Database
+                  <input
+                    required
+                    maxLength={255}
+                    value={value.database}
+                    onChange={(e) => update("database", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Username
+                  <input
+                    required
+                    maxLength={255}
+                    value={value.username}
+                    autoComplete="off"
+                    onChange={(e) => update("username", e.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                Password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={value.password ?? ""}
+                  placeholder={
+                    initial.passwordAction === "keep"
+                      ? "Saved in system vault — leave unchanged"
+                      : "Optional"
+                  }
+                  onChange={(e) => update("password", e.target.value)}
+                />
+              </label>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => {
+                    setRemember(e.target.checked);
+                    setTested(false);
+                  }}
+                />
+                <span>
+                  Save password in the system credential store
+                  <small>
+                    {remember
+                      ? "Stored securely by your operating system, never in the profile."
+                      : "The profile will not contain a password. Enter it when connecting."}
+                  </small>
+                </span>
+              </label>
+            </section>
+            <section
+              className="profile-section profile-security-section"
+              aria-label="Connection security"
+            >
+              <header>
+                <h3>Connection security</h3>
+                <p>Choose how traffic to your database is protected.</p>
+              </header>
+              <div className="profile-form-grid">
+                <label>
+                  TLS
+                  <select
+                    value={value.sslMode}
+                    onChange={(e) => {
+                      update(
+                        "sslMode",
+                        e.target.value as ProfileInput["sslMode"],
+                      );
+                      if (e.target.value !== "require") update("caPath", null);
+                    }}
+                  >
+                    <option value="prefer">Prefer TLS — allow fallback</option>
+                    <option value="require">Require — verified TLS</option>
+                    <option value="disable">Disable — unencrypted</option>
+                  </select>
+                </label>
+                <div className="ca-field">
+                  <span>Custom CA certificate</span>
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => void chooseCa()}
+                  >
+                    <FileKey2 size={16} />
+                    {value.caPath ? "Change certificate" : "Choose PEM file"}
+                  </button>
+                </div>
+              </div>
+              {value.caPath && (
+                <div className="ca-path">
+                  <code>{value.caPath}</code>
+                  <button
+                    type="button"
+                    className="button ghost"
+                    onClick={() => update("caPath", null)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              <p className="form-help">
+                {value.sslMode === "require"
+                  ? "Verified TLS checks the server certificate and hostname. Your custom CA is used when selected."
+                  : value.sslMode === "disable"
+                    ? "Traffic is not encrypted. Use only on networks you trust."
+                    : "This mode may connect without encryption. Choose Require for verified TLS."}
+              </p>
+            </section>
+          </div>
         </fieldset>
         <div className="profile-validation" aria-live="polite">
           {error && (
@@ -303,6 +352,13 @@ export function ProfileEditor({
             <p className="connection-success">
               <Check size={16} />
               Connection verified · {server}
+            </p>
+          )}
+          {!tested && !error && (
+            <p className="profile-test-hint">
+              {busy === "test"
+                ? "Checking the server and credentials…"
+                : "Test the connection to enable saving. Your data will not be modified."}
             </p>
           )}
         </div>

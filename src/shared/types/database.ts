@@ -40,7 +40,23 @@ export type TablePageRequest = {
   page: number;
   pageSize: number;
   filter: string | null;
+  conditions?: TableFilter[];
   sort: TableSort | null;
+};
+
+export type TableFilter = {
+  column: string;
+  operator:
+    | "eq"
+    | "ne"
+    | "contains"
+    | "gt"
+    | "gte"
+    | "lt"
+    | "lte"
+    | "is_null"
+    | "is_not_null";
+  value: string;
 };
 
 export type TableDataRow = {
@@ -127,7 +143,7 @@ export type TableExportFormat = "csv" | "json";
 
 export type ExportTableDataRequest = Pick<
   TablePageRequest,
-  "schema" | "table" | "filter" | "sort"
+  "schema" | "table" | "filter" | "sort" | "conditions"
 > & {
   format: TableExportFormat;
   path: string;

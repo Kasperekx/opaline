@@ -17,7 +17,7 @@ it("requires explicit consent to quit after local saving fails", async () => {
   let exitRequested!: EventCallback<unknown>;
   vi.mocked(listen).mockImplementation(async (_event, callback) => {
     exitRequested = callback as EventCallback<unknown>;
-    return vi.fn();
+    return vi.fn<() => void>();
   });
   const exit = vi.fn();
   mockIPC((command) => {
@@ -55,7 +55,7 @@ it.each([false, true])(
     let exitRequested!: EventCallback<unknown>;
     vi.mocked(listen).mockImplementation(async (_event, callback) => {
       exitRequested = callback as EventCallback<unknown>;
-      return vi.fn();
+      return vi.fn<() => void>();
     });
     const exit = vi.fn();
     mockIPC((command) => {
@@ -90,7 +90,7 @@ it("repeated native Quit requests cannot bypass a failed save", async () => {
   let exitRequested!: EventCallback<unknown>;
   vi.mocked(listen).mockImplementation(async (_event, callback) => {
     exitRequested = callback as EventCallback<unknown>;
-    return vi.fn();
+    return vi.fn<() => void>();
   });
   const save = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   const exit = vi.fn();

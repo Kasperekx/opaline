@@ -2,6 +2,7 @@ import type {
   QueryExecutionError,
   QueryResult,
   QueryExecutionMode,
+  TableFilter,
 } from "../../shared/types/database";
 
 export type QueryTab = {
@@ -18,6 +19,7 @@ export type QueryTab = {
 };
 
 export type TableTab = {
+  initialFilters?: TableFilter[];
   kind: "table";
   id: string;
   title: string;
@@ -26,7 +28,21 @@ export type TableTab = {
   objectType: string;
 };
 
-export type WorkspaceTab = QueryTab | TableTab;
+export type DiagramTab = {
+  kind: "diagram";
+  id: string;
+  title: string;
+  focus?: { schema: string; name: string; request: number };
+};
+export type SchemaTab = {
+  kind: "schema";
+  id: string;
+  title: string;
+  schema: string;
+  table: string | null;
+  drop?: boolean;
+};
+export type WorkspaceTab = QueryTab | TableTab | DiagramTab | SchemaTab;
 
 export type QueryHistoryStatus = "success" | "error" | "cancelled" | "timeout";
 

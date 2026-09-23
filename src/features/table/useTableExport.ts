@@ -8,6 +8,7 @@ import type {
   TableDataRow,
   TableExportProgress,
   TableSort,
+  TableFilter,
 } from "../../shared/types/database";
 import {
   chooseTableExportPath,
@@ -23,6 +24,7 @@ type UseTableExportOptions = {
   selectedRows: TableDataRow[];
   filter: string;
   sort: TableSort | null;
+  conditions?: TableFilter[];
 };
 
 export type FullTableExport = TableExportProgress & {
@@ -38,6 +40,7 @@ export function useTableExport({
   selectedRows,
   filter,
   sort,
+  conditions,
 }: UseTableExportOptions) {
   const { session, api: databaseApi } = useDatabaseSession();
   const [busy, setBusy] = useState(false);
@@ -103,6 +106,7 @@ export function useTableExport({
             table,
             filter: filter || null,
             sort,
+            conditions,
             format,
             path,
           },
@@ -127,7 +131,7 @@ export function useTableExport({
         setBusy(false);
       }
     },
-    [databaseApi, busy, filter, schema, sort, table],
+    [databaseApi, busy, filter, schema, sort, table, conditions],
   );
 
   const cancelFullExport = useCallback(async () => {
