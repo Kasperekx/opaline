@@ -16,6 +16,22 @@ No Kafka, Docker logs, SSH or additional providers in this candidate.
 - Owner approves recipients and delivery. Do not upload user SQL, credentials,
   app-data directories or dumps with the build.
 
+## Preparing the GitHub release draft
+
+The first candidate is `0.1.0-beta.1`, Apple Silicon only. In GitHub Actions,
+open **Quality gates → Run workflow**, select `main`, and enable **Prepare an
+unsigned Apple Silicon beta draft after all quality gates pass**.
+
+All quality jobs must pass before the draft job downloads the Apple Silicon
+artifact from that same run. It checks the source commit, version, architecture,
+size and SHA-256, then attaches the DMG, `build-info.json` and `SHA256SUMS.txt`
+to a **draft prerelease**. Existing releases are not overwritten. Ordinary pushes
+run tests but do not create or publish releases.
+
+The draft is not a public download. Complete the acceptance gates above, update
+the release notes with the tested macOS range and remaining limits, and obtain
+owner approval before publishing. Then add the verified download link to README.
+
 ## Suggested invitation (not sent)
 
 Hi! I'm testing an early macOS build of Opaline, my open-source PostgreSQL client.

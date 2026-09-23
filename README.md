@@ -22,11 +22,11 @@
 </div>
 
 <p align="center">
-  <a href="docs/screenshots/table-clean-grid.png">
-    <img src="docs/screenshots/table-clean-grid.png" width="1280" alt="Opaline's dark desktop workspace with connection navigation, query tabs, and an editable PostgreSQL table" />
+  <a href="docs/screenshots/readme-table.jpg">
+    <img src="docs/screenshots/readme-table.jpg" width="1280" alt="Opaline's graphite and amber workspace with a PostgreSQL table, inline JSON values, and query tabs" />
   </a>
   <br />
-  <sub>Development preview with synthetic data. The interface is evolving as we prepare the beta.</sub>
+  <sub>Current UI · September 23, 2026. Captured from the browser preview using synthetic data; native macOS window chrome is not shown.</sub>
 </p>
 
 ## Built around your workflow
@@ -47,6 +47,7 @@ desktop workspace. It is free to use, modify, and self-build under the MIT licen
 | **Structure at a glance** | Inspect columns, indexes, constraints, foreign keys, and DDL. Browse, filter, sort, copy, and export data to CSV or JSON. |
 | **Database diagrams** | Automatically map accessible tables and declared foreign keys. Search, focus on related tables, inspect relationships, and keep your layout. [Diagram guide](docs/database-diagrams.md). |
 | **Table structure editing** | Create tables, rename tables and columns, add/remove columns, and drop tables from the explorer or diagram. Review generated SQL before applying; destructive changes require confirmation. [Scope and safeguards](docs/table-structure-editor.md). |
+| **PostgreSQL enums** | Choose existing enum types for columns, create types, rename labels, and append values through the structure editor and SQL review. Edit enum cells with a value picker. [Enum guide and limits](docs/enum-types.md). |
 | **Backup without tool setup** | Create custom or SQL backups with automatically selected, bundled PostgreSQL clients. Restore a trusted dump into an existing or newly created database. |
 | **Desktop details** | Resizable panels, keyboard shortcuts, contextual actions, adjustable text size, and interface density. Passwords in the system credential store; verified TLS with optional custom CAs. |
 
@@ -68,9 +69,9 @@ changed the same row, Opaline checks for a conflict instead of silently overwrit
 
 <br />
 
-![Connections grouped in an MMO workspace, with Local, Staging, and Production labels](docs/screenshots/connection-home.png)
+![Current connection library with compact rows grouped by Local, Staging, and Production environments](docs/screenshots/readme-connections.jpg)
 
-Development preview with synthetic endpoints. Each connection keeps its own
+Current browser preview, captured September 23, 2026 with synthetic endpoints. Each connection keeps its own
 query tabs, results, and table drafts.
 
 </details>
@@ -78,19 +79,25 @@ query tabs, results, and table drafts.
 ## Project status
 
 > [!IMPORTANT]
-> **Pre-beta stabilization · macOS first.** No public beta has been published yet.
-> CI installers are unsigned test artifacts, not notarized releases.
+> **Preparing the first macOS pilot.** No public beta download is available yet.
+> The initial pilot will be unsigned and not notarized by Apple. CI installers
+> and local QA packages are test artifacts, not approved releases.
 > Use disposable or non-production data while testing.
 
-- **First beta:** macOS, with separate Apple Silicon and Intel build jobs.
-  Minimum macOS and final installer acceptance are still being qualified.
+- **First target:** macOS. Local native acceptance has been run on Apple Silicon
+  with macOS 26.3; some scenarios remain open. This does not establish a minimum OS.
+- **Platform qualification:** separate Apple Silicon and Intel build jobs exist,
+  but Intel, older macOS versions, and installation on an independent Mac still
+  need acceptance results before we claim support.
 - **Database scope:** PostgreSQL only. Integration checks cover PostgreSQL 14–18;
   backup and restore are same-major operations, not a cross-version migration tool.
 - **Later:** Windows and Linux. Their project configuration is not a support guarantee.
 
 For testing instructions and known limits, read the [tester guide](docs/tester-guide.md).
-The [stabilization report](docs/beta-stabilization-verification.md) records what has
-actually been verified.
+The [latest verification report](docs/beta-enum-verification-2026-09-23.md) records
+enum coverage, PostgreSQL 14–18 integration checks, native backup/restore checks,
+and remaining gaps. The [pilot checklist](docs/beta-pilot.md) defines what must
+pass before distributing a build.
 
 ## Getting started
 
@@ -124,7 +131,9 @@ To build a local desktop bundle:
 npm run tauri build
 ```
 
-Local builds are not a substitute for signed, notarized release artifacts.
+Local builds are unsigned test builds. For an explicitly shared pilot build,
+follow the [tester guide](docs/tester-guide.md) and verify its source and checksum.
+Do not disable macOS security protections globally to launch the app.
 
 ### Make your first connection
 
@@ -196,10 +205,12 @@ The next milestone is a dependable **macOS beta**:
 
 - Complete data-integrity, failure-recovery, security, and accessibility acceptance.
 - Measure large-data performance and finish native desktop QA.
-- Qualify installers, signing, notarization, and the supported macOS versions.
+- Qualify the unsigned installer on an independent Mac and record supported OS/architecture combinations.
+- Establish a private vulnerability-reporting channel and build a traceable candidate from a clean commit with passing CI.
 - Run a small pilot, fix blockers, and publish only after release approval.
+- Add Developer ID signing and notarization later; these are not part of the initial unsigned pilot.
 
-Windows/Linux, SSH, and potential Kafka, Docker-log, or diagram integrations are
+Windows/Linux, SSH, and potential Kafka or Docker-log integrations are
 outside the first beta. They are future directions, not available features or
 release promises.
 

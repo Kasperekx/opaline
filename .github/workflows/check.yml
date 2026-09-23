@@ -3,6 +3,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      draft_beta:
+        description: Prepare an unsigned Apple Silicon beta draft after all quality gates pass
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -125,3 +130,28 @@ jobs:
       - run: npm ci
       - run: npm run desktop:prepare
       - run: node scripts/test-bundled-postgres.mjs
+  beta-draft:
+    if: github.event_name == 'workflow_dispatch' && inputs.draft_beta && github.ref == 'refs/heads/main' && github.repository == 'Kasperekx/opaline'
+    needs: [rust-security, secrets, frontend, desktop, postgres, bundled-backup]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: opaline-unsigned-macos-15-${{ github.sha }}
+          path: release-assets
+      - name: Validate candidate identity and checksum
+        run: node scripts/verify-beta-artifact.mjs release-assets
+      - name: Create draft only (never publish or replace an existing release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.1.0-beta.1 release-assets/*.dmg release-assets/build-info.json release-assets/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --draft --prerelease \
+            --title "Opaline 0.1.0-beta.1 — macOS Apple Silicon" \
+            --notes-file docs/release-beta-1.md

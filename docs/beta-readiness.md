@@ -1,289 +1,288 @@
-# Beta Opaline — co jeszcze robimy
+# Opaline beta — remaining work
 
-Data: 2026-09-23. **Stabilizacja w toku, nie zgoda na publikację.**
+Date: 2026-09-23. **Stabilization in progress, not approval to publish.**
 
-Bieżący odbiór: [kandydat bety](beta-candidate.md). Właściciel potwierdził brak
-konta Apple Developer; wybrał najpierw jawnie niepodpisany, prywatny pilot.
-Podpis/notaryzacja pozostają odłożone, nie ukończone. Aktualne wyniki i paczka QA:
-[ENUM-y i przygotowanie pilota](beta-enum-verification-2026-09-23.md).
-Starsze raporty poniżej są historyczne, nie dotyczą automatycznie obecnego kodu.
+Current acceptance: [beta candidate](beta-candidate.md). The owner confirmed
+there is no Apple Developer account and chose an explicitly unsigned, private
+pilot first. Signing/notarization remain deferred, not completed. Current results
+and QA package: [Enums and pilot preparation](beta-enum-verification-2026-09-23.md).
+Older reports below are historical and do not automatically cover the current code.
 
-Decyzje właściciela: pierwsza beta na **macOS**, Windows/Linux później;
-tworzenie bazy przy restore i jawny autocommit **wchodzą przed betą**.
-Kod jest już w publicznym repozytorium. Aktualne dowody techniczne i pozostające
-ograniczenia: [odbiór stabilizacji](beta-stabilization-verification.md).
+Owner decisions: **macOS** for the first beta, Windows/Linux later;
+creating a database during restore and explicit autocommit **are required before beta**.
+The code is already in the public repository. Technical evidence and remaining
+limitations: [stabilization acceptance](beta-stabilization-verification.md).
 
-Cel: tester instaluje aplikację, łączy się z PostgreSQL, wykonuje SQL, przegląda
-i zmienia dane oraz robi backup bez pomocy autora i bez środowiska developerskiego.
-Premium UX oznacza tu czytelność i przewidywalność, nie więcej widocznych przycisków.
+Goal: a tester installs the app, connects to PostgreSQL, runs SQL, browses and
+edits data, and creates a backup without the author's help or a development environment.
+Premium UX means clarity and predictable behavior, not more visible buttons.
 
-To aktualna lista pozostałych prac. [Pierwotny plan P0/P1](beta-plan.md) zachowuje
-historię etapów. Checkbox oznacza pełny odbiór, a nie samo istnienie kodu.
-**P0 blokuje wydanie; P1 trzeba dostarczyć albo jawnie odłożyć.**
+This is the current remaining-work checklist. The [original P0/P1 plan](beta-plan.md)
+preserves the phase history. A checked box means full acceptance, not merely that
+code exists. **P0 blocks release; P1 must be delivered or explicitly deferred.**
 
-## Co już mamy — nie budujemy tego drugi raz
+## Already implemented — do not rebuild
 
-- Workspaces, profile, środowiska, wiele aktywnych sesji i przełącznik połączeń.
-- Systemowy magazyn haseł, własne CA/TLS, read-only i ostrzeżenie dla production.
-  Zachowujemy decyzję: production może zapisywać po ostrzeżeniu, bez narzucania read-only.
-- Edytor SQL, autocomplete, formatowanie/Undo, pliki SQL, biblioteka i historia.
-- Tabele: filtrowanie, sortowanie, paginacja, struktura, eksport CSV/JSON.
-- Edycja komórek, bufor wielu zmian, przegląd różnic, atomowy zapis i ochrona szkiców.
-- Menu komórki zamiast stałego paska; kopiowanie zakresu, inspekcja i duplikowanie
-  wiersza jako nowego szkicu. PK resetowany, identity/generated uzupełniane przez bazę.
-- Backup/restore z dołączonymi narzędziami PostgreSQL, bez instalowania ich przez użytkownika.
-- Diagram relacji, nawigacja do tabel oraz wspólny edytor struktury z przeglądem DDL.
-- Tworzenie, zmiana i usuwanie tabel; proste indeksy oraz klucze obce.
-- Skróty przełączania/zamykania kart, pusty widok sesji i podgląd JSON w komórkach.
+- Workspaces, profiles, environments, multiple active sessions and a connection switcher.
+- System credential storage, custom CA/TLS, read-only mode and a production warning.
+  Preserve the decision: production writes are available after a warning, without forced read-only.
+- SQL editor, autocomplete, formatting/Undo, SQL files, library and history.
+- Tables: filtering, sorting, pagination, structure and CSV/JSON export.
+- Cell editing, staged batches, diff review, atomic saves and draft protection.
+- A cell menu instead of a permanent toolbar; range copying, inspection and row
+  duplication as a new draft. PK values reset; the database supplies identity/generated values.
+- Backup/restore with bundled PostgreSQL tools, without user installation.
+- Relationship diagrams, table navigation and a shared structure editor with DDL review.
+- Creating, altering and dropping tables; basic indexes and foreign keys.
+- Tab-switching/closing shortcuts, an empty-session view and inline JSON previews.
 
-To funkcje wdrożone lokalnie. **Nie jest to jeszcze odbiór podpisanego wydania na
-wszystkich platformach.** Dowody i ograniczenia: [P0](p0-verification.md),
+These features are implemented locally. **This is not acceptance of a signed
+release on every platform.** Evidence and limitations: [P0](p0-verification.md),
 [P1](p1-verification.md), [backup 14–18](bundled-postgres.md),
-[edycja](inline-table-editing-verification.md),
-[menu i duplikowanie](table-context-actions-verification.md).
+[editing](inline-table-editing-verification.md),
+[menus and duplication](table-context-actions-verification.md).
 
-## Decyzje przed rozpoczęciem stabilizacji
+## Decisions before stabilization
 
-| ID | Do ustalenia | Propozycja do Twojej oceny |
+| ID | Decision | Proposal for review |
 | --- | --- | --- |
-| D1 | Systemy, architektury i najstarsza wersja OS w pierwszej becie | Potwierdzone: macOS najpierw; Windows/Linux później. CI buduje ARM64 i Intel na macOS 15; minimum OS i odbiór obu architektur nadal wymagają potwierdzenia paczką. |
-| D2 | Aktualizacje | W pierwszej becie może wystarczyć ręczna aktualizacja z zachowaniem konfiguracji; auto-update to osobna decyzja. |
-| D3 | Odtwarzanie do nowej bazy | Potwierdzone: przed betą. Wdrożone i sprawdzone integracyjnie 14–18; pozostaje odbiór finalnej paczki. |
-| D4 | Komendy poza transakcją | Potwierdzone: jawny autocommit przed betą. Wdrożony per karta, z potwierdzeniem i resetem przy reconnect/restart; testy VACUUM/CREATE DATABASE 14–18. |
-| D5 | Pierwsza grupa testerów | Deweloperzy backendu pracujący z PostgreSQL, początkowo na danych testowych/local/staging. Zapisać ich 3 najczęstsze zadania. |
-| D6 | SSH i pozostałe integracje | SSH, Kafka i logi Dockera poza pierwszą betą. Diagramy i edytor struktury są już wdrożone i podlegają odbiorowi. |
-| D7 | Repo, nazwa i kanał kontaktu | Repo wybrane: `Kasperekx/opaline`, podłączone przez SSH. Pozostaje ustalić nazwę wydania, kanał błędów i prywatnych zgłoszeń bezpieczeństwa. |
+| D1 | Systems, architectures and oldest OS for the first beta | Confirmed: macOS first; Windows/Linux later. CI builds ARM64 and Intel on macOS 15; minimum OS and both architectures still require package acceptance. |
+| D2 | Updates | Manual updates preserving configuration may suffice for the first beta; automatic updates are a separate decision. |
+| D3 | Restore into a new database | Confirmed: before beta. Implemented and integration-tested on 14–18; final-package acceptance remains open. |
+| D4 | Commands outside transactions | Confirmed: explicit autocommit before beta. Implemented per tab, with confirmation and reset on reconnect/restart; VACUUM/CREATE DATABASE tests on 14–18. |
+| D5 | First testers | Backend developers using PostgreSQL, initially with test/local/staging data. Record their three most common tasks. |
+| D6 | SSH and other integrations | SSH, Kafka and Docker logs are outside the first beta. Diagrams and the structure editor are implemented and included in acceptance. |
+| D7 | Repository, name and contact channel | Repository selected: `Kasperekx/opaline`, connected over SSH. Release name, bug-reporting channel and private security reporting still need agreement. |
 
-**Twoje uwagi do decyzji:**
+**Your decision notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## Kolejność prac
+## Work order
 
-| Kolejność | Zadanie | Priorytet | Co ma powstać |
+| Order | Task | Priority | Deliverable |
 | --- | --- | --- | --- |
-| 1 | B01 — audyt UX codziennej pracy | P0 | Zamknięta lista błędów layoutu i interakcji |
-| 2 | B02 — poprawność zmian danych | P0 | Testy zapisów i konfliktów na prawdziwej bazie |
-| 3 | B03 — awarie i zachowanie pracy | P0 | Natywny odbiór restartu, utraty sieci i zamykania |
-| 4 | B04 — dokończenie odbioru backup/restore | P1 + bezpieczeństwo P0 | Sprawdzony przepływ bez ręcznej konfiguracji narzędzi |
-| 5 | B05 — bezpieczeństwo i prywatność | P0 | Aktualny audyt i rozstrzygnięte znane ryzyka |
-| 6 | B06 — wydajność i dostępność | P0 | Pomiary oraz testy małych okien i dużych danych |
-| 7 | B07 — repo, CI i macierz wersji | P0 | Rzeczywiście zielone joby dla kandydata wydania |
-| 8 | B08 — instalacja, aktualizacje i dokumentacja | P0 | Gotowy pakiet dla testera |
-| 9 | B09 — zamknięty pilotaż i decyzja o publicznej becie | P0 | Zgłoszenia, poprawki i zatwierdzony release |
+| 1 | B01 — everyday UX audit | P0 | A finalized list of layout and interaction defects |
+| 2 | B02 — data-change correctness | P0 | Write and conflict tests against a real database |
+| 3 | B03 — failures and work preservation | P0 | Native acceptance of restarts, network loss and closing |
+| 4 | B04 — complete backup/restore acceptance | P1 + P0 security | A verified workflow without manual tool setup |
+| 5 | B05 — security and privacy | P0 | Current audit and resolved known risks |
+| 6 | B06 — performance and accessibility | P0 | Measurements, small-window and large-data tests |
+| 7 | B07 — repository, CI and version matrix | P0 | Actually passing jobs for the release candidate |
+| 8 | B08 — installation, updates and documentation | P0 | A tester-ready package |
+| 9 | B09 — private pilot and public-beta decision | P0 | Reports, fixes and an approved release |
 
-B05 i przygotowanie B07 można prowadzić wcześniej, równolegle z poprawkami.
-Nie dokładamy nowych integracji w środku stabilizacji bez wspólnej decyzji.
+B05 and preparation for B07 can start earlier, alongside fixes.
+Do not add integrations during stabilization without a shared decision.
 
-## B01 — spójny UX codziennej pracy
+## B01 — consistent everyday UX
 
-Najpierw domykamy to, z czym użytkownik styka się codziennie.
+First, finish the interactions users encounter every day.
 
-- [ ] Przejść cały przepływ: workspace → profil → sesja → SQL → tabela → zmiana
-  → zapis → zamknięcie. Każda akcja ma jednoznaczny cel i przewidywalny efekt.
-- [ ] Przejrzeć wszystkie toolbary i menu: usunąć zbędne instrukcje i dublowanie
-  akcji, ujednolicić nazwy, odstępy, disabled/hover/focus i podpowiedzi skrótów.
-- [ ] Poprawić zachowanie wielu kart i długich nazw. Na ostatnim zrzucie
-  „Reopen closed query” zawija się przy końcu paska — dodać ten przypadek do odbioru.
-- [ ] Sprawdzić tabele szerokie i bardzo długie wartości: brak nakładania nagłówków,
-  brak skoków wiersza, dostęp do menu i edytora przy krawędzi okna.
-- [ ] Ujednolicić empty/loading/error/success. Zwykłe formatowanie i kopiowanie
-  nie zajmują osobnego dużego obszaru. Błąd zapisu nie może wyglądać jak sukces.
-- [ ] Czytelny stan połączenia, środowisko i read-only; jasny powód odmowy edycji.
-- [ ] Natywny odbiór fokusów i skrótów: Cmd/Ctrl+C/S, F2, Enter/Escape, Tab,
-  Shift+F10, zakres komórek, zmiana karty i otwarte dialogi.
+- [ ] Walk through workspace → profile → session → SQL → table → edit → save
+  → close. Every action has an unambiguous target and predictable result.
+- [ ] Review all toolbars and menus: remove unnecessary instructions and duplicate
+  actions; align naming, spacing, disabled/hover/focus states and shortcut hints.
+- [ ] Fix many-tab and long-name behavior. In the latest screenshot,
+  “Reopen closed query” wraps at the end of the toolbar; include this in acceptance.
+- [ ] Check wide tables and very long values: no overlapping headers, row jumps
+  or inaccessible menus/editors near window edges.
+- [ ] Align empty/loading/error/success states. Routine formatting and copying
+  must not occupy a large separate area. Save failures must not resemble success.
+- [ ] Make connection state, environment and read-only mode clear; explain denied edits.
+- [ ] Verify native focus and shortcuts: Cmd/Ctrl+C/S, F2, Enter/Escape, Tab,
+  Shift+F10, cell ranges, tab switching and open dialogs.
 
-Odbiór: tester potrafi zmienić/duplikować rekord, przejrzeć zmiany, zapisać lub
-odrzucić je bez instrukcji autora i bez przypadkowego zapisu do innej sesji.
+Acceptance: testers can edit/duplicate a record, review changes, save or discard
+without the author's instructions or accidentally writing to another session.
 
-**Twoje uwagi B01:**
+**Your B01 notes:**
 
-> Do uzupełnienia: ekrany, komunikaty i zachowania, które Cię irytują.
+> To be completed: screens, messages and behaviors that cause friction.
 
-## B02 — poprawność danych
+## B02 — data correctness
 
-Mechanizmy są zaimplementowane, ale macierz przypadków musi być szersza niż kilka
-testowych tabel. Błąd grożący uszkodzeniem danych blokuje betę.
+The mechanisms exist, but coverage must go beyond a handful of test tables.
+Any defect risking data corruption blocks beta.
 
-- [ ] Testy typów: bigint/numeric bez utraty precyzji, UUID, Unicode, NULL/pusty
-  tekst/DEFAULT, JSON, enum, daty i strefy czasowe, tablice i typy niestandardowe.
-- [ ] Duplikowanie: PK ręczny/złożony/UUID-default/serial/identity, generated,
-  inne UNIQUE, skopiowane lokalne poprawki, limity bufora i read-only.
-- [ ] UPDATE/DELETE/INSERT w jednej transakcji: RLS, brak uprawnień, FK, UNIQUE,
-  deferred constraints, triggery oraz zmiana schematu podczas edycji.
-- [ ] Jednoczesna zmiana/usunięcie/zmiana PK przez innego klienta: zachowanie
-  szkicu, rzetelne porównanie i brak automatycznego nadpisania.
-- [ ] Niepewny COMMIT, zgubiona odpowiedź, błąd odświeżenia po sukcesie:
-  brak powtórnego INSERT i brak mylącego „nie zapisano”.
-- [ ] Kopiowanie i eksport zachowują formaty oraz NULL; jasno określić, kiedy
-  kopiowane są szkice, a kiedy dane odczytane z bazy.
+- [ ] Test types: bigint/numeric without precision loss, UUID, Unicode,
+  NULL/empty text/DEFAULT, JSON, enums, dates/time zones, arrays and custom types.
+- [ ] Duplication: manual/composite/UUID-default/serial/identity PKs, generated
+  columns, other UNIQUE constraints, copied local edits, draft limits and read-only.
+- [ ] UPDATE/DELETE/INSERT in one transaction: RLS, missing privileges, FK, UNIQUE,
+  deferred constraints, triggers and schema changes during editing.
+- [ ] Concurrent updates/deletions/PK changes by another client: retain drafts,
+  compare accurately and never overwrite automatically.
+- [ ] Uncertain COMMIT, lost responses and refresh failure after success:
+  no duplicate INSERT or misleading “not saved” status.
+- [ ] Copy/export preserve formats and NULL; clearly distinguish copying drafts
+  from copying values read from the database.
 
-Odbiór: testy integracyjne dla zadeklarowanych wersji PostgreSQL i regresja do
-każdego ujawnionego błędu. Podgląd w przeglądarce nie zastępuje tych testów.
+Acceptance: integration tests for declared PostgreSQL versions and a regression
+test for every discovered defect. Browser previews do not replace these tests.
 
-**Twoje uwagi B02:**
+**Your B02 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B03 — utrata sieci, restart i ochrona pracy
+## B03 — network loss, restarts and work protection
 
-- [ ] Natywnie sprawdzić wyjście z aplikacji, zamknięcie karty, rozłączenie oraz
-  odświeżenie z lokalnymi zmianami: Save / Discard / Keep working.
-  Lokalny build QA: poprawiono omijanie ochrony przez Cmd+Q; ponowny odbiór
-  Cmd+Q/menu Quit/zamknięcia okna oraz nieudanego zapisu przeszedł. Dock Quit,
-  pozostałe akcje i finalna paczka nadal wymagają pełnego odbioru.
-- [ ] Uśpienie/wybudzenie, utrata sieci, restart PostgreSQL, timeout i anulowanie
-  podczas zapisu, odczytu i eksportu. Nie pozostają wiszące blokady/zadania.
-- [ ] Reconnect nie uruchamia SQL samoczynnie, nie zmienia celu karty i nie gubi
-  szkicu; poprzednie wyniki są oznaczone jako potencjalnie nieaktualne.
-- [ ] Przetestować uszkodzony plik konfiguracji, brak miejsca, prawa dostępu,
-  migrację starego formatu i próbę uruchomienia drugiej instancji.
-- [ ] Zamknięty/niedostępny magazyn haseł: aplikacja wyjaśnia problem i nie
-  nadpisuje istniejącego profilu ani hasła pustą wartością.
-- [ ] Jasno pokazać i opisać, że szkice rekordów są tylko w RAM i nie przetrwają
-  crasha. Nie obiecywać autosave/odzyskania, których nie ma.
+- [ ] Natively test quitting, closing tabs, disconnecting and refreshing with
+  local changes: Save / Discard / Keep working.
+  Local QA build: fixed Cmd+Q bypassing protection; retests of Cmd+Q, menu Quit,
+  window closing and failed saves passed. Dock Quit, other actions and the final
+  package still require full acceptance.
+- [ ] Sleep/wake, network loss, PostgreSQL restart, timeouts and cancellation
+  during writes, reads and exports. No stranded locks or tasks.
+- [ ] Reconnect does not automatically run SQL, change a tab's target or lose
+  drafts; previous results are marked as potentially stale.
+- [ ] Test corrupt configuration, insufficient disk space, access permissions,
+  old-format migration and attempts to start a second instance.
+- [ ] Locked/unavailable credential store: explain the problem and never
+  overwrite an existing profile or password with an empty value.
+- [ ] Clearly show and document that record drafts live only in RAM and do not
+  survive crashes. Do not promise unimplemented autosave or recovery.
 
-**Twoje uwagi B03:**
+**Your B03 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B04 — backup i restore gotowe dla użytkownika
+## B04 — user-ready backup and restore
 
-- [ ] Na czystej maszynie bez PostgreSQL/Dockera/Node/Rusta: Backup → wybór pliku
-  → gotowa kopia. Bez Detect tools, PATH i dodatkowej instalacji klienta.
-- [ ] Powtórzyć dump → restore → porównanie danych, struktury, sekwencji i indeksów
-  z finalnej paczki, na deklarowanych platformach i wersjach serwera.
-- [ ] Sprawdzić duże kopie, niewystarczające miejsce, anulowanie, crash i utratę
-  sieci; istniejący plik nie może zostać zastąpiony niekompletną kopią.
-- [ ] Sprawdzić częściowy dump, zależności, rozszerzenia, role/uprawnienia,
-  uszkodzony lub nieobsługiwany plik i formaty kompresji.
-- [ ] Zweryfikować limity na realnym użyciu: aktualnie plain SQL restore ma limit
-  64 MiB, custom 100 GiB. Pokazać limity wcześniej albo zmienić je po pomiarach;
-  liczba w kodzie nie jest dowodem, że operacja na takim rozmiarze została przetestowana.
-- [ ] Odtwarzanie nadal wymaga jasnego celu, zaufanego pliku i osobnych zgód na
-  production/niepustą bazę/DROP. Nie obiecywać rollbacku dowolnego skryptu SQL.
-- [x] Rozstrzygnąć D3 i wdrożyć kreator nowej bazy: osobna zgoda, wolna nazwa,
-  brak automatycznego DROP przy błędzie; integracja custom/SQL na PostgreSQL 14–18.
-  Nie zastępuje to powyższego odbioru na czystej maszynie.
+- [ ] On a clean machine without PostgreSQL/Docker/Node/Rust: Backup → choose
+  file → completed backup. No Detect tools, PATH setup or client installation.
+- [ ] Repeat dump → restore → compare data, structure, sequences and indexes
+  using the final package on declared platforms and server versions.
+- [ ] Test large backups, insufficient disk space, cancellation, crashes and
+  network loss; incomplete backups must not replace existing files.
+- [ ] Test partial dumps, dependencies, extensions, roles/privileges, corrupt
+  or unsupported files and compression formats.
+- [ ] Validate limits in realistic use: currently 64 MiB for plain SQL restore,
+  100 GiB for custom archives. Show limits early or revise them after measurement;
+  a constant in code is not evidence of testing at that size.
+- [ ] Restore still requires a clear target, trusted file and separate consent
+  for production/nonempty database/DROP. Never promise rollback of arbitrary SQL scripts.
+- [x] Resolve D3 and implement new-database creation: separate consent, unused
+  name, no automatic DROP on failure; custom/SQL integration on PostgreSQL 14–18.
+  This does not replace the clean-machine acceptance above.
 
-**Twoje uwagi B04:**
+**Your B04 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B05 — bezpieczeństwo i prywatność
+## B05 — security and privacy
 
-- [ ] Ponowić audyt JS/Rust i binariów w dokładnej paczce wydania. Ostatni raport
-  wskazywał `glib 0.18.5 / RUSTSEC-2024-0429` oraz nieutrzymywane zależności;
-  potrzebna aktualna ocena i rozwiązanie/udokumentowane ograniczenie ryzyka.
-  Ta checklista nie jest nowym skanem i nie potwierdza aktualności starego wyniku.
-- [ ] Przejrzeć IPC, izolację sesji, CSP, zakres dostępu do plików, parametryzację
-  SQL oraz read-only również po stronie Rust, nie tylko disabled w UI.
-- [ ] Przetestować TLS/CA, nieprawidłowy hostname, zablokowany Keychain i zmianę
-  celu profilu bez niejawnego użycia starego hasła.
-- [ ] Skan sekretów w całej historii repo i gotowych artefaktach; bez danych
-  użytkownika w fixtures, screenshotach, logach i zgłoszeniach.
-- [ ] Opisać lokalne, nieszyfrowane szkice/historię SQL, możliwość ich wyłączenia
-  i czyszczenia oraz zachowanie plików tymczasowych po awarii.
-- [ ] Ustalić prywatny kanał zgłoszeń podatności i zaktualizować SECURITY.md.
-- [ ] Sprawdzić licencje i dołączone notices całej dystrybucji, także klientów
-  PostgreSQL, OpenSSL i ich zależności; ustalić proces aktualizacji tych składników.
+- [ ] Repeat JS/Rust and binary audits on the exact release package. The previous
+  report identified `glib 0.18.5 / RUSTSEC-2024-0429` and unmaintained dependencies;
+  obtain a current assessment and resolve or document risk boundaries.
+  This checklist is not a fresh scan and does not validate the old finding's current status.
+- [ ] Review IPC, session isolation, CSP, file-access scope, SQL parameterization
+  and read-only enforcement in Rust, not merely disabled UI controls.
+- [ ] Test TLS/CA, incorrect hostnames, locked Keychain and profile-target changes
+  without implicitly reusing the previous password.
+- [ ] Scan secrets across repository history and finished artifacts; no user
+  data in fixtures, screenshots, logs or reports.
+- [ ] Document local unencrypted SQL drafts/history, disabling and clearing
+  options, and temporary-file behavior after crashes.
+- [ ] Establish a private vulnerability-reporting channel and update SECURITY.md.
+- [ ] Check licenses and bundled notices across the distribution, including
+  PostgreSQL clients, OpenSSL and dependencies; define their update process.
 
-**Twoje uwagi B05:**
+**Your B05 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B06 — wydajność, małe okna i dostępność
+## B06 — performance, small windows and accessibility
 
-- [ ] Zmierzyć start, RSS po dłuższej sesji, otwieranie dużego katalogu, wiele
-  połączeń i kart, szerokie tabele i duże wyniki. Zapisać dataset i wyniki pomiarów.
-- [ ] Sprawdzić globalny budżet pamięci, nie tylko limit pojedynczego zapytania;
-  odłączanie sesji i zamykanie kart powinno zwalniać zasoby.
-- [ ] Minimum okna 760 × 560, maksymalna czcionka, systemowe skalowanie/DPI,
-  drugi monitor i resize paneli: żadnych niedostępnych akcji.
-- [ ] Klawiatura bez myszy, screen reader, kontrast, focus-visible i reduced motion.
-  Znaczenie stanu nie może zależeć wyłącznie od koloru lub hover.
-- [ ] Duże komórki i katalogi nie zamrażają całej aplikacji; ograniczenia są
-  wyraźnie komunikowane, a operacje możliwe do przerwania.
+- [ ] Measure startup, RSS after long sessions, large catalogs, multiple connections
+  and tabs, wide tables and large results. Record datasets and measurements.
+- [ ] Check the global memory budget, not just per-query limits; disconnecting
+  sessions and closing tabs should release resources.
+- [ ] Minimum window 760 × 560, maximum font size, system scaling/DPI, a second
+  monitor and panel resizing: no inaccessible actions.
+- [ ] Keyboard-only use, screen readers, contrast, focus-visible and reduced motion.
+  Status meaning must not depend solely on color or hover.
+- [ ] Large cells and catalogs do not freeze the app; limits are clearly
+  communicated and operations can be interrupted.
 
-**Twoje uwagi B06:**
+**Your B06 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B07 — repozytorium, CI i macierz wersji
+## B07 — repository, CI and version matrix
 
-- [x] Podłączyć zdalne repo: `origin` → `git@github.com:Kasperekx/opaline.git`.
-  Kod i workflow wypchnięte 2026-09-05 (`5d1c42f` i kolejne poprawki).
-- [x] Przed pierwszym push sprawdzić sekrety i zakres plików, przygotować commit
-  oraz wysłać kod po zatwierdzeniu publikacji. Gitleaks: staging i historia bez wykryć.
-- [ ] Uruchomić istniejący workflow na zdalnym CI i naprawić rzeczywiste błędy
-  na wszystkich zadeklarowanych systemach. Plik YAML nie oznacza zielonego CI.
-  `ce8bfc4` i `4d616f7`: po 12 zielonych jobów, w tym macOS ARM/Intel.
-  Każdy późniejszy kandydat (w tym poprawka natywnego Quit) wymaga własnego CI.
-- [x] Dołączyć do CI i lokalnej macierzy `database::table_changes` wymagające
-  PostgreSQL. Opt-in testy są teraz faktycznie uruchamiane dla wersji 14–18.
-- [ ] Przetestować edycję/duplikowanie na zadeklarowanych wersjach serwera.
-  Dotychczasowa macierz backup/TLS/sesji 14–18 nie oznacza identycznego pokrycia edycji.
-- [ ] Egzekwować typecheck/lint/format/tests/build oraz audyt sekretów/zależności;
-  bez odhaczania blokujących testów przez nieudokumentowane wyjątki.
-- [ ] Wersja, commit/tag, changelog i sumy kontrolne muszą wskazywać dokładnie
-  ten artefakt, który przeszedł odbiór, nie lokalny zmieniający się katalog.
+- [x] Connect remote repository: `origin` → `git@github.com:Kasperekx/opaline.git`.
+  Code and workflow pushed on 2026-09-05 (`5d1c42f` and subsequent fixes).
+- [x] Before the first push, check secrets and file scope, prepare a commit and
+  push after publication approval. Gitleaks: no findings in staging or history.
+- [ ] Run the existing workflow in remote CI and fix actual failures on all
+  declared systems. A YAML file does not mean passing CI.
+  `ce8bfc4` and `4d616f7`: 12 passing jobs each, including macOS ARM/Intel.
+  Every later candidate (including the native Quit fix) requires its own CI run.
+- [x] Include PostgreSQL-dependent `database::table_changes` in CI and the
+  local matrix. Opt-in tests now actually run on versions 14–18.
+- [ ] Test editing/duplication on declared server versions. The existing
+  backup/TLS/session matrix for 14–18 does not imply identical editing coverage.
+- [ ] Enforce typecheck/lint/format/tests/build and secret/dependency audits;
+  do not bypass blocking tests with undocumented exceptions.
+- [ ] Version, commit/tag, changelog and checksums must identify exactly the
+  artifact that passed acceptance, not a changing local directory.
 
-**Twoje uwagi B07:**
+**Your B07 notes:**
 
-> Do uzupełnienia: właściciel repo i docelowe platformy.
+> To be completed: repository owner and target platforms.
 
-## B08 — instalacja, aktualizacje i pierwsze uruchomienie
+## B08 — installation, updates and first launch
 
-- [ ] Przygotować release na najstarszym zadeklarowanym OS. Obecny developerski
-  pakiet klientów był budowany z minimum macOS 26; nie jest dowodem obsługi starszych Maców.
-- [ ] Podpisywanie/notaryzacja i sprawdzenie gotowej dystrybucji. Dla dołączanych
-  klientów podpis ma powstać przed manifestem integralności; testować finalną paczkę.
-- [ ] Zainstalować, uruchomić, zaktualizować i odinstalować na czystych maszynach;
-  sprawdzić brak narzędzi developerskich i poprawny dostęp do magazynu haseł.
-- [ ] Aktualizacja zachowuje profile/bibliotekę/historię. Zaplanować kopię
-  konfiguracji i odzyskanie po nieudanej aktualizacji, bez założenia, że dowolny
-  downgrade potrafi czytać nowszy format konfiguracji.
-- [ ] Jeśli auto-update jest w zakresie: podpisy pakietów, kanał beta, przerwane
-  pobranie i błędna paczka. Jeśli nie — prosta, sprawdzona instrukcja ręczna.
-- [ ] README dla testera, instalacja/pierwsze połączenie, skróty, limity i known issues.
-  Pomoc w aplikacji ma odpowiadać faktycznym zachowaniom, nie staremu UI.
-- [ ] Działające About / Report issue z wersją i dobrowolną, bezpieczną diagnostyką;
-  szablon błędu bez zachęcania do wysyłania danych bazy/sekretów.
+- [ ] Prepare the release on the oldest declared OS. The current development
+  client package was built with a macOS 26 minimum; it does not prove older-Mac support.
+- [ ] Signing/notarization and finished-distribution verification. Bundled clients
+  must be signed before creating the integrity manifest; test the final package.
+- [ ] Install, launch, update and uninstall on clean machines; verify operation
+  without developer tools and correct credential-store access.
+- [ ] Updates preserve profiles/library/history. Plan configuration backup and
+  failed-update recovery without assuming any downgrade can read newer formats.
+- [ ] If auto-update is in scope: package signatures, beta channel, interrupted
+  downloads and invalid packages. Otherwise provide simple, verified manual instructions.
+- [ ] Tester README, installation/first connection, shortcuts, limits and known
+  issues. In-app help must match actual behavior, not an older UI.
+- [ ] Working About / Report issue with version and optional safe diagnostics;
+  the issue template must not encourage sharing database contents or secrets.
 
-Konta wydawcy, certyfikaty, płatności i publikacja wymagają decyzji właściciela;
-ten plan ich nie uruchamia.
+Publisher accounts, certificates, payments and publication require the owner's
+decision; this plan does not initiate them.
 
-**Twoje uwagi B08:**
+**Your B08 notes:**
 
-> Do uzupełnienia.
+> To be completed.
 
-## B09 — pilotaż i warunek wydania
+## B09 — pilot and release criteria
 
-- [ ] Wybrana mała grupa, np. 5–10 testerów, instaluje kandydata samodzielnie
-  i wykonuje zadania z D5 na danych nieprodukcyjnych.
-- [ ] Zbieramy zarówno błędy, jak i miejsca niezrozumiałe bez podpowiedzi autora.
-  Najpierw poprawiamy blokery i utratę pracy, potem kosmetykę.
-- [ ] Każda naprawa blokera ma regresję i ponowny odbiór właściwej paczki.
-- [ ] Wszystkie P0 zamknięte; pozostałe P1 mają jawnie zaakceptowany status.
-- [ ] Brak znanego błędu powodującego utratę danych, pomylenie sesji, wyciek sekretów
-  lub niezamierzony zapis. Opisane ograniczenia i działający kanał zgłoszeń.
-- [ ] Właściciel zatwierdza publikację, instrukcję i sposób dostarczania poprawek.
+- [ ] A selected small group, for example 5–10 testers, independently installs
+  the candidate and performs D5 tasks using non-production data.
+- [ ] Collect defects and anything unclear without the author's guidance.
+  Fix blockers and lost work before cosmetic issues.
+- [ ] Each blocker fix has a regression test and renewed acceptance of the relevant package.
+- [ ] All P0 items closed; remaining P1 items have explicitly accepted statuses.
+- [ ] No known data-loss, session mix-up, secret-leak or unintended-write defects.
+  Limitations are documented and the reporting channel works.
+- [ ] The owner approves publication, instructions and the patch-delivery process.
 
-**Twoje uwagi B09:**
+**Your B09 notes:**
 
-> Do uzupełnienia: kogo zapraszamy i jakie zadania dajemy.
+> To be completed: whom to invite and which tasks to assign.
 
-## Po tej becie — kandydaci, nie ukryte warunki wydania
+## After this beta — candidates, not hidden release requirements
 
-- Logi Dockera skojarzone z produktem/usługą i środowiskiem.
-- Kafka: podgląd topiców, wiadomości i consumer lag jako integracja.
-- Rozszerzenia diagramu: eksport i porównywanie schematów.
-- Integracje observability i powiązania przez service/environment/trace ID.
-- SSH, wizualny EXPLAIN, rozbudowane filtry, import CSV/JSON i kolejni providerzy.
+- Docker logs linked to a product/service and environment.
+- Kafka topic, message and consumer-lag inspection as an integration.
+- Diagram extensions: export and schema comparison.
+- Observability integrations linked through service/environment/trace ID.
+- SSH, visual EXPLAIN, advanced filters, CSV/JSON import and additional providers.
 
-## Twoje dodatkowe uwagi — dopisuj bez zmiany numerów B01–B09
+## Additional feedback — keep B01–B09 numbering unchanged
 
-| ID | Co przeszkadza / czego brakuje | Oczekiwane zachowanie | Priorytet do uzgodnienia |
+| ID | Friction / missing capability | Expected behavior | Priority to agree |
 | --- | --- | --- | --- |
 | U01 |  |  |  |
 | U02 |  |  |  |
@@ -291,7 +290,7 @@ ten plan ich nie uruchamia.
 | U04 |  |  |  |
 | U05 |  |  |  |
 
-D1 (systemy), D3 i D4 są potwierdzone. Nadal potrzebujemy minimum macOS, sposobu
-podpisywania/dostarczenia paczki, prywatnego kanału bezpieczeństwa i testerów.
-Kolejna praca: odbiór dokładnej paczki na czystych Macach oraz pozostałe B01–B09,
-bez dokładania nowych integracji. Nie oznaczamy całej bety jako gotowej po samym CI.
+D1 (systems), D3 and D4 are confirmed. Minimum macOS, package signing/delivery,
+a private security channel and testers still need to be settled.
+Next: accept the exact package on clean Macs and complete the remaining B01–B09
+items without adding integrations. Passing CI alone does not make the beta ready.
