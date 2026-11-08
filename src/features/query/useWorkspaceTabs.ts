@@ -523,9 +523,7 @@ export function useWorkspaceTabs(profileId: string) {
             ...tab,
             id,
             schema: nextName,
-            title: tab.table
-              ? `${tab.table} · structure`
-              : tab.title,
+            title: tab.table ? `${tab.table} · structure` : tab.title,
           };
         }
         return tab;
