@@ -1,11 +1,11 @@
 pub(crate) mod client;
-pub(crate) mod diagram;
 pub(crate) mod diagnostics;
+pub(crate) mod diagram;
 pub(crate) mod export_file;
 pub(crate) mod models;
+pub(crate) mod namespace_changes;
 pub(crate) mod postgres;
 pub(crate) mod read_only;
-pub(crate) mod namespace_changes;
 pub(crate) mod schema_changes;
 pub(crate) mod structure;
 pub(crate) mod table_changes;

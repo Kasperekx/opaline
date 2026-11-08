@@ -1,7 +1,5 @@
 use super::{
-    client::DatabaseClient,
-    table_changes::TransactionGuard,
-    table_data::quote_identifier,
+    client::DatabaseClient, table_changes::TransactionGuard, table_data::quote_identifier,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -135,9 +133,7 @@ pub(crate) async fn list_schemas(client: &Client) -> Result<Vec<SchemaInfo>, Str
         .map_err(|_| "Cannot load schemas. Refresh to retry.".to_string())?;
     Ok(rows
         .into_iter()
-        .map(|row| SchemaInfo {
-            name: row.get(0),
-        })
+        .map(|row| SchemaInfo { name: row.get(0) })
         .collect())
 }
 
@@ -172,14 +168,11 @@ pub(crate) async fn apply(
             .batch_execute("SET LOCAL search_path = pg_catalog")
             .await
             .map_err(|e| e.to_string())?;
-        client
-            .batch_execute(&plan.sql)
-            .await
-            .map_err(|e| {
-                e.as_db_error()
-                    .map(|db| db.message().to_string())
-                    .unwrap_or_else(|| "Database connection failed.".into())
-            })?;
+        client.batch_execute(&plan.sql).await.map_err(|e| {
+            e.as_db_error()
+                .map(|db| db.message().to_string())
+                .unwrap_or_else(|| "Database connection failed.".into())
+        })?;
         Ok(())
     }
     .await;
@@ -237,9 +230,14 @@ mod tests {
     #[test]
     fn plans_create_rename_and_drop() {
         assert_eq!(
-            plan(&change(NamespaceKind::Create, "analytics", None, DropMode::Restrict))
-                .unwrap()
-                .sql,
+            plan(&change(
+                NamespaceKind::Create,
+                "analytics",
+                None,
+                DropMode::Restrict
+            ))
+            .unwrap()
+            .sql,
             "CREATE SCHEMA \"analytics\";"
         );
         let renamed = plan(&change(
