@@ -1,0 +1,95 @@
+/* Workspace content and document tab structure. Visual treatment of the
+   toolbar and capsule tabs lives in styles/studio.css. */
+@layer shell {
+  .workspace-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .workspace-notices {
+    flex: 0 0 auto;
+    max-height: 35%;
+    overflow: auto;
+  }
+  .workspace-notices:empty {
+    display: none;
+  }
+  .workspace-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .version-pill {
+    margin-right: 4px;
+    padding: 3px 8px;
+    border-radius: var(--radius-capsule);
+    color: var(--muted);
+    background: var(--hover);
+    font-size: var(--text-2xs);
+  }
+  .tab-bar {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .query-tabs-scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .query-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .editor-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    cursor: default;
+  }
+  .tab-select {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    color: inherit;
+    background: transparent;
+  }
+  .tab-select > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tab-select.editing {
+    flex: 1;
+  }
+  .tab-select input {
+    width: 112px;
+    min-width: 0;
+    padding: 3px 6px;
+    font-size: var(--text-md);
+  }
+  .tab-close {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .tab-close:disabled {
+    opacity: 0.3;
+  }
+  .tab-dot {
+    flex: 0 0 auto;
+    border-radius: 50%;
+  }
+  .new-tab {
+    padding: 0;
+  }
+  .tab-spacer {
+    flex: 1;
+  }
+}

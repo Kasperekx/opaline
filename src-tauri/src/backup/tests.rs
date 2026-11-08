@@ -42,6 +42,8 @@ fn info() -> SessionInfo {
 }
 fn restore_input() -> RestoreInput {
     RestoreInput {
+        jobs: 1,
+        confirm_parallel: false,
         new_database: None,
         confirm_create: false,
         prepared_id: "test".into(),
@@ -54,6 +56,49 @@ fn restore_input() -> RestoreInput {
         confirm_clean: false,
         preserve_ownership: false,
     }
+}
+
+#[test]
+fn parallel_restore_requires_custom_archive_new_target_and_separate_consent() {
+    let mut input = restore_input();
+    assert!(operations::restore_arguments(DumpFormat::Custom, &input)
+        .unwrap()
+        .contains(&"--single-transaction".into()));
+    for jobs in [0, 3, 5, 255] {
+        input.jobs = jobs;
+        assert!(operations::validate_restore(&info(), &input).is_err());
+    }
+    for jobs in [2, 4] {
+        input.jobs = jobs;
+        input.new_database = None;
+        input.confirm_parallel = true;
+        assert!(operations::validate_restore(&info(), &input).is_err());
+        input.new_database = Some("target".into());
+        input.confirm_create = true;
+        input.confirm_parallel = false;
+        assert!(operations::validate_restore(&info(), &input).is_err());
+        input.confirm_parallel = true;
+        assert!(operations::validate_restore(&info(), &input).is_ok());
+        assert!(operations::restore_arguments(DumpFormat::Sql, &input).is_err());
+        let args = operations::restore_arguments(DumpFormat::Custom, &input).unwrap();
+        assert!(args.contains(&format!("--jobs={jobs}")));
+        assert!(!args.contains(&"--single-transaction".into()));
+        assert!(args.contains(&"--exit-on-error".into()));
+        assert!(args.contains(&"--no-owner".into()));
+    }
+}
+
+#[test]
+fn old_restore_requests_keep_atomic_defaults() {
+    let input: RestoreInput = serde_json::from_value(serde_json::json!({
+        "preparedId": "test", "password": null, "trustedFile": true,
+        "confirmDatabase": "target", "confirmProduction": true,
+        "allowNonempty": false, "clean": false, "confirmClean": false,
+        "preserveOwnership": false
+    }))
+    .unwrap();
+    assert_eq!(input.jobs, 1);
+    assert!(!input.confirm_parallel);
 }
 
 #[test]

@@ -1,10 +1,4 @@
-import {
-  ChevronDown,
-  Download,
-  FileJson2,
-  FileSpreadsheet,
-  Loader2,
-} from "lucide-react";
+import { Download, FileJson2, FileSpreadsheet, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TableExportFormat } from "./table-export";
 
@@ -84,20 +78,16 @@ export function TableExportMenu({
               ? "Export selected rows"
               : "Export table data"
         }
+        title={
+          busy ? "Exporting" : selectedCount > 0 ? "Export selected" : "Export"
+        }
+        className={open ? "active" : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
         disabled={disabled || busy}
         onClick={() => setOpen((current) => !current)}
       >
-        {busy ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
-        <span>
-          {busy
-            ? "Exporting"
-            : selectedCount > 0
-              ? "Export selected"
-              : "Export"}
-        </span>
-        <ChevronDown size={12} />
+        {busy ? <Loader2 className="spin" size={15} /> : <Download size={16} />}
       </button>
       {open && (
         <div
@@ -148,8 +138,8 @@ export function TableExportMenu({
             </button>
           ))}
           <div className="table-export-section">
-            <strong>Full result</strong>
-            <span>Runs in background</span>
+            <strong>All matching rows</strong>
+            <span>Runs in the background</span>
           </div>
           {formats.map(({ id, label, Icon }) => (
             <button

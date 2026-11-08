@@ -17,7 +17,13 @@ export type TableViewState = {
   widths: Record<string, number>;
   pinnedColumn: string | null;
   density: "comfortable" | "compact" | "default";
+  /** Column the row search is scoped to (a search token), or all columns. */
+  searchColumn: string | null;
+  /** Columns hidden from the grid; data, editing and export keep them. */
+  hiddenColumns: string[];
 };
+const validColumnName = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 255;
 export function validFilters(value: unknown): value is TableFilter[] {
   return (
     Array.isArray(value) &&
@@ -55,6 +61,8 @@ export function readTableView(key: string): TableViewState {
     widths: {},
     pinnedColumn: null,
     density: "default",
+    searchColumn: null,
+    hiddenColumns: [],
   };
   const value = readLocalJson<Partial<TableViewState> | null>(key, null);
   if (!value) return fallback;
@@ -89,10 +97,22 @@ export function readTableView(key: string): TableViewState {
     ) ||
     (value.pinnedColumn != null && typeof value.pinnedColumn !== "string") ||
     (value.density !== undefined &&
-      !["default", "comfortable", "compact"].includes(value.density))
+      !["default", "comfortable", "compact"].includes(value.density)) ||
+    (value.searchColumn != null && !validColumnName(value.searchColumn)) ||
+    (value.hiddenColumns !== undefined &&
+      (!Array.isArray(value.hiddenColumns) ||
+        value.hiddenColumns.length > 1000 ||
+        !value.hiddenColumns.every(validColumnName)))
   ) {
     markUnreadableStorage(key);
     return fallback;
   }
-  return { ...fallback, ...value, conditions, widths } as TableViewState;
+  return {
+    ...fallback,
+    ...value,
+    conditions,
+    widths,
+    searchColumn: value.searchColumn ?? null,
+    hiddenColumns: value.hiddenColumns ?? [],
+  } as TableViewState;
 }

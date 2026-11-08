@@ -8,8 +8,8 @@ use tokio_postgres::{types::ToSql, Client};
 use super::{
     models::{ExportTableDataRequest, TableExportFormat, TableExportProgress, TableExportResult},
     table_data::{
-        normalize_filter, order_clause, qualified_name, searchable_projection, table_metadata,
-        text_projection, validate_relation_name,
+        normalize_filter, order_clause, qualified_name, search_predicate, table_metadata,
+        text_projection, validate_relation_name, TABLE_SOURCE_ALIAS,
     },
 };
 
@@ -47,14 +47,13 @@ where
     }
     let filter = normalize_filter(request.filter.as_deref())?;
     let selected_columns = text_projection(&metadata.columns);
-    let searchable_columns = searchable_projection(&metadata.columns);
+    let search = search_predicate(&metadata.columns, 1);
     let order = order_clause(&metadata, request.sort.as_ref())?;
     let relation = qualified_name(&request.schema, &request.table);
     let (conditions, values) = super::table_filter::conditions(&metadata, &request.conditions, 2)?;
     let sql = format!(
-        "SELECT {selected_columns} FROM {relation} \
-         WHERE ($1::text IS NULL OR \
-           strpos(lower(concat_ws(' ', {searchable_columns})), lower($1::text)) > 0) \
+        "SELECT {selected_columns} FROM {relation} AS {TABLE_SOURCE_ALIAS} \
+         WHERE {search} \
          {conditions} {order}"
     );
     let filter_parameter = filter.as_deref();
@@ -98,7 +97,7 @@ where
         let values = (0..metadata.columns.len())
             .map(|index| {
                 row.try_get::<_, Option<String>>(index)
-                    .map_err(|error| format!("Could not decode an exported row: {error}"))
+                    .map_err(|_| super::table_data::decode_column_error(&metadata.columns[index]))
             })
             .collect::<Result<Vec<_>, _>>()?;
         let chunk = match request.format {
@@ -195,7 +194,7 @@ fn export_query_error(error: tokio_postgres::Error) -> String {
     {
         "Export cancelled.".into()
     } else {
-        format!("Could not export table data: {error}")
+        crate::database::diagnostics::database_error("Could not export table data", error)
     }
 }
 

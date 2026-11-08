@@ -1,4 +1,5 @@
 // Development-only responsive fixture. All values and responses are synthetic.
+import "../src/styles/global-styles";
 import { createRoot } from "react-dom/client";
 import { useEffect, useRef } from "react";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -13,8 +14,6 @@ import { TableChangesReview } from "../src/features/table/TableChangesReview";
 import { TablePagination } from "../src/features/table/TablePagination";
 import { tableChangePage, applyFixtureChanges } from "./table-change-fixture";
 import type { TableChangesRequest } from "../src/shared/types/database";
-import "../src/App.css";
-import "../src/features/connections/connections.css";
 import "../src/features/query/p1.css";
 import "../src/features/table/inline-editing.css";
 

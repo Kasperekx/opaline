@@ -51,9 +51,10 @@ External dependencies can reject the operation. See the official
 ## Explicit limits
 
 - No visual editing of views, foreign tables, partitions or inherited tables.
-- Use SQL for schema moves, existing primary-key/identity/generated-column changes,
+- Use SQL for schema moves of tables, existing primary-key/identity/generated-column changes,
   custom casts, arbitrary default expressions and advanced indexes (partial, expression,
   included columns, concurrent builds). New indexes use ordinary BTREE defaults.
+- Namespace create/rename/drop is separate — see [Schema namespace editor](schema-namespace-editor.md).
 - FK creation uses validated, immediate MATCH SIMPLE constraints. Deferrable,
   unvalidated and MATCH FULL/PARTIAL relationships require SQL for editing.
 - At most 100 constraint operations and 32 ordered columns per index/relationship.

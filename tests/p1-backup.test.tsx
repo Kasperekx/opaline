@@ -164,8 +164,104 @@ it("requires separate new database consent and resets it when the target changes
       clean: false,
       allowNonempty: false,
       confirmProduction: true,
+      jobs: 1,
+      confirmParallel: false,
     }),
   ]);
+});
+it("requires fresh parallel consent when worker count changes and sends the selected mode", async () => {
+  tools();
+  const user = userEvent.setup();
+  const restore = vi.spyOn(backupApi, "restore").mockResolvedValue({
+    bytes: 1024,
+    durationMs: 20,
+    message: "Created and restored",
+  });
+  view();
+  await user.click(screen.getByRole("button", { name: "Restore database" }));
+  await user.selectOptions(screen.getByLabelText("Restore destination"), "new");
+  await user.type(screen.getByLabelText("New database name"), "fresh_copy");
+  await user.click(
+    screen.getByRole("button", { name: "Choose dump and inspect" }),
+  );
+  await screen.findByRole("textbox", { name: "Dump preview" });
+  const mode = screen.getByLabelText("Restore mode") as HTMLSelectElement;
+  expect(mode.value).toBe("1");
+  await user.click(screen.getByRole("checkbox", { name: /I trust this file/ }));
+  await user.click(
+    screen.getByRole("checkbox", { name: /I approve creating this database/ }),
+  );
+  await user.click(
+    screen.getByRole("checkbox", {
+      name: /I approve restoring into PRODUCTION/,
+    }),
+  );
+  await user.type(
+    screen.getByLabelText("Type the target database name: fresh_copy"),
+    "fresh_copy",
+  );
+  const run = screen.getByRole("button", {
+    name: "Create database & restore",
+  }) as HTMLButtonElement;
+  expect(run.disabled).toBe(false);
+  await user.selectOptions(mode, "2");
+  expect(run.disabled).toBe(true);
+  const consent = () =>
+    screen.getByRole("checkbox", {
+      name: /I accept that a failed or cancelled parallel restore/,
+    });
+  await user.click(consent());
+  expect(run.disabled).toBe(false);
+  await user.selectOptions(mode, "4");
+  expect(run.disabled).toBe(true);
+  expect((consent() as HTMLInputElement).checked).toBe(false);
+  await user.click(consent());
+  await user.click(run);
+  await waitFor(() => expect(restore).toHaveBeenCalledOnce());
+  expect(restore.mock.calls[0][1]).toMatchObject({
+    jobs: 4,
+    confirmParallel: true,
+    newDatabase: "fresh_copy",
+  });
+});
+
+it("resets parallel mode on target or file changes and never offers it for SQL or existing databases", async () => {
+  tools();
+  const user = userEvent.setup();
+  view();
+  await user.click(screen.getByRole("button", { name: "Restore database" }));
+  const inspect = screen.getByRole("button", {
+    name: "Choose dump and inspect",
+  });
+  await user.click(inspect);
+  await screen.findByRole("textbox", { name: "Dump preview" });
+  expect(screen.queryByLabelText("Restore mode")).toBeNull();
+  const destination = screen.getByLabelText("Restore destination");
+  await user.selectOptions(destination, "new");
+  const mode = () => screen.getByLabelText("Restore mode") as HTMLSelectElement;
+  await user.selectOptions(mode(), "2");
+  await user.type(screen.getByLabelText("New database name"), "copy");
+  expect(mode().value).toBe("1");
+  await user.selectOptions(mode(), "4");
+  await user.selectOptions(destination, "existing");
+  expect(screen.queryByLabelText("Restore mode")).toBeNull();
+  await user.selectOptions(destination, "new");
+  expect(mode().value).toBe("1");
+  await user.selectOptions(mode(), "2");
+  await user.click(inspect);
+  await screen.findByRole("textbox", { name: "Dump preview" });
+  expect(mode().value).toBe("1");
+  vi.mocked(backupApi.prepare).mockResolvedValue({
+    id: "sql",
+    format: "sql",
+    bytes: 40,
+    digest: "a".repeat(64),
+    preview: "SELECT 1",
+    serverMajor: 17,
+  });
+  await user.click(inspect);
+  await screen.findByText("SQL script · beginning of file");
+  expect(screen.queryByLabelText("Restore mode")).toBeNull();
 });
 it("never offers restore for a read-only session", () => {
   view(true);

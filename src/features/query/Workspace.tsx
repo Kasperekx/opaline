@@ -1,19 +1,14 @@
 import {
   Check,
   Copy,
-  Loader2,
   PanelsTopLeft,
   ChevronDown,
   CircleHelp,
   X,
-  Play,
-  Square,
-  SquareTerminal,
   Unplug,
   BookMarked,
   FolderOpen,
   Save,
-  Wand2,
   Command,
   HardDriveDownload,
   RotateCcw,
@@ -32,7 +27,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Explorer } from "../explorer/Explorer";
-import { HelpDialog } from "../../shared/components/HelpDialog";
+import type { NamespaceDialogMode } from "../explorer/NamespaceDialog";
 import { ResizeHandle } from "../../shared/components/ResizeHandle";
 import { ActionMenu } from "../../shared/components/ActionMenu";
 import { useMediaQuery } from "../../shared/hooks/useMediaQuery";
@@ -42,25 +37,36 @@ import type {
   SessionStatus,
 } from "../connections/connection-types";
 import { EnvironmentBadge } from "../connections/EnvironmentBadge";
+import { useDatabaseSession } from "../connections/SessionContext";
 import type { useQueryPreferences } from "./useQueryPreferences";
 import { TableWorkspace } from "../table/TableWorkspace";
-import { QueryHistoryPanel } from "./QueryHistoryPanel";
-import { QueryPreferencesPanel } from "./QueryPreferencesPanel";
-import { ResultsGrid } from "./ResultsGrid";
+import {
+  formatCount,
+  ResultsGrid,
+  RunDuration,
+  useRunOutcome,
+} from "./ResultsGrid";
+import { lineColumnAt } from "./sql-diagnostics";
 import { SqlEditor, type SqlEditorHandle } from "./SqlEditor";
 import { useWorkspace } from "./useWorkspace";
-import { useWorkspaceLayout } from "./useWorkspaceLayout";
+import type { WorkspaceLayout } from "./useWorkspaceLayout";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { useWorkRisk, useWorkSafety } from "../../shared/safety/WorkSafety";
 import { FileWorkRisk, useSqlDocuments } from "./useSqlDocuments";
 import { useSqlCompletions } from "./useSqlCompletions";
-import { QueryLibrary } from "./QueryLibrary";
-import { CommandPalette } from "./CommandPalette";
 import { useWorkspaceCommands } from "./useWorkspaceCommands";
 import "./p1.css";
-import { BackupDialog } from "../backup/BackupDialog";
-import { QueryExecutionControl } from "./QueryExecutionControl";
-import { SchemaEditor } from "../structure/SchemaEditor";
+import { QueryExecutionControl, RunQueryButton } from "./QueryExecutionControl";
+import {
+  BackupDialog,
+  CommandPalette,
+  HelpDialog,
+  NamespaceDialog,
+  QueryHistoryPanel,
+  QueryLibrary,
+  QueryPreferencesPanel,
+  SchemaEditor,
+} from "./lazy-panels";
 
 const DiagramWorkspace = lazy(() => import("../diagram/DiagramWorkspace"));
 
@@ -73,6 +79,7 @@ type WorkspaceProps = {
   onSwitchConnection: () => void;
   onManageConnections: () => void;
   queryPreferences: ReturnType<typeof useQueryPreferences>;
+  layout: WorkspaceLayout;
   onDisconnect: () => void;
 };
 
@@ -88,7 +95,9 @@ export function Workspace({
   onDisconnect,
   onManageConnections,
   queryPreferences,
+  layout,
 }: WorkspaceProps) {
+  const { session, api: databaseApi } = useDatabaseSession();
   const workspace = useWorkspace(connection.database, queryPreferences);
   const safety = useWorkSafety();
   useWorkRisk({
@@ -97,7 +106,6 @@ export function Workspace({
     label: `${connection.name}: SQL query`,
     busy: workspace.runningTabId !== null,
   });
-  const layout = useWorkspaceLayout();
   const compactWindow = useMediaQuery("(max-width: 1080px)");
   const editorRef = useRef<SqlEditorHandle>(null);
   const documents = useSqlDocuments(workspace.tabs, connection.id, editorRef);
@@ -107,6 +115,10 @@ export function Workspace({
   const [backupOpen, setBackupOpen] = useState(false);
   const [schemaRevision, setSchemaRevision] = useState(0);
   const [schemaApplying, setSchemaApplying] = useState(false);
+  const [namespaceDialog, setNamespaceDialog] = useState<{
+    mode: NamespaceDialogMode;
+    name: string;
+  } | null>(null);
   const [dirtyTableIds, setDirtyTableIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -131,6 +143,15 @@ export function Workspace({
     activeResult?.resultSets[workspace.activeResultIndex] ?? null;
   const resultCount = activeSet?.rows.length ?? 0;
   const queryBusy = workspace.runningTabId === activeQueryTab?.id;
+  const outcome = useRunOutcome(
+    activeQueryTab?.id,
+    activeResult ?? activeQueryTab?.error ?? null,
+  );
+  const errorPosition = activeQueryTab?.error?.position ?? null;
+  const errorLocation =
+    activeQueryTab && errorPosition !== null
+      ? lineColumnAt(activeQueryTab.sql, errorPosition)
+      : null;
   const dirty =
     activeQueryTab !== null &&
     activeQueryTab.sql !== activeQueryTab.lastExecutedSql;
@@ -158,14 +179,25 @@ export function Workspace({
   });
   useEffect(() => {
     if (!active || !explorerVisible) return;
-    const frame = requestAnimationFrame(() =>
-      document
-        .getElementById(`database-explorer-${connection.id}`)
-        ?.querySelector<HTMLInputElement>("input")
-        ?.focus(),
-    );
+    // Only a revealed overlay takes focus. A pinned sidebar stays quiet, like a
+    // Finder sidebar; Cmd/Ctrl+K still focuses its search explicitly.
+    const frame = compactWindow
+      ? requestAnimationFrame(() =>
+          document
+            .getElementById(`database-explorer-${connection.id}`)
+            ?.querySelector<HTMLInputElement>("input")
+            ?.focus(),
+        )
+      : 0;
+    // Escape dismisses only the floating overlay. A pinned sidebar is part of
+    // the window; Escape there belongs to popovers, editors and inspectors.
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || document.querySelector("dialog[open]"))
+      if (
+        !compactWindow ||
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        document.querySelector("dialog[open]")
+      )
         return;
       event.preventDefault();
       setExplorerVisible(false);
@@ -176,7 +208,7 @@ export function Workspace({
       cancelAnimationFrame(frame);
       window.removeEventListener("keydown", dismiss);
     };
-  }, [active, explorerVisible, connection.id]);
+  }, [active, explorerVisible, connection.id, compactWindow]);
 
   const togglePanel = (panel: WorkspacePanel) => {
     setOpenPanel((current) => (current === panel ? null : panel));
@@ -189,6 +221,22 @@ export function Workspace({
     },
     [layout],
   );
+
+  // The sidebar selection follows the active document, like Xcode's navigator:
+  // a table or its structure draft highlights that table; SQL tabs highlight none.
+  const activeTable =
+    activeTab?.kind === "table"
+      ? { schema: activeTab.schema, name: activeTab.table }
+      : activeTab?.kind === "schema" && activeTab.table
+        ? { schema: activeTab.schema, name: activeTab.table }
+        : null;
+  const sidebarSelection = activeTable
+    ? (workspace.objects.find(
+        (object) =>
+          object.schema === activeTable.schema &&
+          object.name === activeTable.name,
+      ) ?? null)
+    : null;
 
   const splitStyle = {
     "--editor-ratio": `${layout.editorRatio}fr`,
@@ -206,7 +254,18 @@ export function Workspace({
         ))}
       <div className="object-navigator" hidden={!explorerVisible}>
         <Explorer
-          onCreateTable={() => workspace.tabs.openSchema()}
+          onCreateTable={(schema) =>
+            workspace.tabs.openSchema(schema ?? "public")
+          }
+          onCreateSchema={() =>
+            setNamespaceDialog({ mode: "create", name: "" })
+          }
+          onRenameSchema={(schema) =>
+            setNamespaceDialog({ mode: "rename", name: schema })
+          }
+          onDropSchema={(schema) =>
+            setNamespaceDialog({ mode: "drop", name: schema })
+          }
           onEditTable={(object, drop) =>
             workspace.tabs.openSchema(object.schema, object.name, drop)
           }
@@ -217,7 +276,8 @@ export function Workspace({
           onReveal={() => setExplorerVisible(true)}
           connection={connection}
           objects={workspace.objects}
-          selected={workspace.selected}
+          schemas={workspace.schemas}
+          selected={sidebarSelection}
           expandedObjectKey={workspace.expandedObjectKey}
           columns={workspace.columns}
           filter={workspace.filter}
@@ -239,6 +299,18 @@ export function Workspace({
           }}
           onToggle={workspace.toggleObject}
         />
+        {!compactWindow && (
+          <ResizeHandle
+            className="navigator-resize-handle"
+            label="Resize database explorer"
+            minimum={240}
+            maximum={440}
+            orientation="vertical"
+            value={layout.explorerWidth}
+            onResize={layout.resizeExplorer}
+            onReset={layout.resetExplorer}
+          />
+        )}
         <button
           className="icon-button navigator-close"
           aria-label="Close database explorer"
@@ -309,7 +381,7 @@ export function Workspace({
               )}
               <button
                 className="icon-button"
-                title={`Commands · ${primaryModifierLabel} ⇧ P`}
+                title={`Commands · ⇧${primaryModifierLabel}P   Open Quickly · ⇧${primaryModifierLabel}O`}
                 aria-label="Open command palette"
                 onClick={() => setCommandsOpen(true)}
               >
@@ -433,7 +505,9 @@ export function Workspace({
           {!activeTab && (
             <section className="workspace-empty" aria-label="No open tabs">
               <div className="workspace-empty-content">
-                <PanelsTopLeft size={28} strokeWidth={1.3} aria-hidden="true" />
+                <span className="workspace-empty-icon" aria-hidden="true">
+                  <PanelsTopLeft size={22} strokeWidth={1.4} />
+                </span>
                 <h1>Your workspace is clear</h1>
                 <p>No open tabs. Your connection stays here.</p>
                 <div className="workspace-empty-actions">
@@ -442,30 +516,27 @@ export function Workspace({
                     className="button primary"
                     onClick={() => workspace.tabs.addQueryTab()}
                   >
-                    <SquareTerminal size={16} />
                     New query
                   </button>
                   <button
                     className="button secondary"
                     onClick={() => setExplorerVisible(true)}
                   >
-                    <Database size={16} />
                     Browse tables
                   </button>
                   <button
-                    className="button ghost"
+                    className="button secondary"
                     onClick={() => workspace.tabs.openDiagram()}
                   >
-                    <Network size={16} />
                     Database diagram
                   </button>
                 </div>
                 {workspace.tabs.canRestore && (
                   <button
-                    className="button ghost"
+                    className="button ghost compact"
                     onClick={workspace.tabs.restoreClosedTab}
                   >
-                    <RotateCcw size={15} />
+                    <RotateCcw size={14} />
                     Reopen closed query
                   </button>
                 )}
@@ -481,26 +552,32 @@ export function Workspace({
               <section className="editor-pane" aria-label="SQL editor">
                 <div className="editor-toolbar">
                   <div className="query-path">
-                    <SquareTerminal size={14} />
-                    <span>{activeQueryTab?.title}</span>
-                    <span
-                      className="sql-document-state"
-                      title={activeQueryTab?.file?.path}
+                    <strong
+                      className="query-title"
+                      title={activeQueryTab?.title}
                     >
-                      {activeQueryTab?.file
-                        ? activeQueryTab.sql === activeQueryTab.file.savedSql
-                          ? "File saved"
-                          : "Unsaved file changes"
-                        : "Local draft"}
-                    </span>
-                    {dirty && (
+                      {activeQueryTab?.title}
+                    </strong>
+                    <span className="query-subtitle">
                       <span
-                        className="unsaved"
-                        title="Different from the last whole-document execution"
+                        className="sql-document-state"
+                        title={activeQueryTab?.file?.path}
                       >
-                        Not executed
+                        {activeQueryTab?.file
+                          ? activeQueryTab.sql === activeQueryTab.file.savedSql
+                            ? "File saved"
+                            : "Unsaved file changes"
+                          : "Local draft"}
                       </span>
-                    )}
+                      {dirty && (
+                        <span
+                          className="unsaved"
+                          title="Different from the last whole-document execution"
+                        >
+                          Not executed
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <div className="editor-actions">
                     <QueryExecutionControl
@@ -518,66 +595,50 @@ export function Workspace({
                         }))
                       }
                     />
-                    <button
-                      className="toolbar-button"
-                      disabled={documents.busy}
-                      onClick={() => void documents.format()}
-                      title="Format SQL · Undo restores the original"
-                    >
-                      <Wand2 size={15} />
-                      Format
-                    </button>
-                    <ActionMenu
-                      label="Query actions"
-                      actions={[
-                        {
-                          label: "Open SQL file…",
-                          icon: FolderOpen,
-                          disabled: documents.busy,
-                          onSelect: () => void documents.open(),
-                        },
-                        {
-                          label: "Save SQL file…",
-                          icon: Save,
-                          disabled: documents.busy,
-                          onSelect: () => void documents.save(),
-                        },
-                        {
-                          label: workspace.copied ? "Copied" : "Copy SQL",
-                          icon: workspace.copied ? Check : Copy,
-                          separator: true,
-                          onSelect: () => void workspace.copyQuery(),
-                        },
-                      ]}
+                    <div className="toolbar-capsule editor-capsule">
+                      <button
+                        className="toolbar-button"
+                        disabled={documents.busy}
+                        onClick={() => void documents.format()}
+                        title="Format SQL · Undo restores the original"
+                      >
+                        Format
+                      </button>
+                      <ActionMenu
+                        label="Query actions"
+                        actions={[
+                          {
+                            label: "Open SQL file…",
+                            icon: FolderOpen,
+                            disabled: documents.busy,
+                            onSelect: () => void documents.open(),
+                          },
+                          {
+                            label: "Save SQL file…",
+                            icon: Save,
+                            disabled: documents.busy,
+                            onSelect: () => void documents.save(),
+                          },
+                          {
+                            label: workspace.copied ? "Copied" : "Copy SQL",
+                            icon: workspace.copied ? Check : Copy,
+                            separator: true,
+                            onSelect: () => void workspace.copyQuery(),
+                          },
+                        ]}
+                      />
+                    </div>
+                    <RunQueryButton
+                      running={workspace.runningTabId !== null}
+                      cancelling={workspace.cancelling}
+                      disabled={status === "lost" || status === "unknown"}
+                      onRun={() =>
+                        void workspace.runQuery(
+                          editorRef.current?.getSubmission(),
+                        )
+                      }
+                      onCancel={() => void workspace.cancelQuery()}
                     />
-                    {workspace.runningTabId ? (
-                      <button
-                        className="cancel-button"
-                        disabled={workspace.cancelling}
-                        onClick={() => void workspace.cancelQuery()}
-                      >
-                        {workspace.cancelling ? (
-                          <Loader2 className="spin" size={15} />
-                        ) : (
-                          <Square size={13} fill="currentColor" />
-                        )}
-                        {workspace.cancelling ? "Cancelling" : "Cancel"}
-                      </button>
-                    ) : (
-                      <button
-                        className="run-button"
-                        disabled={status === "lost" || status === "unknown"}
-                        title="Run selected SQL, or the entire editor when nothing is selected"
-                        onClick={() =>
-                          void workspace.runQuery(
-                            editorRef.current?.getSubmission(),
-                          )
-                        }
-                      >
-                        <Play size={14} fill="currentColor" />
-                        Run <kbd>{primaryModifierLabel}↵</kbd>
-                      </button>
-                    )}
                   </div>
                 </div>
                 <div className="code-editor">
@@ -586,7 +647,8 @@ export function Workspace({
                     ref={editorRef}
                     value={activeTab.sql}
                     schema={completions.schema}
-                    errorPosition={activeTab.error?.position ?? null}
+                    error={activeTab.error}
+                    running={queryBusy}
                     onChange={(sql) =>
                       workspace.tabs.updateSql(activeTab.id, sql)
                     }
@@ -609,14 +671,13 @@ export function Workspace({
               />
               <section className="results-pane" aria-label="Query results">
                 <div className="results-header">
-                  <div className="results-tabs">
-                    <button className="active">
-                      Results {activeSet && <span>{resultCount}</span>}
-                    </button>
+                  <div className="results-tabs segmented-capsule">
+                    <button className="active">Results</button>
                   </div>
                   {activeResult && activeResult.resultSets.length > 1 && (
                     <div
-                      className="result-set-switcher"
+                      className="result-set-switcher segmented-capsule"
+                      role="group"
                       aria-label="Result sets"
                     >
                       {activeResult.resultSets.map((_, index) => (
@@ -634,13 +695,23 @@ export function Workspace({
                       ))}
                     </div>
                   )}
-                  <div className="result-meta">
+                  <div
+                    className="result-meta"
+                    aria-busy={
+                      (queryBusy && activeResult !== null) || undefined
+                    }
+                  >
                     {activeResult && (
                       <>
                         <span>
-                          {resultCount} {resultCount === 1 ? "row" : "rows"}
+                          {formatCount(resultCount)}{" "}
+                          {resultCount === 1 ? "row" : "rows"}
                         </span>
-                        <span>{activeResult.durationMs} ms</span>
+                        <RunDuration
+                          key={outcome.generation}
+                          durationMs={activeResult.durationMs}
+                          fresh={outcome.fresh}
+                        />
                       </>
                     )}
                     {activeSet?.truncated && (
@@ -648,7 +719,7 @@ export function Workspace({
                         className="truncated"
                         title="The row or 8 MiB result budget was reached. Narrow your query to retrieve more data."
                       >
-                        Limited preview · {resultCount} rows
+                        Limited preview · {formatCount(resultCount)} rows
                       </span>
                     )}
                   </div>
@@ -657,6 +728,9 @@ export function Workspace({
                   resultSet={activeSet}
                   busy={queryBusy}
                   error={activeTab.error}
+                  errorLocation={errorLocation}
+                  onRevealError={() => editorRef.current?.revealError()}
+                  revealKey={outcome.fresh ? outcome.generation : undefined}
                 />
               </section>
             </div>
@@ -865,6 +939,25 @@ export function Workspace({
           objects={workspace.objects}
           workspaceName={workspaceName ?? connection.workspaceId}
           onClose={() => setBackupOpen(false)}
+        />
+      )}
+      {namespaceDialog && (
+        <NamespaceDialog
+          open
+          mode={namespaceDialog.mode}
+          initialName={namespaceDialog.name}
+          sessionId={connection.id}
+          online={status === "active"}
+          readOnly={session.readOnly}
+          api={databaseApi}
+          onClose={() => setNamespaceDialog(null)}
+          onApplied={(change) => {
+            workspace.tabs.namespaceApplied(change);
+            setSchemaRevision((value) => value + 1);
+            workspace.clearSelection();
+            completions.refresh();
+            void workspace.refreshObjects();
+          }}
         />
       )}
     </div>

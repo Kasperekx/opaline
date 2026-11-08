@@ -1,8 +1,16 @@
+mod child_process;
 mod create_database;
+mod diagnostics;
 mod files;
 mod managed;
 pub(crate) mod models;
 mod operations;
+#[cfg(test)]
+mod parallel_tests;
+#[cfg(test)]
+mod performance;
+#[cfg(test)]
+mod preparation_tests;
 mod process;
 #[cfg(test)]
 mod tests;
@@ -11,23 +19,72 @@ mod tools;
 use crate::{profiles::ProfileStore, state::AppState};
 use files::PreparedFile;
 use models::*;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tauri_plugin_fs::FsExt;
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{watch, Mutex, OwnedSemaphorePermit, Semaphore};
 use tools::PgTools;
+
+const MAX_RESTORE_PREVIEWS: usize = 4;
 
 struct PreparedRestore {
     session_id: String,
     tools: PgTools,
     file: PreparedFile,
 }
-#[derive(Default)]
+struct RestorePreviewEntry {
+    restore: PreparedRestore,
+    slot: OwnedSemaphorePermit,
+}
 pub(crate) struct BackupState {
     tools: Mutex<HashMap<String, PgTools>>,
-    prepared: Mutex<HashMap<String, PreparedRestore>>,
+    prepared: Mutex<HashMap<String, RestorePreviewEntry>>,
+    preparation_slots: Arc<Semaphore>,
     jobs: Mutex<HashMap<String, watch::Sender<bool>>>,
 }
+impl Default for BackupState {
+    fn default() -> Self {
+        Self {
+            tools: Mutex::default(),
+            prepared: Mutex::default(),
+            preparation_slots: Arc::new(Semaphore::new(MAX_RESTORE_PREVIEWS)),
+            jobs: Mutex::default(),
+        }
+    }
+}
 impl BackupState {
+    fn reserve_restore_preview(&self) -> Result<OwnedSemaphorePermit, String> {
+        self.preparation_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| "Close an existing restore preview before preparing another file.".into())
+    }
+
+    async fn take_restore_preview(
+        &self,
+        id: &str,
+        session_id: &str,
+    ) -> Result<PreparedRestore, String> {
+        let entry = {
+            let mut prepared = self.prepared.lock().await;
+            if prepared
+                .get(id)
+                .is_none_or(|entry| entry.restore.session_id != session_id)
+            {
+                return Err("Prepare this dump again in the target connection.".into());
+            }
+            prepared.remove(id).ok_or("Restore preview expired.")?
+        };
+        // A consumed preview no longer occupies a preparation slot, even while restore runs.
+        drop(entry.slot);
+        Ok(entry.restore)
+    }
+
+    async fn release_restore_preview(&self, id: &str) {
+        let entry = { self.prepared.lock().await.remove(id) };
+        // Dropping a snapshot deletes its temporary file, so do it outside the map lock.
+        drop(entry);
+    }
+
     async fn tools(
         &self,
         session_id: &str,
@@ -100,15 +157,12 @@ pub(crate) async fn prepare_restore(
     if client.session.info.read_only {
         return Err("Restore is disabled for read-only connections.".into());
     }
+    let slot = state.reserve_restore_preview()?;
     let tools = state
         .tools(&session_id, tools_id.as_deref(), &app, &client)
         .await?;
     let major = operations::check_server(&client, &tools).await?;
     let _inspection_lease = client;
-    let mut prepared = state.prepared.lock().await;
-    if prepared.len() >= 4 {
-        return Err("Close an existing restore preview before preparing another file.".into());
-    }
     let (sender, mut cancel) = watch::channel(false);
     {
         let mut jobs = state.jobs.lock().await;
@@ -120,8 +174,11 @@ pub(crate) async fn prepare_restore(
     let copy_cancel = cancel.clone();
     let job_session_id = session_id.clone();
     let outcome = async {
-        let file = tokio::task::spawn_blocking(move || {
-            files::snapshot_with_cancel(std::path::Path::new(&path), || *copy_cancel.borrow())
+        let (file, slot) = tokio::task::spawn_blocking(move || {
+            // Keep the slot until blocking I/O really ends, even if its awaiting task is dropped.
+            let file =
+                files::snapshot_with_cancel(std::path::Path::new(&path), || *copy_cancel.borrow())?;
+            Ok::<_, String>((file, slot))
         })
         .await
         .map_err(|_| "Could not prepare the dump snapshot.")??;
@@ -146,12 +203,15 @@ pub(crate) async fn prepare_restore(
             preview,
             server_major: major,
         };
-        prepared.insert(
+        state.prepared.lock().await.insert(
             id,
-            PreparedRestore {
-                session_id,
-                tools,
-                file,
+            RestorePreviewEntry {
+                restore: PreparedRestore {
+                    session_id,
+                    tools,
+                    file,
+                },
+                slot,
             },
         );
         Ok(output)
@@ -166,7 +226,7 @@ pub(crate) async fn release_restore(
     id: String,
     state: tauri::State<'_, BackupState>,
 ) -> Result<(), String> {
-    state.prepared.lock().await.remove(&id);
+    state.release_restore_preview(&id).await;
     Ok(())
 }
 
@@ -244,17 +304,9 @@ pub(crate) async fn restore_database(
                 .or_else(|| session.password().map(str::to_owned)),
         )
         .await?;
-    let mut prepared_map = state.prepared.lock().await;
-    if prepared_map
-        .get(&input.prepared_id)
-        .is_none_or(|p| p.session_id != session_id)
-    {
-        return Err("Prepare this dump again in the target connection.".into());
-    }
-    let prepared = prepared_map
-        .remove(&input.prepared_id)
-        .ok_or("Restore preview expired.")?;
-    drop(prepared_map);
+    let prepared = state
+        .take_restore_preview(&input.prepared_id, &session_id)
+        .await?;
     let (sender, cancel) = watch::channel(false);
     state.jobs.lock().await.insert(session_id.clone(), sender);
     let creates_database = input.new_database.is_some();

@@ -28,3 +28,7 @@ export function useDatabaseSession() {
     throw new Error("Database operations require an explicit session.");
   return context;
 }
+/** For surfaces that also render outside a session (tests, previews). */
+export function useOptionalDatabaseSession() {
+  return useContext(SessionContext);
+}

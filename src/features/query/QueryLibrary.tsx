@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { ArrowUpRight, BookMarked, Plus, Search, Trash2 } from "lucide-react";
-import { ConnectionDialog } from "../connections/ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { EnvironmentBadge } from "../connections/EnvironmentBadge";
 import { useDatabaseSession } from "../connections/SessionContext";
 import { useFormSafety } from "../../shared/safety/useFormSafety";
@@ -53,15 +53,16 @@ export function QueryLibrary({
       });
   };
   return (
-    <ConnectionDialog
+    <Sheet
       className="bookmark-dialog"
+      size={860}
       title="Bookmarks"
       subtitle="Workspace queries · stored on this device"
       onClose={() => protect(onClose)}
     >
       <div className="bookmark-toolbar">
         <label className="bookmark-search">
-          <Search size={16} />
+          <Search size={14} />
           <input
             ref={searchRef}
             data-initial-focus="true"
@@ -75,14 +76,14 @@ export function QueryLibrary({
           />
         </label>
         <button
-          className="button ghost"
+          className="button ghost bookmark-add"
           disabled={!sql.trim() || saving || saved}
           title={
             !sql.trim() ? "Open a query with SQL to bookmark it" : undefined
           }
           onClick={() => setSaving(true)}
         >
-          <Plus size={15} />
+          <Plus size={13} strokeWidth={2.2} />
           {saved ? "Bookmarked" : "Bookmark current query"}
         </button>
       </div>
@@ -186,7 +187,6 @@ export function QueryLibrary({
                 setDeleting(null);
               }}
             >
-              <BookMarked size={16} />
               <span>
                 <strong>{entry.title}</strong>
                 <code>{entry.sql.replace(/\s+/g, " ").slice(0, 100)}</code>
@@ -195,7 +195,9 @@ export function QueryLibrary({
           ))}
           {!entries.length && (
             <div className="bookmark-empty">
-              <BookMarked size={22} />
+              <span className="bookmark-empty-icon" aria-hidden="true">
+                <BookMarked size={20} />
+              </span>
               <strong>
                 {search ? "No matching bookmarks" : "Keep useful queries here"}
               </strong>
@@ -221,7 +223,7 @@ export function QueryLibrary({
         {selected && (
           <section className="bookmark-preview" aria-label="Bookmark preview">
             <header>
-              <span>SQL PREVIEW</span>
+              <span>SQL preview</span>
               <h3>{selected.title}</h3>
             </header>
             <pre tabIndex={0} aria-label="Saved SQL">
@@ -262,14 +264,14 @@ export function QueryLibrary({
               ) : (
                 <>
                   <button
-                    className="icon-button"
+                    className="icon-button bookmark-delete-button"
                     aria-label={`Delete ${selected.title}`}
                     onClick={() => setDeleting(selected.id)}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                   </button>
                   <button className="button primary" onClick={open}>
-                    Open query <ArrowUpRight size={15} />
+                    Open query <ArrowUpRight size={13} strokeWidth={2.2} />
                   </button>
                 </>
               )}
@@ -290,6 +292,6 @@ export function QueryLibrary({
         />
         <small>New tab · does not execute SQL</small>
       </div>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

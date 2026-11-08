@@ -14,6 +14,7 @@ use super::{
 const MIN_PAGE_SIZE: u16 = 10;
 const MAX_PAGE_SIZE: u16 = 200;
 const MAX_FILTER_CHARACTERS: usize = 500;
+pub(crate) const TABLE_SOURCE_ALIAS: &str = "__opaline_source";
 
 pub(crate) struct TableMetadata {
     pub(crate) columns: Vec<ColumnInfo>,
@@ -85,32 +86,28 @@ pub(crate) async fn fetch_page(
     } else {
         ""
     };
-    let searchable_columns = searchable_projection(&metadata.columns);
+    let search = search_predicate(&metadata.columns, 1);
     let order_clause = order_clause(&metadata, request.sort.as_ref())?;
     let (conditions, values) = super::table_filter::conditions(&metadata, &request.conditions, 4)?;
     let sql = format!(
         "SELECT {selected_columns}{row_version} \
-         FROM {qualified_table} \
-         WHERE ($1::text IS NULL OR \
-           strpos(lower(concat_ws(' ', {searchable_columns})), lower($1::text)) > 0) \
+         FROM {qualified_table} AS {TABLE_SOURCE_ALIAS} \
+         WHERE {search} \
          {conditions} {order_clause} LIMIT $2 OFFSET $3"
     );
     let filter_parameter = filter.as_deref();
     let mut parameters: Vec<&(dyn ToSql + Sync)> = vec![&filter_parameter, &limit, &offset];
     parameters.extend(values.iter().map(|value| value as &(dyn ToSql + Sync)));
-    let rows = client
-        .query_raw(&sql, parameters)
-        .await
-        .map_err(|error| format!("Could not load table data: {error}"))?;
+    let rows = client.query_raw(&sql, parameters).await.map_err(|error| {
+        crate::database::diagnostics::database_error("Could not load table data", error)
+    })?;
     pin_mut!(rows);
     let mut data_rows = Vec::new();
     let mut has_more = false;
     let mut bytes = 0usize;
-    while let Some(row) = rows
-        .try_next()
-        .await
-        .map_err(|error| format!("Could not load table data: {error}"))?
-    {
+    while let Some(row) = rows.try_next().await.map_err(|error| {
+        crate::database::diagnostics::database_error("Could not load table data", error)
+    })? {
         if data_rows.len() == usize::from(page_size) {
             has_more = true;
             break;
@@ -118,7 +115,7 @@ pub(crate) async fn fetch_page(
         for index in 0..metadata.columns.len() {
             bytes = bytes.saturating_add(
                 row.try_get::<_, Option<&str>>(index)
-                    .map_err(|_| "Could not decode row data.")?
+                    .map_err(|_| decode_column_error(&metadata.columns[index]))?
                     .map_or(0, str::len)
                     + 24,
             );
@@ -202,7 +199,9 @@ pub(crate) async fn fetch_row(
     let row = client
         .query_opt(&sql, &sql_parameters(&parameters))
         .await
-        .map_err(|error| format!("Could not compare current values: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not compare current values", error)
+        })?
         .map(|row| map_row(&row, &metadata))
         .transpose()?;
     if row.as_ref().is_some_and(|row| {
@@ -260,7 +259,9 @@ pub(crate) async fn insert_row(
     let row = client
         .query_one(&sql, &parameter_refs)
         .await
-        .map_err(|error| format!("Could not insert row: {error}"))?;
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not insert row", error)
+        })?;
 
     map_row(&row, &metadata)
 }
@@ -315,7 +316,9 @@ pub(crate) async fn update_row(
     let row = client
         .query_opt(&sql, &parameter_refs)
         .await
-        .map_err(|error| format!("Could not update row: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not update row", error)
+        })?
         .ok_or_else(stale_row_error)?;
 
     map_row(&row, &metadata)
@@ -355,7 +358,9 @@ pub(crate) async fn delete_row(
     client
         .query_opt(&sql, &parameter_refs)
         .await
-        .map_err(|error| format!("Could not delete row: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not delete row", error)
+        })?
         .ok_or_else(stale_row_error)?;
     Ok(())
 }
@@ -375,7 +380,9 @@ pub(crate) async fn table_metadata(
             &[&schema, &table],
         )
         .await
-        .map_err(|error| format!("Could not inspect table: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not inspect table", error)
+        })?
         .ok_or_else(|| "The selected table or view no longer exists.".to_string())?;
     let columns = postgres::list_columns(client, schema, table).await?;
     Ok(TableMetadata {
@@ -400,6 +407,7 @@ pub(crate) fn order_clause(
     metadata: &TableMetadata,
     sort: Option<&TableSort>,
 ) -> Result<String, String> {
+    // ORDER BY must resolve native source values, not SELECT's text aliases.
     let primary_key = metadata.primary_key();
     let mut terms = Vec::new();
     if let Some(sort) = sort {
@@ -413,7 +421,7 @@ pub(crate) fn order_clause(
             SortDirection::Desc => ("DESC", "NULLS FIRST"),
         };
         terms.push(format!(
-            "{} {direction} {nulls}",
+            "{TABLE_SOURCE_ALIAS}.{} {direction} {nulls}",
             quote_identifier(&column.name)
         ));
     }
@@ -421,10 +429,13 @@ pub(crate) fn order_clause(
         if sort.is_some_and(|sort| sort.column == column.name) {
             continue;
         }
-        terms.push(format!("{} ASC", quote_identifier(&column.name)));
+        terms.push(format!(
+            "{TABLE_SOURCE_ALIAS}.{} ASC",
+            quote_identifier(&column.name)
+        ));
     }
     if terms.is_empty() && metadata.supports_row_versions() {
-        terms.push("ctid ASC".into());
+        terms.push(format!("{TABLE_SOURCE_ALIAS}.ctid ASC"));
     }
     Ok(if terms.is_empty() {
         String::new()
@@ -536,12 +547,14 @@ fn ensure_insertable(metadata: &TableMetadata) -> Result<(), String> {
 
 fn map_row(row: &Row, metadata: &TableMetadata) -> Result<TableDataRow, String> {
     let values = (0..metadata.columns.len())
-        .map(|index| row.try_get(index))
-        .collect::<Result<Vec<Option<String>>, _>>()
-        .map_err(|error| format!("Could not decode table row: {error}"))?;
+        .map(|index| {
+            row.try_get(index)
+                .map_err(|_| decode_column_error(&metadata.columns[index]))
+        })
+        .collect::<Result<Vec<Option<String>>, _>>()?;
     let row_version = if metadata.supports_row_versions() {
         row.try_get(metadata.columns.len())
-            .map_err(|error| format!("Could not decode row version: {error}"))?
+            .map_err(|_| "Could not decode the PostgreSQL row version. Report this relation and server version; verify any in-progress write before retrying it.")?
     } else {
         None
     };
@@ -549,6 +562,10 @@ fn map_row(row: &Row, metadata: &TableMetadata) -> Result<TableDataRow, String> 
         values,
         row_version,
     })
+}
+
+pub(crate) fn decode_column_error(column: &ColumnInfo) -> String {
+    format!("Opaline could not decode column {} ({}). Try selecting this column as text in SQL and report its type and server version. No row value is included in this diagnostic.", quote_identifier(&column.name), column.data_type)
 }
 
 fn returning_clause(metadata: &TableMetadata) -> String {
@@ -580,12 +597,19 @@ pub(crate) fn text_projection(columns: &[ColumnInfo]) -> String {
         .join(", ")
 }
 
-pub(crate) fn searchable_projection(columns: &[ColumnInfo]) -> String {
-    columns
+pub(crate) fn search_predicate(columns: &[ColumnInfo], parameter: usize) -> String {
+    let values = columns
         .iter()
         .map(|column| format!("COALESCE({}::text, '')", quote_identifier(&column.name)))
         .collect::<Vec<_>>()
-        .join(", ")
+        .join(", ");
+    // Pass one array, not one function argument per column. PostgreSQL's usual
+    // 100-argument limit otherwise prevents wide tables from opening at all.
+    format!(
+        "(${parameter}::text IS NULL OR \
+         strpos(lower(concat_ws(' ', VARIADIC ARRAY[{values}]::text[])), \
+         lower(${parameter}::text)) > 0)"
+    )
 }
 
 pub(crate) fn validate_relation_name(schema: &str, table: &str) -> Result<(), String> {
@@ -606,6 +630,10 @@ pub(crate) fn quote_identifier(identifier: &str) -> String {
 fn stale_row_error() -> String {
     "This row changed or was deleted after it was loaded. Refresh before editing it again.".into()
 }
+
+#[cfg(test)]
+#[path = "table_data_tests.rs"]
+mod compatibility_tests;
 
 #[cfg(test)]
 mod tests {

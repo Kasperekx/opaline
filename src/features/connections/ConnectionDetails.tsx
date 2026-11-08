@@ -2,10 +2,11 @@ import {
   Copy,
   LockKeyhole,
   Pencil,
-  Plug,
   ShieldCheck,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
+import { SheetFooter } from "../../shared/components/Sheet";
 import { EnvironmentBadge } from "./EnvironmentBadge";
 import type { ConnectionProfile } from "./connection-types";
 
@@ -28,6 +29,28 @@ export function ConnectionDetails({
   onDelete: () => void;
   onMove?: () => void;
 }) {
+  const properties: [label: string, value: string | number, mono?: boolean][] =
+    [
+      ["Host", profile.host, true],
+      ["Port", profile.port, true],
+      ["Database", profile.database, true],
+      ["Username", profile.username, true],
+      ["Access", profile.readOnly ? "Read-only" : "Read & write"],
+      [
+        "TLS",
+        profile.sslMode === "require"
+          ? "Required · verified"
+          : profile.sslMode === "prefer"
+            ? "Preferred · may be unencrypted"
+            : "Disabled · unencrypted",
+      ],
+      [
+        "CA certificate",
+        profile.caPath
+          ? (profile.caPath.split(/[\\/]/).pop() ?? profile.caPath)
+          : "System trust store",
+      ],
+    ];
   return (
     <>
       <div className="connection-detail-body">
@@ -41,58 +64,47 @@ export function ConnectionDetails({
             environment={profile.environment}
             readOnly={profile.readOnly}
           />
-          <div className="connection-primary-actions">
-            <button
-              className="button primary"
-              disabled={busy}
-              onClick={onConnect}
-            >
-              <Plug size={17} />
-              {active ? "Open connection" : "Connect"}
-            </button>
-            <span>{active ? "Session open" : "Not connected"}</span>
-          </div>
+          <span
+            className={
+              "connection-status" + (active ? " connected" : " is-plain")
+            }
+          >
+            {active && <i aria-hidden="true" />}
+            {active ? "Session open" : "Not connected"}
+          </span>
+          <button
+            className="button primary"
+            disabled={busy}
+            onClick={onConnect}
+          >
+            {active ? "Open connection" : "Connect"}
+          </button>
         </div>
         {profile.environment === "production" && (
           <p className="connection-notice production-notice">
-            {profile.readOnly
-              ? "Production · Read-only access. Data changes are blocked."
-              : "Production · Write access requires a warning confirmation before connecting."}
+            <TriangleAlert size={13} aria-hidden="true" />
+            <span>
+              {profile.readOnly
+                ? "Production · Read-only access. Data changes are blocked."
+                : "Production · Write access requires a warning confirmation before connecting."}
+            </span>
           </p>
         )}
         <dl className="connection-properties">
-          {[
-            ["Host", profile.host],
-            ["Port", profile.port],
-            ["Database", profile.database],
-            ["Username", profile.username],
-            ["Access", profile.readOnly ? "Read-only" : "Read & write"],
-            [
-              "TLS",
-              profile.sslMode === "require"
-                ? "Required · verified"
-                : profile.sslMode === "prefer"
-                  ? "Preferred · may be unencrypted"
-                  : "Disabled · unencrypted",
-            ],
-            [
-              "CA certificate",
-              profile.caPath
-                ? profile.caPath.split(/[\\/]/).pop()
-                : "System trust store",
-            ],
-          ].map(([label, value]) => (
+          {properties.map(([label, value, mono]) => (
             <div key={label}>
               <dt>{label}</dt>
-              <dd title={String(value)}>{value}</dd>
+              <dd className={mono ? "mono" : undefined} title={String(value)}>
+                {value}
+              </dd>
             </div>
           ))}
         </dl>
         <div className="credential-summary">
           {profile.credentialId ? (
-            <ShieldCheck size={18} />
+            <ShieldCheck size={15} aria-hidden="true" />
           ) : (
-            <LockKeyhole size={18} />
+            <LockKeyhole size={15} aria-hidden="true" />
           )}
           <span>
             {profile.credentialId
@@ -110,26 +122,26 @@ export function ConnectionDetails({
           </p>
         )}
       </div>
-      <footer className="connection-dialog-footer connection-secondary-actions">
+      <SheetFooter className="connection-secondary-actions">
         <button
-          className="button ghost"
+          className="button secondary"
           disabled={active || busy}
           title={active ? "Disconnect before editing" : "Edit profile"}
           onClick={onEdit}
         >
-          <Pencil size={15} />
+          <Pencil size={13} aria-hidden="true" />
           Edit
         </button>
         <button
-          className="button ghost"
+          className="button secondary"
           disabled={busy || profile.requiresCa}
           onClick={onDuplicate}
         >
-          <Copy size={15} />
+          <Copy size={13} aria-hidden="true" />
           Duplicate
         </button>
         <button
-          className="button ghost"
+          className="button secondary"
           disabled={active || busy}
           onClick={onMove}
         >
@@ -141,10 +153,10 @@ export function ConnectionDetails({
           title={active ? "Disconnect before deleting" : "Delete profile"}
           onClick={onDelete}
         >
-          <Trash2 size={15} />
+          <Trash2 size={13} aria-hidden="true" />
           Delete
         </button>
-      </footer>
+      </SheetFooter>
     </>
   );
 }

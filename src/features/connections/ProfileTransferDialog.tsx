@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { errorMessage } from "../../shared/lib/database-api";
 import { useOperationLock } from "../../shared/hooks/useOperationLock";
 import { useWorkRisk } from "../../shared/safety/WorkSafety";
@@ -43,9 +43,11 @@ export function ProfileTransferDialog({
     });
   const filters = [{ name: "Opaline profiles", extensions: ["json"] }];
   return (
-    <ConnectionDialog
+    <Sheet
       title="Import / export profiles"
       subtitle={workspace.name}
+      className="profile-transfer-dialog"
+      size={520}
       busy={busy}
       onClose={onClose}
     >
@@ -151,6 +153,6 @@ export function ProfileTransferDialog({
           </p>
         )}
       </div>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

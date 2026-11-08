@@ -10,7 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ConnectionDialog } from "../../features/connections/ConnectionDialog";
+import { Hourglass, TriangleAlert } from "lucide-react";
+import { Sheet, SheetFooter } from "../components/Sheet";
 
 export type WorkScope = {
   sessionId?: string;
@@ -111,7 +112,7 @@ export function WorkSafetyProvider({ children }: { children: ReactNode }) {
     <Context.Provider value={value}>
       {children}
       {pending && (
-        <ConnectionDialog
+        <Sheet
           title={
             blocked
               ? "An operation is still running"
@@ -119,20 +120,27 @@ export function WorkSafetyProvider({ children }: { children: ReactNode }) {
                 ? "Save changes before leaving?"
                 : "Discard unsaved changes?"
           }
-          subtitle="Protect your work"
+          subtitle={
+            blocked
+              ? "Wait for completion or cancel the operation before closing this view."
+              : "This view has pending work. Review the details below before continuing."
+          }
+          icon={blocked ? Hourglass : TriangleAlert}
+          tone={blocked ? "accent" : "warning"}
+          size="small"
+          showClose={false}
           busy={saving}
           onClose={() => {
             if (!savingRef.current) setPending(null);
           }}
         >
           <div className="safety-content">
-            {saveError && <p role="alert">{saveError}</p>}
-            <p>
-              {blocked
-                ? "Wait for completion or cancel the operation before closing this view."
-                : "This view has pending work. Review the details below before continuing."}
-            </p>
-            <ul>
+            {saveError && (
+              <p className="safety-error" role="alert">
+                {saveError}
+              </p>
+            )}
+            <ul className="safety-risks">
               {risks.map((risk, index) => (
                 <li key={index}>
                   {risk.label}
@@ -141,9 +149,9 @@ export function WorkSafetyProvider({ children }: { children: ReactNode }) {
               ))}
             </ul>
           </div>
-          <footer className="dialog-actions">
+          <SheetFooter>
             <button
-              className="button ghost"
+              className="button secondary"
               data-initial-focus="true"
               disabled={saving}
               onClick={() => setPending(null)}
@@ -210,8 +218,8 @@ export function WorkSafetyProvider({ children }: { children: ReactNode }) {
                 {saving ? "Saving…" : "Save and continue"}
               </button>
             )}
-          </footer>
-        </ConnectionDialog>
+          </SheetFooter>
+        </Sheet>
       )}
     </Context.Provider>
   );

@@ -191,6 +191,7 @@ pub(crate) async fn dump(
     Ok(JobResult {bytes, duration_ms: started.elapsed().as_millis() as u64, message: "Dump completed and saved. This is one database, not a cluster backup; roles and tablespaces must be managed separately.".into()})
 }
 pub(crate) fn validate_restore(info: &SessionInfo, input: &RestoreInput) -> Result<(), String> {
+    validate_execution(input)?;
     if info.read_only {
         return Err("Restore is disabled for read-only connections.".into());
     }
@@ -225,6 +226,54 @@ pub(crate) fn validate_restore(info: &SessionInfo, input: &RestoreInput) -> Resu
     }
     Ok(())
 }
+
+fn validate_execution(input: &RestoreInput) -> Result<(), String> {
+    if ![1, 2, 4].contains(&input.jobs) {
+        return Err("Choose 1, 2 or 4 restore workers.".into());
+    }
+    if input.jobs > 1 && (input.new_database.is_none() || !input.confirm_parallel) {
+        return Err("Parallel restore requires a new database and explicit consent to partial changes on failure or cancellation.".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn restore_arguments(
+    format: DumpFormat,
+    input: &RestoreInput,
+) -> Result<Vec<String>, String> {
+    validate_execution(input)?;
+    if format == DumpFormat::Sql {
+        if input.jobs > 1 {
+            return Err(
+                "Parallel restore is available only for custom archives, not SQL scripts.".into(),
+            );
+        }
+        return Ok([
+            "--no-psqlrc",
+            "--single-transaction",
+            "--set=ON_ERROR_STOP=on",
+            "--set=ON_ERROR_ROLLBACK=off",
+            "--set=VERBOSITY=terse",
+            "--file",
+        ]
+        .map(str::to_owned)
+        .into());
+    }
+    let mut args = vec!["--verbose".into(), "--exit-on-error".into()];
+    if input.jobs == 1 {
+        args.push("--single-transaction".into());
+    } else {
+        // pg_restore cannot combine multiple workers with a single transaction.
+        args.push(format!("--jobs={}", input.jobs));
+    }
+    if !input.preserve_ownership {
+        args.extend(["--no-owner".into(), "--no-privileges".into()]);
+    }
+    if input.clean {
+        args.extend(["--clean".into(), "--if-exists".into()]);
+    }
+    Ok(args)
+}
 pub(crate) async fn restore(
     session: &DatabaseSession,
     prepared: PreparedRestore,
@@ -235,6 +284,7 @@ pub(crate) async fn restore(
 ) -> Result<JobResult, String> {
     let started = Instant::now();
     validate_restore(&session.info, &input)?;
+    let arguments = restore_arguments(prepared.file.format, &input)?;
     check_server(&session.client, &prepared.tools).await?;
     if input.clean && prepared.file.format != DumpFormat::Custom {
         return Err("Clean / drop is available only for custom archives. SQL scripts control their own statements.".into());
@@ -251,35 +301,23 @@ pub(crate) async fn restore(
         .as_deref()
         .unwrap_or(&session.info.connection.database);
     let credentials = credentials(session, config, input.new_database.as_deref()).await?;
-    let mut command;
-    if prepared.file.format == DumpFormat::Custom {
-        command = credentials.command(&prepared.tools.restore);
-        command.args(["--verbose", "--exit-on-error", "--single-transaction"]);
-        if !input.preserve_ownership {
-            command.args(["--no-owner", "--no-privileges"]);
-        }
-        if input.clean {
-            command.args(["--clean", "--if-exists"]);
-        }
-        command.arg(prepared.file.file.path());
+    let executable = if prepared.file.format == DumpFormat::Custom {
+        &prepared.tools.restore
     } else {
-        command = credentials.command(&prepared.tools.psql);
-        command
-            .args([
-                "--no-psqlrc",
-                "--single-transaction",
-                "--set=ON_ERROR_STOP=on",
-                "--set=ON_ERROR_ROLLBACK=off",
-                "--set=VERBOSITY=terse",
-                "--file",
-            ])
-            .arg(prepared.file.file.path());
-    }
+        &prepared.tools.psql
+    };
+    let mut command = credentials.command(executable);
+    command.args(arguments).arg(prepared.file.file.path());
     if let Some(name) = &input.new_database {
         progress(JobProgress { stage: "Creating database".into(), elapsed_ms: started.elapsed().as_millis() as u64, message: "Creating an empty database before restoring. Existing databases will not be reused.".into() });
         super::create_database::create(session, name, cancel.clone()).await?;
     }
-    process::run(command, cancel, progress, "Restoring database", cancel_tool(&session.client, &credentials.application_name, target)).await.map_err(|error| format!("{error} Restore into {target:?} is not confirmed complete. Partial changes or external effects are possible. Inspect before retrying. If a database was created, it has been kept; nothing was automatically dropped."))?;
+    let stage = if input.jobs > 1 {
+        format!("Restoring database · {} workers", input.jobs)
+    } else {
+        "Restoring database".into()
+    };
+    process::run(command, cancel, progress, &stage, cancel_tool(&session.client, &credentials.application_name, target)).await.map_err(|error| format!("{error} Restore into {target:?} is not confirmed complete. Partial changes or external effects are possible. Inspect before retrying. If a database was created, it has been kept; nothing was automatically dropped."))?;
     let message = if input.new_database.is_some() {
         format!("Database {target:?} created and restore completed. Add a connection profile for this database to open it. The previous connection was not changed.")
     } else {

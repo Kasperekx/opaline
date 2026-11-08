@@ -36,6 +36,22 @@ See [the editing plan](inline-table-editing-plan.md) and
 [verification results](inline-table-editing-verification.md), plus the
 [context-menu and duplication checks](table-context-actions-verification.md).
 
+## Finding columns in wide tables
+
+- **Search one column.** Type `column:` in "Search rows" (for example
+  `email:gmail`) or choose **Search in this column** from a column's menu. The
+  search becomes a token and matches only that column (case-insensitive
+  substring on the value as text). Backspace at the start of the field removes
+  the token; Return applies. Cmd/Ctrl+F focuses the field.
+- **Jump to a column.** Cmd/Ctrl+J opens **Columns**: type a few letters, then
+  Return scrolls the column into view, flashes its header and focuses its cell
+  on the current row.
+- **Show or hide columns.** In **Columns**, the checkbox (or Option-Return)
+  hides a column; **Hide column** is also in each column's menu. Hidden
+  columns are only a view setting: editing, the record inspector, saving and
+  export still use the full row. The choice is remembered per table, together
+  with the search scope. At least one column always stays visible.
+
 ## Workspaces and connections
 
 Choose **Connections → New workspace**, name a product (for example MMO), then
@@ -113,7 +129,16 @@ Writes save immediately, without application rollback. New/reopened tabs and
 reconnect/restart return to Atomic. Read-only sessions cannot enable autocommit;
 manual BEGIN/COMMIT remain unsupported. Verify outcomes before retrying after errors.
 
-Custom restore uses one transaction and stops on error. SQL restore uses patched
+Custom restore defaults to **Safe restore**, one transaction with stop-on-error.
+For a custom archive restored into a **new** database, **Parallel restore** can use
+2 or 4 workers. It requires separate consent because completed work is not rolled
+back as a whole after an error or cancellation. Existing targets and SQL scripts
+cannot use this mode. Changing the target or file resets the mode; changing the
+worker count resets its consent. More workers are not always faster, and use
+additional server connections and resources. Opaline does not weaken durability
+or TLS settings to accelerate imports.
+
+SQL restore uses patched
 psql restricted mode and stops on error; a trusted script can still contain
 transaction commands or invoke server-side code with external effects. Cancellation
 is not proof of rollback. Reconnect affected sessions and inspect the target before
@@ -131,6 +156,13 @@ Limits and remaining verification: [P1 report](p1-verification.md).
 The [design and implementation plan](connection-workspaces.md) describes
 the workspace/profile/session boundaries. `tests/preview.html` is a development-only
 UI fixture with synthetic data, not a database connection or a production entry.
+
+## Schema namespaces
+
+Create, rename, or drop PostgreSQL schemas from the explorer (folder actions and
+**New schema**). Empty schemas are listed. Changes go through SQL review; drops
+default to `RESTRICT`, with opt-in `CASCADE` and typed confirmation. See
+[Schema namespace editor](schema-namespace-editor.md).
 
 ## Structure inspector
 

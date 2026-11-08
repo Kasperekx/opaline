@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { HardDriveDownload, Loader2 } from "lucide-react";
-import { ConnectionDialog } from "../connections/ConnectionDialog";
+import {
+  Check,
+  Database,
+  HardDriveDownload,
+  History,
+  Loader2,
+} from "lucide-react";
+import { Sheet, SheetFooter } from "../../shared/components/Sheet";
 import { EnvironmentBadge } from "../connections/EnvironmentBadge";
 import { useDatabaseSession } from "../connections/SessionContext";
 import type { DatabaseObject } from "../../shared/types/database";
@@ -15,6 +21,11 @@ import {
 import { useBackupTask } from "./useBackupTask";
 import { BackupAdvanced } from "./BackupAdvanced";
 import "./backup.css";
+
+const formatElapsed = (ms: number) => {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
 
 export function BackupDialog({
   objects,
@@ -35,6 +46,8 @@ export function BackupDialog({
   const { trusted, name, production, nonempty, clean, cleanConsent, owners } =
     restoreForm;
   const { createNew, newDatabase, createConsent } = restoreForm;
+  const restoreJobs =
+    createNew && task.preview?.format === "custom" ? restoreForm.jobs : 1;
   const targetDatabase =
     mode === "restore" && createNew ? newDatabase : session.database;
   const readyRestore =
@@ -43,41 +56,34 @@ export function BackupDialog({
     name === targetDatabase &&
     (!createNew || (validNewDatabaseName(newDatabase) && createConsent)) &&
     (!clean || (cleanConsent && nonempty)) &&
+    (restoreJobs === 1 || restoreForm.parallelConsent) &&
     (session.environment !== "production" || production);
   return (
-    <ConnectionDialog
-      className="backup-dialog"
-      title="Backup / Restore"
-      subtitle={`${workspaceName} / ${session.name} · ${session.environment} · ${session.host}:${session.port} / ${session.database}`}
-      busy={task.busy}
-      onClose={onClose}
-    >
-      <div className="p1-panel backup-panel">
-        <div className="backup-target">
-          <HardDriveDownload size={23} />
-          <div>
-            <small>
-              {workspaceName} / {session.name}
-            </small>
-            <strong>
-              {targetDatabase || "New database"}
-              {mode === "restore" && createNew ? " · new" : ""}
-            </strong>
-            <span>
-              {session.host}:{session.port} · {session.username}
-            </span>
-          </div>
-          <EnvironmentBadge
-            environment={session.environment}
-            readOnly={session.readOnly}
-          />
-        </div>
+    <Sheet
+      className={`backup-dialog ${mode}`}
+      icon={mode === "backup" ? HardDriveDownload : History}
+      size={mode === "backup" ? "medium" : "large"}
+      showClose={false}
+      title={
+        mode === "backup"
+          ? `Back up ${session.database}`
+          : createNew
+            ? "Restore into a new database"
+            : `Restore into ${session.database}`
+      }
+      subtitle={
+        mode === "backup"
+          ? "Saves one database to a file, using this connection’s credentials and TLS settings. Nothing on the server is changed."
+          : "Restores a trusted dump on this server. Opaline pauses its own database operations while the job runs; other applications are not blocked."
+      }
+      accessory={
         <div
-          className="backup-mode"
+          className="segmented-capsule backup-mode"
           role="group"
           aria-label="Maintenance operation"
         >
           <button
+            type="button"
             aria-pressed={mode === "backup"}
             disabled={task.busy}
             onClick={() => setMode("backup")}
@@ -85,6 +91,7 @@ export function BackupDialog({
             Backup
           </button>
           <button
+            type="button"
             aria-pressed={mode === "restore"}
             disabled={task.busy || session.readOnly}
             title={
@@ -97,6 +104,95 @@ export function BackupDialog({
             Restore database
           </button>
         </div>
+      }
+      busy={task.busy}
+      onClose={onClose}
+    >
+      <div className="backup-panel">
+        {task.error && (
+          <p className="backup-error" role="alert">
+            {task.error}
+          </p>
+        )}
+        {task.busy && (
+          <div
+            className={`backup-progress${task.cancelling ? " cancelling" : ""}`}
+            role="status"
+          >
+            <div className="backup-progress-head">
+              {task.progress && (
+                <span className="backup-elapsed">
+                  <small>Elapsed</small>
+                  <strong>{formatElapsed(task.progress.elapsedMs)}</strong>
+                </span>
+              )}
+              <span className="backup-stage">
+                <Loader2 className="spin" size={14} aria-hidden="true" />
+                {task.progress?.stage ?? "Preparing…"}
+              </span>
+            </div>
+            <span className="backup-progress-track" aria-hidden="true">
+              <span />
+            </span>
+          </div>
+        )}
+        {task.result && (
+          <div className="backup-outcome">
+            <span className="backup-outcome-icon" aria-hidden="true">
+              <Check size={16} strokeWidth={2.25} />
+            </span>
+            <p role="status">
+              {task.result.message} ·{" "}
+              {(task.result.durationMs / 1000).toFixed(1)}s
+            </p>
+          </div>
+        )}
+        {task.log.length > 0 && (
+          <details className="backup-activity">
+            <summary>Task activity · no raw SQL or credentials</summary>
+            <ul>
+              {task.log.map((entry, index) => (
+                <li key={index}>{entry}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <section className="backup-section">
+          <span className="backup-caption">
+            {mode === "backup" ? "Source" : "Target"}
+          </span>
+          <div className="backup-target">
+            <span
+              className={`backup-tile env-${session.environment}`}
+              aria-hidden="true"
+            >
+              <Database size={16} />
+            </span>
+            <div>
+              <span>
+                <strong>
+                  {targetDatabase || "New database"}
+                  {mode === "restore" && createNew ? " · new" : ""}
+                </strong>{" "}
+                <small>
+                  on {workspaceName} / {session.name}
+                </small>
+              </span>
+              <code>
+                {session.username}@{session.host}:{session.port}
+              </code>
+            </div>
+            <EnvironmentBadge
+              environment={session.environment}
+              readOnly={session.readOnly}
+            />
+          </div>
+          {session.readOnly && (
+            <p className="backup-note">
+              Restore requires write access. Backups only read.
+            </p>
+          )}
+        </section>
         <fieldset className="backup-fields" disabled={task.busy}>
           {mode === "backup" ? (
             <BackupOptions form={backupForm} objects={objects} />
@@ -109,39 +205,13 @@ export function BackupDialog({
           password={password}
           onPasswordChange={setPassword}
         />
-        {task.error && (
-          <p className="p1-error" role="alert">
-            {task.error}
-          </p>
-        )}
-        {task.busy && (
-          <div className="backup-progress" role="status">
-            <Loader2 className="spin" size={18} />
-            <span>{task.progress?.stage ?? "Preparing…"}</span>
-            {task.progress && (
-              <span>{Math.floor(task.progress.elapsedMs / 1000)}s</span>
-            )}
-          </div>
-        )}
-        {task.result && (
-          <p className="backup-success" role="status">
-            {task.result.message} · {(task.result.durationMs / 1000).toFixed(1)}
-            s
-          </p>
-        )}
-        {task.log.length > 0 && (
-          <details>
-            <summary>Task activity · no raw SQL or credentials</summary>
-            <ul>
-              {task.log.map((entry, index) => (
-                <li key={index}>{entry}</li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
-      <footer className="dialog-actions">
-        <button className="button ghost" disabled={task.busy} onClick={onClose}>
+      <SheetFooter>
+        <button
+          className="button secondary"
+          disabled={task.busy}
+          onClick={onClose}
+        >
           Close
         </button>
         {task.running ? (
@@ -207,6 +277,9 @@ export function BackupDialog({
                     backupApi.restore(
                       session.id,
                       {
+                        jobs: restoreJobs,
+                        confirmParallel:
+                          restoreJobs > 1 && restoreForm.parallelConsent,
                         preparedId,
                         newDatabase: createNew ? newDatabase : null,
                         confirmCreate: createNew && createConsent,
@@ -233,7 +306,7 @@ export function BackupDialog({
                 : "Restore to this database"}
           </button>
         )}
-      </footer>
-    </ConnectionDialog>
+      </SheetFooter>
+    </Sheet>
   );
 }

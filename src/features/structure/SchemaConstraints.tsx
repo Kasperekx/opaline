@@ -83,7 +83,7 @@ export function SchemaConstraints({
       aria-label="Indexes and relationships"
     >
       <div className="schema-section-heading">
-        <h2>Indexes & relationships</h2>
+        <h2>Indexes and relationships</h2>
         <div className="schema-constraint-actions">
           <button
             className="button ghost"
@@ -121,178 +121,181 @@ export function SchemaConstraints({
           </button>
         </div>
       </div>
-      {draft.expected?.indexes.map((index) => {
-        const simple =
-          index.method === "btree" &&
-          !index.predicate &&
-          !index.includedColumns.length &&
-          !index.primary &&
-          !index.constraintName &&
-          index.columns.every((name) =>
-            draft.columns.some((c) => c.original === name),
-          );
-        const removed = changes.some(
-          (c) => c.kind === "dropIndex" && c.name === index.name,
-        );
-        return (
-          <div
-            className="schema-constraint-row"
-            key={`index-${index.name}`}
-            data-removed={removed}
-          >
-            <div>
-              <strong>{index.name}</strong>
-              <small>
-                {index.primary
-                  ? "Primary key"
-                  : index.unique
-                    ? "Unique index"
-                    : "Index"}{" "}
-                · {index.definition}
-              </small>
-            </div>
-            {simple && (
-              <button
-                className="button ghost"
-                aria-label={`Edit index ${index.name}`}
-                disabled={removed || !!form}
-                onClick={() => {
-                  setReplacing(index.name);
-                  setForm({
-                    kind: "createIndex",
-                    name: index.name,
-                    columns: index.columns.map(
-                      (name) =>
-                        draft.columns.find((c) => c.original === name)!.name,
-                    ),
-                    unique: index.unique,
-                  });
-                }}
-              >
-                Edit
-              </button>
-            )}
-            <button
-              className="icon-button"
-              aria-label={`${removed ? "Restore" : "Remove"} index ${index.name}`}
-              title={
-                index.constraintName || index.primary
-                  ? "Constraint-owned index; use SQL"
-                  : "Stage removal"
-              }
-              disabled={!!index.constraintName || index.primary || !!form}
-              onClick={() => toggleRemoval("dropIndex", index.name)}
-            >
-              {removed ? <RotateCcw size={15} /> : <Trash2 size={15} />}
-            </button>
-          </div>
-        );
-      })}
-      {draft.expected?.foreignKeys
-        .filter((fk) => fk.direction === "outgoing")
-        .map((fk) => {
-          const advanced =
-            !fk.validated ||
-            draft.expected?.constraints.some(
-              (c) => c.name === fk.name && c.deferrable,
-            ) ||
-            /MATCH (FULL|PARTIAL)|DEFERRABLE|NOT VALID/.test(fk.definition);
+      <div className="schema-constraint-list">
+        {draft.expected?.indexes.map((index) => {
+          const simple =
+            index.method === "btree" &&
+            !index.predicate &&
+            !index.includedColumns.length &&
+            !index.primary &&
+            !index.constraintName &&
+            index.columns.every((name) =>
+              draft.columns.some((c) => c.original === name),
+            );
           const removed = changes.some(
-            (c) => c.kind === "dropForeignKey" && c.name === fk.name,
+            (c) => c.kind === "dropIndex" && c.name === index.name,
           );
           return (
             <div
               className="schema-constraint-row"
-              key={`fk-${fk.name}`}
+              key={`index-${index.name}`}
               data-removed={removed}
             >
               <div>
-                <strong>{fk.name}</strong>
+                <strong>{index.name}</strong>
                 <small>
-                  {fk.sourceColumns.join(", ")} → {fk.targetSchema}.
-                  {fk.targetTable} ({fk.targetColumns.join(", ")})
+                  {index.primary
+                    ? "Primary key"
+                    : index.unique
+                      ? "Unique index"
+                      : "Index"}{" "}
+                  · {index.definition}
                 </small>
               </div>
-              <button
-                className="button ghost"
-                aria-label={`Edit relationship ${fk.name}`}
-                title={
-                  advanced
-                    ? "Advanced relationship options require SQL"
-                    : "Replace relationship after SQL review"
-                }
-                disabled={removed || !!form || advanced}
-                onClick={() => {
-                  setReplacing(fk.name);
-                  setForm({
-                    kind: "addForeignKey",
-                    name: fk.name,
-                    columns: fk.sourceColumns.map(
-                      (name) =>
-                        draft.columns.find((c) => c.original === name)?.name ??
-                        name,
-                    ),
-                    targetSchema: fk.targetSchema,
-                    targetTable: fk.targetTable,
-                    targetColumns: fk.targetColumns,
-                    onDelete: fk.onDelete.toUpperCase(),
-                    onUpdate: fk.onUpdate.toUpperCase(),
-                  });
-                }}
-              >
-                Edit
-              </button>
+              {simple && (
+                <button
+                  className="button ghost"
+                  aria-label={`Edit index ${index.name}`}
+                  disabled={removed || !!form}
+                  onClick={() => {
+                    setReplacing(index.name);
+                    setForm({
+                      kind: "createIndex",
+                      name: index.name,
+                      columns: index.columns.map(
+                        (name) =>
+                          draft.columns.find((c) => c.original === name)!.name,
+                      ),
+                      unique: index.unique,
+                    });
+                  }}
+                >
+                  Edit
+                </button>
+              )}
               <button
                 className="icon-button"
-                disabled={!!form}
-                aria-label={`${removed ? "Restore" : "Remove"} relationship ${fk.name}`}
-                onClick={() => toggleRemoval("dropForeignKey", fk.name)}
+                aria-label={`${removed ? "Restore" : "Remove"} index ${index.name}`}
+                title={
+                  index.constraintName || index.primary
+                    ? "Constraint-owned index; use SQL"
+                    : "Stage removal"
+                }
+                disabled={!!index.constraintName || index.primary || !!form}
+                onClick={() => toggleRemoval("dropIndex", index.name)}
               >
                 {removed ? <RotateCcw size={15} /> : <Trash2 size={15} />}
               </button>
             </div>
           );
         })}
-      {changes
-        .filter((c) => c.kind === "createIndex" || c.kind === "addForeignKey")
-        .map((item) => (
-          <div
-            className="schema-constraint-row is-pending"
-            key={`${item.kind}-${item.name}`}
-          >
-            <div>
-              <strong>{item.name}</strong>
-              <small>
-                Pending {item.kind === "createIndex" ? "index" : "relationship"}{" "}
-                · {item.columns.join(", ")}
-                {item.kind === "addForeignKey"
-                  ? ` → ${item.targetSchema}.${item.targetTable} (${item.targetColumns.join(", ")})`
-                  : ""}
-              </small>
-            </div>
-            <button
-              className="button ghost"
-              aria-label={`Undo change ${item.name}`}
-              onClick={() =>
-                onChange(
-                  changes.filter(
-                    (c) =>
-                      c !== item &&
-                      !(
-                        c.name === item.name &&
-                        c.kind ===
-                          (item.kind === "createIndex"
-                            ? "dropIndex"
-                            : "dropForeignKey")
+        {draft.expected?.foreignKeys
+          .filter((fk) => fk.direction === "outgoing")
+          .map((fk) => {
+            const advanced =
+              !fk.validated ||
+              draft.expected?.constraints.some(
+                (c) => c.name === fk.name && c.deferrable,
+              ) ||
+              /MATCH (FULL|PARTIAL)|DEFERRABLE|NOT VALID/.test(fk.definition);
+            const removed = changes.some(
+              (c) => c.kind === "dropForeignKey" && c.name === fk.name,
+            );
+            return (
+              <div
+                className="schema-constraint-row"
+                key={`fk-${fk.name}`}
+                data-removed={removed}
+              >
+                <div>
+                  <strong>{fk.name}</strong>
+                  <small>
+                    {fk.sourceColumns.join(", ")} → {fk.targetSchema}.
+                    {fk.targetTable} ({fk.targetColumns.join(", ")})
+                  </small>
+                </div>
+                <button
+                  className="button ghost"
+                  aria-label={`Edit relationship ${fk.name}`}
+                  title={
+                    advanced
+                      ? "Advanced relationship options require SQL"
+                      : "Replace relationship after SQL review"
+                  }
+                  disabled={removed || !!form || advanced}
+                  onClick={() => {
+                    setReplacing(fk.name);
+                    setForm({
+                      kind: "addForeignKey",
+                      name: fk.name,
+                      columns: fk.sourceColumns.map(
+                        (name) =>
+                          draft.columns.find((c) => c.original === name)
+                            ?.name ?? name,
                       ),
-                  ),
-                )
-              }
+                      targetSchema: fk.targetSchema,
+                      targetTable: fk.targetTable,
+                      targetColumns: fk.targetColumns,
+                      onDelete: fk.onDelete.toUpperCase(),
+                      onUpdate: fk.onUpdate.toUpperCase(),
+                    });
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  className="icon-button"
+                  disabled={!!form}
+                  aria-label={`${removed ? "Restore" : "Remove"} relationship ${fk.name}`}
+                  onClick={() => toggleRemoval("dropForeignKey", fk.name)}
+                >
+                  {removed ? <RotateCcw size={15} /> : <Trash2 size={15} />}
+                </button>
+              </div>
+            );
+          })}
+        {changes
+          .filter((c) => c.kind === "createIndex" || c.kind === "addForeignKey")
+          .map((item) => (
+            <div
+              className="schema-constraint-row is-pending"
+              key={`${item.kind}-${item.name}`}
             >
-              Undo
-            </button>
-          </div>
-        ))}
+              <div>
+                <strong>{item.name}</strong>
+                <small>
+                  Pending{" "}
+                  {item.kind === "createIndex" ? "index" : "relationship"} ·{" "}
+                  {item.columns.join(", ")}
+                  {item.kind === "addForeignKey"
+                    ? ` → ${item.targetSchema}.${item.targetTable} (${item.targetColumns.join(", ")})`
+                    : ""}
+                </small>
+              </div>
+              <button
+                className="button ghost"
+                aria-label={`Undo change ${item.name}`}
+                onClick={() =>
+                  onChange(
+                    changes.filter(
+                      (c) =>
+                        c !== item &&
+                        !(
+                          c.name === item.name &&
+                          c.kind ===
+                            (item.kind === "createIndex"
+                              ? "dropIndex"
+                              : "dropForeignKey")
+                        ),
+                    ),
+                  )
+                }
+              >
+                Undo
+              </button>
+            </div>
+          ))}
+      </div>
       {!form &&
         !changes.length &&
         !draft.expected?.indexes.length &&

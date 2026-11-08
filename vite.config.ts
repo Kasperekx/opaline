@@ -12,6 +12,11 @@ export default defineConfig(async () => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // React gets its own chunk; otherwise Rollup hoists it into the
+          // editor chunk and the launch path would import all of CodeMirror.
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+            return "react";
+          }
           if (
             id.includes("node_modules/@codemirror") ||
             id.includes("node_modules/@lezer") ||

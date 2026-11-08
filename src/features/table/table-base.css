@@ -1,0 +1,1421 @@
+/* Table data — Opaline Native. One toolbar row, a Finder-like grid on the
+   solid content surface, glass only on floating chrome (popovers, the
+   unsaved-changes bar, export progress, sheets). */
+@layer features {
+  /* Toolbar row: title + Data/Structure switch + search + capsule actions.
+   The workspace owns the row; the data view fills its slots. A standalone
+   data view (tests, previews) renders the same row itself. */
+  .table-workspace-bar,
+  .table-data-toolbar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    min-width: 0;
+    height: var(--toolbar-height);
+    gap: 16px;
+    padding: 0 12px 0 20px;
+    background: var(--bg);
+  }
+
+  .table-data-toolbar {
+    grid-area: toolbar;
+  }
+
+  .table-title {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    min-width: 96px;
+    max-width: 280px;
+  }
+
+  .table-title > strong {
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-headline);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-subtitle {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-editability {
+    color: inherit;
+  }
+
+  .table-workspace-actions {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  /* Data / Structure (and Structure sections): one segmented capsule. These
+   reset the older underline tabs; button sizing uses :where() so a host
+   (e.g. the structure section bar) can size its own segments. */
+  .view-tabs.segmented-capsule {
+    flex: none;
+    max-width: 100%;
+    gap: 0;
+    padding: 2px;
+    overflow-x: auto;
+    border: 0;
+    background: rgba(255, 255, 255, 0.07);
+    scrollbar-width: none;
+  }
+
+  :where(.view-tabs.segmented-capsule) > button {
+    position: static;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-height: 0;
+    height: 24px;
+    gap: 6px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent;
+    font-size: var(--text-md);
+    white-space: nowrap;
+    cursor: default;
+    transition: none;
+  }
+
+  .view-tabs.segmented-capsule > button::after {
+    display: none;
+    content: none;
+  }
+
+  .view-tabs.segmented-capsule > button:hover {
+    color: var(--text);
+  }
+
+  .view-tabs.segmented-capsule small {
+    min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    color: var(--muted);
+    background: none;
+    font-size: var(--text-2xs);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Search capsule. */
+  /* Grows while in use or scoped, like Safari's field; shrinks back when idle. */
+  .table-filter.search-capsule:focus-within,
+  .table-filter.search-capsule:has(.search-token) {
+    flex-basis: 300px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .table-filter.search-capsule {
+      transition: flex-basis 220ms var(--ease);
+    }
+  }
+  .table-filter.search-capsule {
+    flex: 0 1 200px;
+    width: auto;
+    min-width: 120px;
+    padding: 0 4px 0 10px;
+  }
+
+  .table-filter.search-capsule:has(input:focus-visible) {
+    outline: 3px solid var(--accent-line);
+    outline-offset: 1px;
+  }
+
+  .table-filter input:focus-visible {
+    outline: none;
+  }
+
+  .table-filter input::placeholder {
+    color: var(--muted);
+  }
+
+  .table-filter input:disabled {
+    opacity: 0.5;
+  }
+
+  .table-filter .apply-filter {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--muted);
+    background: transparent;
+    opacity: 0.7;
+  }
+
+  .table-filter .apply-filter:hover:not(:disabled),
+  .table-filter:focus-within .apply-filter {
+    color: var(--text);
+    background: var(--hover);
+    opacity: 1;
+  }
+
+  .table-filter .apply-filter:disabled {
+    opacity: 0.3;
+  }
+
+  /* Capsule action group. */
+  .table-toolbar-actions {
+    flex: none;
+  }
+
+  .table-toolbar-actions > button,
+  .table-toolbar-actions > .table-export-menu > button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    min-width: 34px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent;
+  }
+
+  .table-toolbar-actions > button:hover:not(:disabled),
+  .table-toolbar-actions > .table-export-menu > button:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  .table-toolbar-actions > button.active,
+  .table-toolbar-actions > .table-export-menu > button.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .table-toolbar-actions > button:disabled,
+  .table-toolbar-actions > .table-export-menu > button:disabled {
+    opacity: 0.35;
+  }
+
+  /* Record inspector toggle: a lone round button after the capsule. */
+  .table-inspector-slot {
+    display: contents;
+  }
+
+  .table-inspector-toggle {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent;
+  }
+
+  .table-inspector-toggle:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  .table-inspector-toggle[aria-pressed="true"] {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .table-inspector-toggle[aria-pressed="true"]:hover:not(:disabled) {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .table-inspector-toggle:disabled {
+    opacity: 0.35;
+  }
+
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .table-inspector-toggle {
+      transition:
+        transform 120ms var(--ease),
+        background-color 150ms ease,
+        color 150ms ease;
+    }
+    .table-inspector-toggle:active:not(:disabled) {
+      transform: scale(0.94);
+    }
+  }
+
+  .toolbar-badge {
+    position: absolute;
+    top: 1px;
+    right: 3px;
+    min-width: 12px;
+    height: 12px;
+    padding: 0 2px;
+    border-radius: var(--radius-capsule);
+    color: #fff;
+    background: var(--accent-fill);
+    font-size: 9px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 12px;
+    text-align: center;
+  }
+
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .table-toolbar-actions > button,
+    .table-toolbar-actions > .table-export-menu > button {
+      transition:
+        transform 120ms var(--ease),
+        background-color 150ms ease,
+        color 150ms ease;
+    }
+    .table-toolbar-actions > button:active:not(:disabled),
+    .table-toolbar-actions > .table-export-menu > button:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+  }
+
+  /* Export menu: a popover from the export button. */
+  .table-export-menu {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .table-export-popover {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 8px);
+    right: -80px;
+    width: 304px;
+    padding: 5px;
+    border-radius: var(--radius);
+    color: var(--text);
+    background: var(--material-popover);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-popover);
+    transform-origin: calc(100% - 96px) 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .table-export-popover {
+      animation: menu-in 160ms var(--ease) both;
+    }
+  }
+
+  .table-export-popover > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    gap: 8px;
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+  }
+
+  .table-export-popover > div strong {
+    flex: none;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .table-export-popover > div span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-export-popover > .table-export-section {
+    position: relative;
+    margin-top: 11px;
+  }
+
+  .table-export-popover > .table-export-section::before {
+    position: absolute;
+    top: -6px;
+    right: 4px;
+    left: 4px;
+    height: 0.5px;
+    background: var(--line-strong);
+    content: "";
+  }
+
+  .table-export-popover > button {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text);
+    background: transparent;
+    text-align: left;
+  }
+
+  .table-export-popover > button > svg {
+    color: var(--muted);
+  }
+
+  .table-export-popover > button > span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .table-export-popover > button strong {
+    font-weight: 500;
+  }
+
+  .table-export-popover small {
+    color: var(--muted);
+    font-size: var(--text-2xs);
+  }
+
+  .table-export-popover > button:hover,
+  .table-export-popover > button:focus-visible {
+    outline: none;
+    color: #fff;
+    background: var(--accent-fill);
+  }
+
+  .table-export-popover > button:hover > svg,
+  .table-export-popover > button:focus-visible > svg,
+  .table-export-popover > button:hover small,
+  .table-export-popover > button:focus-visible small {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  /* Layout. */
+  .table-data-view {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-areas:
+      "toolbar"
+      "notice"
+      "data"
+      "pagination";
+    grid-template-rows: auto auto minmax(0, 1fr) 44px;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .table-context-stack {
+    display: grid;
+    grid-area: notice;
+    min-width: 0;
+  }
+
+  /* Inline notices: quiet grouped boxes, not banners. */
+  .table-notice {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 34px;
+    gap: 10px;
+    margin: 0 20px 10px;
+    padding: 4px 6px 4px 12px;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    background: var(--surface-2);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+    font-size: var(--text-callout);
+  }
+
+  .table-notice.success {
+    color: var(--success);
+  }
+
+  .table-notice.error {
+    color: var(--danger);
+  }
+
+  .table-notice span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-notice button {
+    flex: none;
+    height: 24px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--accent);
+    background: transparent;
+    font-size: var(--text-callout);
+  }
+
+  .table-notice button:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  /* Floating chrome above the pagination footer: export progress over the
+     table's one contextual bar. One centred column, so nothing overlaps
+     and the grid never moves. Only the capsules take pointer input; the
+     stack is a size container so the bar can collapse labels when narrow. */
+  .table-floating-stack {
+    position: absolute;
+    z-index: 30;
+    right: 16px;
+    bottom: calc(44px + 16px);
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    container-type: inline-size;
+    pointer-events: none;
+  }
+
+  .table-floating-stack:empty {
+    display: none;
+  }
+
+  .table-floating-stack * {
+    pointer-events: auto;
+  }
+
+  .table-floating-stack > .table-changes-bar,
+  .table-floating-stack > .table-export-progress {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    max-width: 100%;
+    translate: none;
+  }
+
+  .table-floating-stack
+    > .table-changes-bar:has(.table-change-context, .table-error-notice) {
+    width: min(640px, 100%);
+  }
+
+  /* Full export progress: a floating glass capsule over the grid. */
+  .table-export-progress {
+    position: absolute;
+    z-index: 30;
+    bottom: calc(44px + 16px);
+    left: 50%;
+    display: flex;
+    align-items: center;
+    max-width: calc(100% - 32px);
+    min-height: 52px;
+    gap: 14px;
+    padding: 0 8px 0 16px;
+    border-radius: var(--radius-capsule);
+    color: var(--text);
+    background: var(--material-bar);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-bar);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+    translate: -50% 0;
+  }
+
+  .table-export-progress > svg {
+    color: var(--accent);
+  }
+
+  .table-export-progress > span:first-of-type {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-export-progress strong {
+    color: var(--text);
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .table-export-progress-track {
+    position: relative;
+    width: 140px;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .table-export-progress-track i {
+    display: block;
+    width: 48px;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent-fill);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .table-export-progress-track i {
+      animation: export-progress 1.4s var(--ease-in-out) infinite;
+    }
+  }
+
+  .table-export-progress button {
+    height: 34px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1);
+    font-size: var(--text-md);
+  }
+
+  .table-export-progress button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  @media (max-width: 760px) {
+    .table-export-progress-track {
+      display: none;
+    }
+  }
+
+  /* Grid scroller and base table. Row styling lives in table-grid.css. */
+  .table-data-grid-wrap {
+    position: relative;
+    grid-area: data;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .table-data-grid {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-md);
+    font-variant-numeric: tabular-nums;
+    user-select: text;
+  }
+
+  .table-data-grid th,
+  .table-data-grid td {
+    max-width: 420px;
+    padding: 0 8px;
+    border: 0;
+    color: var(--text);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .table-data-grid th {
+    position: sticky;
+    z-index: 3;
+    top: 0;
+    padding: 0;
+    color: var(--muted);
+    background: var(--bg);
+    box-shadow: inset 0 -0.5px 0 var(--line-strong);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .table-data-grid th > .column-sort {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    gap: 6px;
+    padding: 0 8px;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+  }
+
+  .table-data-grid th > .column-sort:hover:not(:disabled) {
+    color: var(--text-soft);
+  }
+
+  .table-data-grid th > .column-sort:disabled {
+    opacity: 0.62;
+  }
+
+  .column-heading {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .column-heading strong {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    min-width: 0;
+    gap: 4px;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .column-heading strong svg {
+    flex: none;
+    color: var(--muted);
+  }
+
+  .column-heading small {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-weight: 400;
+    opacity: 0.7;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-data-grid .table-row-selection {
+    position: sticky;
+    z-index: 2;
+    left: 0;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 0;
+    text-align: center;
+    user-select: none;
+  }
+
+  .table-data-grid th.table-row-selection {
+    z-index: 5;
+  }
+
+  .table-data-grid td.table-row-selection {
+    color: var(--muted);
+  }
+
+  /* A macOS-style checkbox: hairline ring, accent fill when checked. */
+  .table-selection-checkbox {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    border-radius: 4px;
+    background: transparent center / 10px 10px no-repeat;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    vertical-align: middle;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .table-selection-checkbox:checked {
+    background-color: var(--accent-fill);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.2 4.1 7.2 8 2.8'/%3E%3C/svg%3E");
+    box-shadow: none;
+  }
+
+  .table-selection-checkbox:indeterminate {
+    background-color: var(--accent-fill);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M2.5 5h5'/%3E%3C/svg%3E");
+    box-shadow: none;
+  }
+
+  .table-selection-checkbox:disabled {
+    opacity: 0.35;
+  }
+
+  .table-cell-value {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-null {
+    color: var(--muted);
+  }
+
+  .primary-key-cell {
+    color: var(--muted);
+  }
+
+  /* Typed value editor used by the bulk "Set value" sheet. */
+  .cell-editor {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .cell-editor-options {
+    display: flex;
+    flex: none;
+    gap: 4px;
+  }
+
+  .cell-editor input,
+  .cell-editor select,
+  .cell-editor textarea {
+    width: 100%;
+    min-width: 0;
+    height: var(--control-height);
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--radius-control);
+    outline: 0;
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 0.5px var(--line-strong);
+    font: inherit;
+    font-size: var(--text-md);
+    user-select: text;
+  }
+
+  .cell-editor textarea {
+    min-height: var(--control-height);
+    padding-top: 6px;
+    font-family: var(--font-mono);
+    font-size: var(--text-callout);
+    resize: vertical;
+  }
+
+  .cell-editor input:focus,
+  .cell-editor select:focus,
+  .cell-editor textarea:focus {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 1px var(--accent-fill),
+      0 0 0 3px var(--accent-soft);
+  }
+
+  .cell-editor input:disabled,
+  .cell-editor select:disabled,
+  .cell-editor textarea:disabled {
+    opacity: 0.4;
+  }
+
+  .cell-editor.invalid input,
+  .cell-editor.invalid select,
+  .cell-editor.invalid textarea {
+    box-shadow:
+      inset 0 0 0 1px var(--danger-fill),
+      0 0 0 3px rgba(255, 69, 58, 0.18);
+  }
+
+  .cell-editor-error {
+    display: grid;
+    flex: none;
+    place-items: center;
+    color: var(--danger);
+  }
+
+  .cell-editor button {
+    flex: none;
+    height: 22px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 5px;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .cell-editor button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .cell-editor button[aria-pressed="true"] {
+    color: #fff;
+    background: var(--accent-fill);
+  }
+
+  /* Empty, loading and refreshing states. */
+  .table-data-state {
+    display: flex;
+    min-width: 320px;
+    min-height: 260px;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: var(--text-md);
+    text-align: center;
+  }
+
+  .table-data-state strong {
+    color: var(--text);
+    font-size: var(--text-headline);
+    font-weight: 600;
+  }
+
+  .table-data-state .button {
+    margin-top: 4px;
+  }
+
+  .table-loading-overlay {
+    position: sticky;
+    z-index: 6;
+    bottom: 16px;
+    left: calc(50% - 18px);
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-capsule);
+    color: var(--text);
+    background: var(--material-bar);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-bar);
+  }
+
+  /* First load: placeholder rows at the grid's rhythm (see feedback.css). */
+  .table-grid-skeleton {
+    --skeleton-row-height: 30px;
+    height: 100%;
+    padding-top: 30px;
+    overflow: hidden;
+  }
+
+  :root[data-density="compact"] .table-data-view .table-grid-skeleton,
+  :root .table-data-view[data-table-density="compact"] .table-grid-skeleton {
+    --skeleton-row-height: 26px;
+  }
+
+  :root
+    .table-data-view[data-table-density="comfortable"]
+    .table-grid-skeleton {
+    --skeleton-row-height: 36px;
+  }
+
+  .table-grid-skeleton .skeleton-row {
+    padding-left: 44px;
+  }
+
+  /* Page changes and refreshes keep the previous rows, dimmed, instead of
+     blanking the grid. The dim waits a beat so quick loads never flicker,
+     and the spinner only appears if the wait is noticeable. */
+  .table-data-grid-wrap > .table-data-grid {
+    transition: opacity 150ms var(--ease);
+  }
+
+  .table-data-grid-wrap[data-refreshing] > .table-data-grid {
+    opacity: 0.5;
+    transition: opacity 200ms var(--ease) 150ms;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .table-loading-overlay {
+      animation: fade-in 200ms var(--ease) 400ms both;
+    }
+  }
+
+  /* Footer: page position, density, page size, previous/next capsule. */
+  .table-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    grid-area: pagination;
+    align-items: center;
+    min-width: 0;
+    gap: 6px 14px;
+    padding: 0 14px 0 20px;
+    color: var(--muted);
+    background: var(--bg);
+    font-size: var(--text-2xs);
+  }
+
+  .table-pagination > div:first-child {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 14px;
+    margin-right: auto;
+  }
+
+  .table-pagination > div:first-child > span:first-child {
+    color: var(--text-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .filter-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .table-pagination label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .table-pagination select {
+    height: 24px;
+    padding: 0 22px 0 9px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.08)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398989d' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 6l3-3 3 3M5 10l3 3 3-3'/%3E%3C/svg%3E")
+      right 6px center / 9px 9px no-repeat;
+    font-size: var(--text-callout);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .table-pagination select:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .table-pagination select:disabled {
+    opacity: 0.4;
+  }
+
+  .pagination-buttons {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 2px;
+    border-radius: var(--radius-capsule);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: var(--edge-light);
+  }
+
+  .pagination-buttons button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent;
+  }
+
+  .pagination-buttons button:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  .pagination-buttons button:disabled {
+    opacity: 0.35;
+  }
+
+  .pagination-divider {
+    width: 0.5px;
+    height: 14px;
+    background: var(--line-strong);
+  }
+
+  /* "Set value…": a popover above its button in the floating bar. It uses
+     the popover material and grows from the button (transform-origin is
+     set from the anchor), 160ms scale .96 → 1. */
+  .table-bulk-popover {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    width: min(440px, calc(100vw - 16px));
+    max-height: calc(100dvh - 16px);
+    gap: 12px;
+    padding: 14px;
+    overflow: auto;
+    border-radius: var(--radius-lg);
+    color: var(--text);
+    background: var(--material-popover);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-popover);
+    font-size: var(--text-md);
+  }
+
+  /* Hidden for the one layout pass before it is placed. */
+  .table-bulk-popover:not([data-placed]) {
+    visibility: hidden;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .table-bulk-popover[data-placed] {
+      animation: menu-in 160ms var(--ease) both;
+    }
+  }
+
+  .table-bulk-popover header {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 2px;
+  }
+
+  .table-bulk-popover header strong {
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .table-bulk-popover header span {
+    color: var(--muted);
+    font-size: var(--text-callout);
+    line-height: 1.4;
+  }
+
+  .table-bulk-popover footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .table-mutation-error {
+    padding: 9px 11px;
+    border-radius: var(--radius-control);
+    color: #ffb4ac;
+    background: rgba(255, 69, 58, 0.12);
+    font-size: var(--text-callout);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .bulk-update-fields {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.75fr) minmax(180px, 1.25fr);
+    align-items: start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .bulk-update-fields label {
+    display: grid;
+    gap: 6px;
+    color: var(--text-soft);
+    font-size: var(--text-callout);
+  }
+
+  .bulk-update-fields > label > select {
+    min-width: 0;
+    height: var(--control-height);
+    padding: 0 26px 0 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c7c7cc' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 6l3-3 3 3M5 10l3 3 3-3'/%3E%3C/svg%3E")
+      right 8px center / 10px 10px no-repeat;
+    box-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.14),
+      0 0.5px 1px rgba(0, 0, 0, 0.3);
+    font: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .bulk-update-fields .cell-editor {
+    width: 100%;
+  }
+
+  .bulk-update-fields > small {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    line-height: 1.45;
+  }
+
+  @media (max-width: 520px) {
+    .bulk-update-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* Query results share the grid's type, lines and selection. */
+  .result-table th {
+    height: 28px;
+    padding: 0 10px;
+    border-right: 0;
+    border-bottom: 0;
+    color: var(--muted);
+    background: var(--bg);
+    box-shadow: inset 0 -0.5px 0 var(--line-strong);
+    font-family: inherit;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .result-table td {
+    height: 30px;
+    padding: 0 10px;
+    border-right: 0;
+    border-bottom: 0;
+    color: var(--text);
+    font-size: var(--text-md);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Row tint over the solid content colour keeps sticky cells opaque. */
+  .result-table td,
+  .result-table td.row-number,
+  .result-table tbody tr:hover td {
+    background: linear-gradient(var(--row-tint), var(--row-tint)), var(--bg);
+  }
+
+  .result-table tbody tr {
+    --row-tint: transparent;
+  }
+
+  .result-table tbody tr:nth-child(even) {
+    --row-tint: var(--stripe);
+  }
+
+  @media (hover: hover) {
+    .result-table tbody tr:hover {
+      --row-tint: var(--hover);
+    }
+  }
+
+  .result-table td.row-number {
+    color: var(--muted);
+  }
+
+  .result-table th.row-number {
+    background: var(--bg);
+  }
+
+  .result-table td.null-cell {
+    color: var(--muted);
+    font-style: normal;
+  }
+
+  .result-table td[data-cell-selected="true"],
+  .result-table tbody tr:hover td[data-cell-selected="true"] {
+    background:
+      linear-gradient(var(--accent-soft), var(--accent-soft)),
+      linear-gradient(var(--row-tint), var(--row-tint)), var(--bg);
+    box-shadow: none;
+  }
+
+  .result-table td:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--accent-fill);
+  }
+
+  @media (max-width: 760px) {
+    .table-workspace-bar,
+    .table-data-toolbar {
+      flex-wrap: wrap;
+      height: auto;
+      min-height: var(--toolbar-height);
+      gap: 8px 12px;
+      padding-block: 8px;
+    }
+    .table-filter.search-capsule {
+      flex-basis: 160px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .bulk-update-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .bulk-update-fields > small {
+      grid-column: 1;
+    }
+  }
+
+  /* Search token: the column the row search is scoped to (Mail-style). */
+  .table-filter .search-token {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+    max-width: 140px;
+    height: 20px;
+    padding: 0 5px 0 8px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--accent);
+    background: var(--accent-soft);
+    font-size: var(--text-callout);
+    font-weight: 500;
+  }
+  .table-filter .search-token > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-filter .search-token:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  /* Columns: find, jump to, show or hide. Popover material, anchored to its
+     toolbar button; one surface for a wide table's columns. */
+  .table-columns-popover {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    max-height: min(440px, calc(100vh - 120px));
+    padding: 6px;
+    border-radius: var(--radius-lg);
+    color: var(--text);
+    background: var(--material-popover);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-popover);
+    transform-origin: top right;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .table-columns-popover {
+      animation: menu-in 160ms var(--ease) both;
+    }
+  }
+  .table-columns-search {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    margin-bottom: 4px;
+    padding: 0 8px;
+    border-radius: var(--radius-control);
+    color: var(--muted);
+    background: var(--field);
+  }
+  .table-columns-search:focus-within {
+    outline: 3px solid var(--accent-line);
+  }
+  .table-columns-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    color: var(--text);
+    background: transparent;
+    font-size: var(--text-md);
+  }
+  .table-columns-search input:focus-visible {
+    outline: none;
+  }
+  .table-columns-popover ul {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+  }
+  .table-columns-popover li[role="option"] {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 6px;
+    border-radius: 6px;
+  }
+  .table-columns-popover li.active {
+    background: var(--hover);
+  }
+  .table-columns-popover li > button {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    color: var(--text);
+    background: transparent;
+    text-align: left;
+  }
+  .table-columns-popover li > button.is-hidden {
+    color: var(--muted);
+  }
+  .table-columns-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--text-callout);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-columns-name b {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .table-columns-name svg {
+    color: var(--muted);
+  }
+  .table-columns-popover li > button small {
+    flex: none;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+  }
+  .table-columns-empty {
+    padding: 16px 8px;
+    color: var(--muted);
+    font-size: var(--text-callout);
+    text-align: center;
+  }
+  .table-columns-popover footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 6px 4px 2px 8px;
+    border-top: var(--hairline) solid var(--line-strong);
+    color: var(--muted);
+    font-size: var(--text-2xs);
+  }
+
+  /* Jumped-to column: the header glows once in the accent, then settles. */
+  .inline-table-grid th[data-flash] {
+    animation: column-flash 1.1s var(--ease) both;
+  }
+  @keyframes column-flash {
+    0%,
+    35% {
+      background-color: var(--accent-soft);
+      box-shadow: inset 0 -2px 0 var(--accent-fill);
+    }
+  }
+}

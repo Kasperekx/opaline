@@ -1,18 +1,36 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { isDesktopRuntime } from "../../shared/lib/database-api";
 import { primaryModifierLabel } from "../../shared/lib/platform";
-import type { CommandAction } from "./CommandPalette";
+import { databaseObjectKey } from "../../shared/lib/database-object";
+import { useOptionalDatabaseSession } from "../connections/SessionContext";
+import {
+  requestPaletteScope,
+  type CommandAction,
+} from "./command-palette-model";
+import { useSavedQueries } from "./useSavedQueries";
 import type { useWorkspace } from "./useWorkspace";
 import type { useSqlDocuments } from "./useSqlDocuments";
 import type { useSqlCompletions } from "./useSqlCompletions";
+
+const compactNumber = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+/** Planner estimates, like the explorer: 2,184 · 48.3K · 1.2M. */
+const formatRows = (rows: number) =>
+  rows < 10_000 ? rows.toLocaleString("en-US") : compactNumber.format(rows);
+const objectId = (schema: string, name: string) =>
+  `object:${databaseObjectKey({ schema, name })}`;
+type Memory = Map<string, { last: number; uses: number }>;
 
 type Options = {
   onCloseTab: (id: string) => void;
   onSelectTab: (id: string) => void;
   active: boolean;
   hasQuery: boolean;
-  workspace: Pick<ReturnType<typeof useWorkspace>, "tabs" | "refreshObjects">;
+  workspace: Pick<ReturnType<typeof useWorkspace>, "tabs" | "refreshObjects"> &
+    Partial<Pick<ReturnType<typeof useWorkspace>, "objects" | "selectObject">>;
   documents: ReturnType<typeof useSqlDocuments>;
   completions: Pick<ReturnType<typeof useSqlCompletions>, "refresh">;
   onSwitchConnection: () => void;
@@ -108,6 +126,108 @@ export function useWorkspaceCommands({
     { label: "Query history", run: onOpenHistory },
     { label: "Backup / Restore database", run: onOpenBackup },
   ];
+  // Palette memory lives for this session only: tables opened (from any
+  // path) and items run from the palette, for the empty-query list.
+  const memory = useRef<Memory>(new Map());
+  const [memoryVersion, bumpMemory] = useReducer((n: number) => n + 1, 0);
+  const remember = useCallback((id: string) => {
+    const entry = memory.current.get(id);
+    memory.current.set(id, { last: Date.now(), uses: (entry?.uses ?? 0) + 1 });
+    bumpMemory();
+  }, []);
+  const activeTab = workspace.tabs.activeTab;
+  const activeTableId =
+    activeTab && "kind" in activeTab && activeTab.kind === "table"
+      ? objectId(activeTab.schema, activeTab.table)
+      : null;
+  useEffect(() => {
+    if (activeTableId) remember(activeTableId);
+  }, [activeTableId, remember]);
+
+  const actions = useRef({
+    selectObject: workspace.selectObject,
+    openSchema: workspace.tabs.openSchema,
+    addQueryTab: workspace.tabs.addQueryTab,
+  });
+  actions.current = {
+    selectObject: workspace.selectObject,
+    openSchema: workspace.tabs.openSchema,
+    addQueryTab: workspace.tabs.addQueryTab,
+  };
+  const objects = workspace.objects;
+  const objectItems = useMemo(
+    () =>
+      (objects ?? []).map((object): CommandAction => {
+        const view = object.objectType.includes("view");
+        const editable =
+          object.objectType === "table" ||
+          object.objectType === "partitioned_table";
+        return {
+          id: objectId(object.schema, object.name),
+          label: object.name,
+          section: view ? "Views" : "Tables",
+          detail: object.schema,
+          qualified: `${object.schema}.${object.name}`,
+          meta:
+            !view && object.estimatedRows > 0
+              ? `${formatRows(object.estimatedRows)} rows`
+              : undefined,
+          // The explorer's open path: selects, opens the tab, never runs SQL.
+          run: () => actions.current.selectObject?.(object),
+          alternate: editable
+            ? {
+                label: "Edit structure",
+                run: () =>
+                  actions.current.openSchema(object.schema, object.name),
+              }
+            : undefined,
+        };
+      }),
+    [objects],
+  );
+  const session = useOptionalDatabaseSession();
+  const library = useSavedQueries(session?.session.workspaceId ?? "");
+  const queryItems = useMemo(
+    () =>
+      library.entries.map((entry): CommandAction => ({
+        id: `query:${entry.id}`,
+        label: entry.title,
+        section: "Queries",
+        detail: entry.sql.replace(/\s+/g, " ").trim().slice(0, 64),
+        // Opens an editable copy in a new tab; never executes it.
+        run: () => {
+          remember(`query:${entry.id}`);
+          actions.current.addQueryTab(entry.sql, entry.title);
+        },
+      })),
+    [library.entries, remember],
+  );
+  const recalled = useMemo(
+    () =>
+      [...objectItems, ...queryItems].map((item) => {
+        const used = memory.current.get(item.id!);
+        return used ? { ...item, lastUsed: used.last, uses: used.uses } : item;
+      }),
+    // memoryVersion invalidates after the in-memory map changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [objectItems, queryItems, memoryVersion],
+  );
+  const paletteItems: CommandAction[] = [
+    ...commands.map((command) => {
+      const used = memory.current.get(command.label);
+      return {
+        ...command,
+        lastUsed: used?.last,
+        uses: used?.uses,
+        run: () => {
+          remember(command.label);
+          command.run();
+        },
+      };
+    }),
+    ...recalled,
+  ];
+
   function moveTab(direction: number) {
     const tabs = workspace.tabs.tabs;
     const index = tabs.findIndex(
@@ -165,16 +285,21 @@ export function useWorkspaceCommands({
         document.querySelector("dialog[open]")
       )
         return;
+      const key = event.key.toLowerCase();
+      // Shift+Cmd+P: everything; Shift+Cmd+O (Open Quickly): tables and
+      // views. Neither edits text, so they also work from a text field.
+      if ((key === "p" || key === "o") && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        if (event.repeat) return;
+        requestPaletteScope(key === "o" ? "tables" : "all");
+        commandsRef.current.onOpenCommands();
+        return;
+      }
       if (
         event.target instanceof Element &&
         event.target.closest("input, textarea, select")
       )
         return;
-      const key = event.key.toLowerCase();
-      if (key === "p" && event.shiftKey) {
-        event.preventDefault();
-        commandsRef.current.onOpenCommands();
-      }
       if ((key === "s" || key === "o") && !event.altKey) {
         event.preventDefault();
         const command = commandsRef.current.commands.find(
@@ -218,5 +343,5 @@ export function useWorkspaceCommands({
     };
   }, [active]);
 
-  return commands;
+  return paletteItems;
 }

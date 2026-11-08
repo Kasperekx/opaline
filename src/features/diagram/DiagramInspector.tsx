@@ -1,4 +1,4 @@
-import { ArrowUpRight, X } from "lucide-react";
+import { ArrowDown, ArrowUpRight, X } from "lucide-react";
 import type { StructureForeignKey } from "../../shared/types/structure";
 import type { TableNode } from "./diagram-model";
 
@@ -33,37 +33,53 @@ export function DiagramInspector({
       <header>
         <span>{relation ? "Relationship" : "Table"}</span>
         <button
-          className="icon-button"
+          className="icon-button subtle"
           aria-label="Close diagram details"
           onClick={onClose}
         >
-          <X size={16} />
+          <X size={13} />
         </button>
       </header>
       {relation ? (
         <>
-          <h2>{relation.name}</h2>
-          <p>Foreign key{relation.validated ? "" : " · not validated"}</p>
+          <div className="diagram-inspector-title">
+            <h2>{relation.name}</h2>
+            <p className={relation.validated ? undefined : "is-warning"}>
+              Foreign key{relation.validated ? "" : " · not validated"}
+            </p>
+          </div>
           <div className="diagram-relation-pair">
             <strong>
-              {relation.sourceSchema}.{relation.sourceTable}
+              <span>{relation.sourceSchema}.</span>
+              {relation.sourceTable}
             </strong>
             <code>{relation.sourceColumns.join(", ")}</code>
-            <span>references ↓</span>
+            <span className="diagram-relation-arrow">
+              <ArrowDown size={12} aria-hidden="true" />
+              references
+            </span>
             <strong>
-              {relation.targetSchema}.{relation.targetTable}
+              <span>{relation.targetSchema}.</span>
+              {relation.targetTable}
             </strong>
             <code>{relation.targetColumns.join(", ")}</code>
           </div>
           <dl>
-            <dt>On delete</dt>
-            <dd>{relation.onDelete}</dd>
-            <dt>On update</dt>
-            <dd>{relation.onUpdate}</dd>
+            <div>
+              <dt>On delete</dt>
+              <dd>{relation.onDelete}</dd>
+            </div>
+            <div>
+              <dt>On update</dt>
+              <dd>{relation.onUpdate}</dd>
+            </div>
           </dl>
           <p>Column pairs follow the order shown above.</p>
           {onEdit && (
-            <button className="button secondary" onClick={onEdit}>
+            <button
+              className="button secondary diagram-inspector-end"
+              onClick={onEdit}
+            >
               Edit relationship
             </button>
           )}
@@ -71,30 +87,41 @@ export function DiagramInspector({
       ) : (
         table && (
           <>
-            <h2>{table.data.table.name}</h2>
-            <p>
-              {table.data.table.schema} · {table.data.table.objectType}
-            </p>
-            <button className="button secondary" onClick={onOpen}>
-              Open table <ArrowUpRight size={15} />
-            </button>
-            {onEdit && (
-              <button className="button secondary" onClick={onEdit}>
-                Edit structure
+            <div className="diagram-inspector-title">
+              <h2>{table.data.table.name}</h2>
+              <p>
+                {table.data.table.schema} · {table.data.table.objectType}
+              </p>
+            </div>
+            <div className="diagram-inspector-actions">
+              <button className="button secondary" onClick={onOpen}>
+                Open table <ArrowUpRight size={13} />
               </button>
-            )}
-            {onDrop && (
-              <button className="button danger" onClick={onDrop}>
-                Drop table…
-              </button>
-            )}
-            {table.data.table.columns.length > 12 && (
-              <button className="button ghost" onClick={onToggleColumns}>
-                {table.data.expanded
-                  ? "Collapse columns on canvas"
-                  : "Show all columns on canvas"}
-              </button>
-            )}
+              {(onEdit || onDrop) && (
+                <div>
+                  {onEdit && (
+                    <button className="button secondary" onClick={onEdit}>
+                      Edit structure
+                    </button>
+                  )}
+                  {onDrop && (
+                    <button
+                      className="button secondary diagram-drop"
+                      onClick={onDrop}
+                    >
+                      Drop table…
+                    </button>
+                  )}
+                </div>
+              )}
+              {table.data.table.columns.length > 12 && (
+                <button className="button ghost" onClick={onToggleColumns}>
+                  {table.data.expanded
+                    ? "Collapse columns on canvas"
+                    : "Show all columns on canvas"}
+                </button>
+              )}
+            </div>
             <h3>Columns</h3>
             <ul>
               {table.data.table.columns.map((column) => (

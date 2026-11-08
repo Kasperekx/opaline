@@ -188,10 +188,11 @@ pub(crate) async fn apply_changes(
             "BEGIN; SET LOCAL statement_timeout = '25000ms'; SET LOCAL lock_timeout = '5000ms';",
         )
         .await
-        .map_err(|_| {
-            TableChangesError::rejected(
-                "Could not begin the save. Reconnect if the connection was lost.",
-            )
+        .map_err(|error| {
+            TableChangesError::rejected(super::diagnostics::database_error(
+                "Could not begin the save",
+                error,
+            ))
         })?;
     let mut rows = Vec::with_capacity(input.changes.len());
     let mut response_bytes = 0usize;
@@ -279,9 +280,12 @@ pub(crate) async fn apply_changes(
                     .await,
                 Ok(Ok(()))
             );
-            Err(TableChangesError::rejected(format!(
-                "The database rejected the commit; nothing was saved. {error}"
-            )))
+            Err(TableChangesError::rejected(
+                super::diagnostics::database_error(
+                    "The database rejected the commit; nothing was saved",
+                    error,
+                ),
+            ))
         }
         Err(_) => Err(TableChangesError::unknown()),
     }

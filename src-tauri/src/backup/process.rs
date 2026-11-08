@@ -1,7 +1,10 @@
-use super::{models::JobProgress, tools::command};
+use super::{
+    child_process::OwnedChild, diagnostics::diagnostic, models::JobProgress, tools::command,
+};
 use crate::database::models::{ConnectionConfig, SslMode};
 use base64::Engine;
 use std::{
+    collections::VecDeque,
     io::Write,
     path::Path,
     process::Stdio,
@@ -133,21 +136,13 @@ impl ProcessCredentials {
     }
 }
 
-fn diagnostic(bytes: &[u8]) -> &'static str {
-    let text = String::from_utf8_lossy(bytes).to_lowercase();
-    if text.contains("password authentication") || text.contains("no password supplied") {
-        "Authentication failed. Check the password or system credential store."
-    } else if text.contains("certificate") || text.contains("ssl error") {
-        "TLS verification failed. Check the host, trusted CA and the PostgreSQL client trust store."
-    } else if text.contains("no space left") {
-        "Not enough disk space."
-    } else if text.contains("permission denied") {
-        "Permission denied. Check database privileges and file permissions."
-    } else if text.contains("does not exist") {
-        "A required database object, role or extension is missing. Review the dump requirements."
-    } else {
-        "The PostgreSQL tool reported an error. Check version compatibility, dependencies, privileges and the trusted dump content. Raw server output is not logged because it may contain data or secrets."
-    }
+const DIAGNOSTIC_TAIL_BYTES: usize = 64 * 1024;
+
+fn append_diagnostic_tail(tail: &mut VecDeque<u8>, bytes: &[u8]) {
+    let bytes = &bytes[bytes.len().saturating_sub(DIAGNOSTIC_TAIL_BYTES)..];
+    let remove = (tail.len() + bytes.len()).saturating_sub(DIAGNOSTIC_TAIL_BYTES);
+    tail.drain(..remove);
+    tail.extend(bytes);
 }
 
 pub(crate) async fn run(
@@ -161,29 +156,26 @@ pub(crate) async fn run(
         return Err("Operation cancelled before starting.".into());
     }
     let started = Instant::now();
-    let mut child = command
-        .spawn()
+    let mut child = OwnedChild::spawn(&mut command)
         .map_err(|_| "Cannot start PostgreSQL client. Check its installation and permissions.")?;
     let mut stderr = child
-        .stderr
-        .take()
+        .take_stderr()
         .ok_or("Cannot capture client diagnostics.")?;
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     let mut interrupted = false;
     let result = {
         let monitor = async {
             let drain = async {
-                let mut diagnostic = Vec::new();
+                let mut diagnostic = VecDeque::with_capacity(DIAGNOSTIC_TAIL_BYTES);
                 let mut buffer = [0u8; 8192];
                 loop {
                     let size = stderr.read(&mut buffer).await?;
                     if size == 0 {
                         break;
                     }
-                    let keep = size.min(65536usize.saturating_sub(diagnostic.len()));
-                    diagnostic.extend_from_slice(&buffer[..keep]);
+                    append_diagnostic_tail(&mut diagnostic, &buffer[..size]);
                 }
-                Ok::<_, std::io::Error>(diagnostic)
+                Ok::<_, std::io::Error>(Vec::from(diagnostic))
             };
             let (status, output) = tokio::join!(child.wait(), drain);
             let status = status.map_err(|_| "Cannot confirm the PostgreSQL client outcome.")?;
@@ -204,10 +196,10 @@ pub(crate) async fn run(
         loop {
             tokio::select! {
                 result = &mut monitor => break result,
-                _ = cancel.changed() => {interrupted = true; break Err("Operation cancelled. The client is terminated; a server rollback or final commit is not confirmed. Inspect the target before retrying.".into());},
+                _ = cancel.changed() => {interrupted = true; break Err("Operation cancelled. Client shutdown was requested; a server rollback or final commit is not confirmed. Inspect the target before retrying.".into());},
                 _ = interval.tick() => {
                     progress(JobProgress {stage: stage.into(), elapsed_ms: started.elapsed().as_millis() as u64, message: "PostgreSQL client is running. Progress percentage is not available.".into()});
-                    if started.elapsed() > Duration::from_secs(3600) {interrupted = true; break Err("Operation exceeded the 1 hour safety timeout. The client is terminated; inspect the target before retrying.".into());}
+                    if started.elapsed() > Duration::from_secs(3600) {interrupted = true; break Err("Operation exceeded the 1 hour safety timeout. Client shutdown was requested; inspect the target before retrying.".into());}
                 }
             }
         }
@@ -216,19 +208,19 @@ pub(crate) async fn run(
         let _ = tokio::time::timeout(Duration::from_secs(5), cancel_server).await;
     }
     if result.is_err() {
-        let _ = child.kill().await;
+        // Reaping can stall in uninterruptible OS I/O. Keep cancellation bounded;
+        // the owned-process guard still signals the group if this wait expires.
+        let _ = tokio::time::timeout(Duration::from_secs(5), child.terminate()).await;
     }
     result
 }
 
 pub(crate) async fn bounded_output(mut command: Command) -> Result<Vec<u8>, String> {
     command.stdout(Stdio::piped()).stderr(Stdio::null());
-    let mut child = command
-        .spawn()
-        .map_err(|_| "Cannot start PostgreSQL client.")?;
+    let mut child =
+        OwnedChild::spawn(&mut command).map_err(|_| "Cannot start PostgreSQL client.")?;
     let mut output = child
-        .stdout
-        .take()
+        .take_stdout()
         .ok_or("Cannot read PostgreSQL client output.")?
         .take(512 * 1024 + 1);
     let mut bytes = Vec::new();
@@ -253,4 +245,25 @@ pub(crate) async fn bounded_output(mut command: Command) -> Result<Vec<u8>, Stri
         );
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagnostic_tail_is_bounded_and_retains_late_errors_without_exposing_data() {
+        let mut tail = VecDeque::new();
+        append_diagnostic_tail(&mut tail, &vec![b'x'; DIAGNOSTIC_TAIL_BYTES * 2]);
+        assert_eq!(tail.len(), DIAGNOSTIC_TAIL_BYTES);
+        append_diagnostic_tail(
+            &mut tail,
+            b"\npg_dump: error: no space left on device: private-table-value\n",
+        );
+        assert_eq!(tail.len(), DIAGNOSTIC_TAIL_BYTES);
+        let bytes = Vec::from(tail);
+        assert!(bytes.ends_with(b"private-table-value\n"));
+        assert!(diagnostic(&bytes).starts_with("Not enough disk space."));
+        assert!(!diagnostic(&bytes).contains("private-table-value"));
+    }
 }

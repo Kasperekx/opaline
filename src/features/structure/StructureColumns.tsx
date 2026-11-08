@@ -1,7 +1,16 @@
-import { KeyRound, LockKeyhole } from "lucide-react";
+import { ChevronRight, Columns3, KeyRound, LockKeyhole } from "lucide-react";
 import type { StructureColumn } from "../../shared/types/structure";
+import { StructureEmpty } from "./StructureDefinitions";
 
 export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
+  if (!columns.length)
+    return (
+      <StructureEmpty
+        title="No columns"
+        description="This object has no column definitions."
+        Icon={Columns3}
+      />
+    );
   return (
     <div className="structure-columns-wrap">
       <table className="structure-columns">
@@ -11,7 +20,7 @@ export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
             <th scope="col">#</th>
             <th scope="col">Column</th>
             <th scope="col">Type</th>
-            <th scope="col">Nullable</th>
+            <th scope="col">Nullability</th>
             <th scope="col">Default / generation</th>
             <th scope="col">Comment</th>
           </tr>
@@ -22,9 +31,11 @@ export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
               <td className="structure-position">{column.position}</td>
               <th scope="row">
                 <span className="structure-column-name">
-                  {column.primaryKey && (
-                    <KeyRound size={13} aria-label="Primary key" />
-                  )}
+                  <span className="structure-column-key">
+                    {column.primaryKey && (
+                      <KeyRound size={13} aria-label="Primary key" />
+                    )}
+                  </span>
                   <span>{column.name}</span>
                 </span>
               </th>
@@ -32,8 +43,17 @@ export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
                 <code className="structure-type">{column.dataType}</code>
                 {column.enumValues.length > 0 && (
                   <details className="structure-enum">
-                    <summary>{column.enumValues.length} allowed values</summary>
-                    <span>{column.enumValues.join(" · ")}</span>
+                    <summary>
+                      <ChevronRight size={10} aria-hidden="true" />
+                      {column.enumValues.length} allowed values
+                    </summary>
+                    <ul>
+                      {column.enumValues.map((value) => (
+                        <li key={value}>
+                          <code>{value || '""'}</code>
+                        </li>
+                      ))}
+                    </ul>
                   </details>
                 )}
                 {column.collation && (
@@ -42,10 +62,10 @@ export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
               </td>
               <td>
                 {column.nullable ? (
-                  <span className="structure-muted">Yes</span>
+                  <span className="structure-muted">Nullable</span>
                 ) : (
                   <span className="structure-required">
-                    <LockKeyhole size={12} /> No
+                    <LockKeyhole size={11} aria-hidden="true" /> Not null
                   </span>
                 )}
               </td>
@@ -72,13 +92,23 @@ export function StructureColumns({ columns }: { columns: StructureColumn[] }) {
                       {column.defaultValue}
                     </code>
                   </>
+                ) : column.defaultValue === null ? (
+                  <span className="structure-absent" aria-label="No default">
+                    —
+                  </span>
                 ) : (
                   <code className="structure-expression">
-                    {column.defaultValue ?? "—"}
+                    {column.defaultValue}
                   </code>
                 )}
               </td>
-              <td className="structure-comment">{column.comment ?? "—"}</td>
+              <td className="structure-comment">
+                {column.comment || (
+                  <span className="structure-absent" aria-label="No comment">
+                    —
+                  </span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

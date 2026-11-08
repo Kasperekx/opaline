@@ -14,6 +14,7 @@ import { useQueryHistory } from "./useQueryHistory";
 import type { useQueryPreferences } from "./useQueryPreferences";
 import { useDatabaseSession } from "../connections/SessionContext";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
+import { toAbsoluteErrorPosition } from "./sql-diagnostics";
 
 export type QuerySubmission = {
   sql: string;
@@ -25,18 +26,6 @@ const createId = () =>
   typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-const toAbsoluteErrorPosition = (
-  error: QueryExecutionError,
-  submission: QuerySubmission,
-) => {
-  if (error.position === null) return error;
-  const relativeCharacters = Math.max(0, error.position - 1);
-  const relativeOffset = Array.from(submission.sql)
-    .slice(0, relativeCharacters)
-    .join("").length;
-  return { ...error, position: submission.offset + relativeOffset };
-};
 
 const historyStatus = (error: QueryExecutionError): QueryHistoryStatus => {
   if (error.kind === "cancelled") return "cancelled";
@@ -63,6 +52,7 @@ export function useWorkspace(
     queryPreferences.preferences.historyEnabled,
   );
   const [objects, setObjects] = useState<DatabaseObject[]>([]);
+  const [schemas, setSchemas] = useState<string[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [selected, setSelected] = useState<DatabaseObject | null>(null);
   const [expandedObjectKey, setExpandedObjectKey] = useState<string | null>(
@@ -91,7 +81,12 @@ export function useWorkspace(
     setExplorerBusy(true);
     setExplorerError(null);
     try {
-      setObjects(await databaseApi.listObjects());
+      const [nextObjects, nextSchemas] = await Promise.all([
+        databaseApi.listObjects(),
+        databaseApi.listSchemas(),
+      ]);
+      setObjects(nextObjects);
+      setSchemas(nextSchemas.map((schema) => schema.name));
     } catch (error) {
       setExplorerError(errorMessage(error));
     } finally {
@@ -274,6 +269,7 @@ export function useWorkspace(
 
   return {
     objects,
+    schemas,
     columns,
     selected,
     clearSelection: () => setSelected(null),

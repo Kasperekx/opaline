@@ -1,0 +1,213 @@
+/* Sheet: the shared modal (shared/components/Sheet.tsx) on a native <dialog>.
+   Header (icon tile, title, subtitle, accessory, close), caller-owned body,
+   footer (leading slot, trailing actions). Feature styles refine it from the
+   features layer with plain selectors. */
+@layer controls {
+  .sheet {
+    position: fixed;
+    inset: 0;
+    width: min(var(--sheet-width, 640px), calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100dvh - 40px);
+    margin: auto;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: var(--text);
+    background: var(--material-sheet);
+    backdrop-filter: var(--material-blur-strong);
+    -webkit-backdrop-filter: var(--material-blur-strong);
+    border: 0;
+    border-radius: var(--radius-sheet);
+    box-shadow: var(--shadow-sheet);
+  }
+  .sheet[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet-small {
+    --sheet-width: 480px;
+  }
+  .sheet-medium {
+    --sheet-width: 640px;
+  }
+  .sheet-large {
+    --sheet-width: 960px;
+  }
+  .sheet::backdrop {
+    background: var(--scrim);
+  }
+
+  /* Header. */
+  .sheet-header {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 24px 24px 8px;
+  }
+  .sheet-title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .sheet-icon + .sheet-title {
+    justify-content: center;
+    min-height: 44px;
+  }
+  .sheet-title h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .sheet-title p {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .sheet-accessory {
+    display: flex;
+    flex: none;
+    align-items: center;
+  }
+  .sheet-close.icon-button {
+    flex: none;
+    margin: -3px -8px 0 0;
+  }
+
+  /* Icon tile: colour plus the title's words, never colour alone. */
+  .sheet-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .sheet-icon[data-tone="warning"] {
+    color: var(--warning);
+    background: rgba(255, 159, 10, 0.16);
+  }
+  .sheet-icon[data-tone="danger"] {
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.18);
+  }
+  .sheet-icon[data-tone="local"] {
+    color: var(--env-local);
+    background: rgba(48, 209, 88, 0.16);
+  }
+  .sheet-icon[data-tone="staging"] {
+    color: var(--env-staging-text);
+    background: rgba(255, 159, 10, 0.16);
+  }
+  .sheet-icon[data-tone="production"] {
+    color: var(--env-production-text);
+    background: rgba(255, 69, 58, 0.16);
+  }
+
+  /* Footer: optional leading slot, actions trailing (secondary, primary). */
+  .sheet-footer {
+    position: sticky;
+    z-index: 2;
+    bottom: 0;
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px 24px;
+    background: var(--material-sheet);
+  }
+  .sheet-footer > .button {
+    flex: none;
+  }
+  /* The leading note yields: it wraps its own text before the actions wrap. */
+  .sheet-footer-start {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-right: auto;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    line-height: 1.4;
+  }
+
+  /* Motion: 240ms scale .96 → 1 with the scrim fading over 200ms; the exit
+     mirrors it faster. display/overlay stay discrete so the closing sheet
+     remains in the top layer until it has faded. */
+  .sheet,
+  .sheet::backdrop {
+    opacity: 0;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease);
+    transition-behavior: allow-discrete;
+  }
+  .sheet {
+    transform: scale(0.96);
+    transition-property: opacity, transform, overlay, display;
+  }
+  .sheet::backdrop {
+    transition-property: opacity, overlay, display;
+  }
+  .sheet[open],
+  .sheet[open]::backdrop {
+    opacity: 1;
+  }
+  .sheet[open] {
+    transform: none;
+    transition-duration: 240ms;
+  }
+  .sheet[open]::backdrop {
+    transition-duration: 200ms;
+  }
+  @starting-style {
+    .sheet[open],
+    .sheet[open]::backdrop {
+      opacity: 0;
+    }
+    .sheet[open] {
+      transform: scale(0.96);
+    }
+  }
+  /* The exit copy appears already open, then transitions closed. */
+  .sheet.sheet-ghost,
+  .sheet.sheet-ghost::backdrop {
+    transition: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet,
+    .sheet[open] {
+      transform: none;
+      transition-property: opacity, overlay, display;
+    }
+    @starting-style {
+      .sheet[open] {
+        transform: none;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .sheet {
+      width: calc(100vw - 16px);
+      max-height: calc(100dvh - 16px);
+    }
+    .sheet-header,
+    .sheet-footer {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+  }
+}

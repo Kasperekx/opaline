@@ -1,0 +1,304 @@
+.section {
+  border-block: 1px solid var(--line);
+  background: #101112;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
+  align-items: center;
+  gap: 70px;
+  padding-block: 100px 80px;
+}
+
+.copy h2 {
+  font-size: clamp(38px, 4vw, 55px);
+}
+
+.copy h2 span {
+  color: var(--accent);
+}
+
+.description {
+  max-width: 390px;
+  margin-block: 26px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+  text-wrap: pretty;
+}
+
+.availability {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 0 12px;
+  color: #dfd9cf;
+  font-size: 12px;
+}
+
+.availability > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.diagram {
+  min-width: 0;
+  margin: 0;
+}
+
+.canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.canvas::before {
+  position: absolute;
+  inset: -12% 0;
+  z-index: -1;
+  content: "";
+  background: radial-gradient(ellipse, #dfbb7908, transparent 67%);
+  pointer-events: none;
+}
+
+.canvas > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.guide {
+  fill: none;
+  stroke: #e9d9b907;
+  stroke-dasharray: 2 7;
+}
+
+.track {
+  fill: none;
+  stroke: #c5b49438;
+  stroke-width: 1.25;
+}
+
+.plannedTrack {
+  fill: none;
+  stroke: #a8a6a030;
+  stroke-width: 1.25;
+  stroke-dasharray: 4 6;
+}
+
+.beam {
+  animation: beam-travel 6s linear infinite;
+  animation-play-state: paused;
+  opacity: 0;
+}
+
+.returnBeam {
+  animation-direction: reverse;
+  animation-delay: -3s;
+}
+
+.diagram[data-active] .beam {
+  animation-play-state: running;
+}
+
+.node > circle {
+  fill: #191a1c;
+  stroke: #e9d9b932;
+  stroke-width: 1;
+}
+
+.node .nodeRing {
+  fill: #dfbb7903;
+  stroke: #dfbb790c;
+}
+
+.availableNode > circle {
+  stroke: #dfbb7950;
+}
+
+.plannedNode > circle {
+  fill: #141517;
+  stroke: #a8a6a024;
+}
+
+.plannedNode > image {
+  opacity: 0.5;
+}
+
+.plannedNode > image[href="/providers/sqlite.svg"] {
+  filter: grayscale(1);
+}
+
+.genericProvider {
+  color: #94928d;
+}
+
+.node .opalineMark {
+  fill: none;
+  stroke: #f1f0ec;
+  stroke-width: 6;
+}
+
+.node .opalineAccent {
+  fill: var(--accent);
+  stroke: #191a1c;
+  stroke-width: 3;
+}
+
+.nodeLabel {
+  position: absolute;
+  width: 30%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.clientLabel {
+  top: 58%;
+  left: 19.6875%;
+}
+
+.providerLabel {
+  top: 55.6%;
+  left: 83.4375%;
+}
+
+.nodeLabel strong {
+  display: block;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.025em;
+}
+
+.nodeLabel > span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.providerLabel > span {
+  color: var(--accent);
+}
+
+.plannedLabel strong {
+  color: #b3b0a9;
+  font-size: 13px;
+}
+
+.plannedLabel > span {
+  color: #96948f;
+  font:
+    9px var(--font-code),
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.diagramCaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 45px;
+  margin-top: 25px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.motionControl {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 72px;
+  color: #b3aa9a;
+  border-radius: 5px;
+  font-size: 11px;
+  transition: color 160ms ease-out;
+}
+
+.diagram[data-managed] .motionControl {
+  display: inline-flex;
+}
+
+@keyframes beam-travel {
+  0% {
+    transform: translateX(100px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  85%,
+  100% {
+    transform: translateX(730px);
+    opacity: 0;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motionControl:hover {
+    color: var(--accent);
+  }
+}
+
+@media (max-width: 1100px) {
+  .content {
+    gap: 30px;
+  }
+}
+
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    padding-block: 70px 32px;
+  }
+  .description {
+    max-width: 480px;
+  }
+  .diagram {
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    gap: 36px;
+  }
+  .nodeLabel strong {
+    font-size: 13px;
+  }
+  .nodeLabel > span {
+    font-size: 10px;
+  }
+  .plannedLabel strong {
+    font-size: 11px;
+  }
+  .plannedLabel > span {
+    font-size: 9px;
+  }
+  .diagramCaption {
+    margin-top: 38px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beam {
+    animation: none;
+  }
+  .diagram[data-managed] .motionControl {
+    display: none;
+  }
+}

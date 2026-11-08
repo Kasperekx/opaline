@@ -1,189 +1,596 @@
-.backup-panel {
-  overflow-y: auto;
-  min-height: 0;
-  gap: 16px;
-}
-.backup-dialog[open] {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.backup-dialog > header,
-.backup-dialog > footer {
-  flex-shrink: 0;
-}
-.backup-dialog > header p {
-  overflow-wrap: anywhere;
-}
-.backup-target {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: var(--surface-3);
-}
-.backup-target > div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 140px;
-  gap: 5px;
-  overflow-wrap: anywhere;
-}
-.backup-target strong {
-  font-size: var(--text-lg);
-}
-.backup-target small,
-.backup-target span {
-  color: var(--text-soft);
-  font-size: var(--text-sm);
-}
-.backup-mode {
-  display: flex;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.backup-mode button {
-  border: 0;
-  background: transparent;
-  flex: 1;
-  min-height: 40px;
-  border-radius: 5px;
-  color: var(--text-soft);
-}
-.backup-mode [aria-pressed="true"] {
-  background: var(--surface-3);
-  color: var(--text);
-  box-shadow: 0 1px 3px #0003;
-}
-.backup-tools {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.backup-tools > div {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 180px;
-}
-.backup-tools small {
-  color: var(--text-soft);
-  overflow-wrap: anywhere;
-}
-.backup-engine {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--teal);
-  font-size: var(--text-sm);
-}
-.backup-engine svg {
-  flex-shrink: 0;
-}
-.backup-advanced {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-.backup-advanced > summary {
-  color: var(--text-soft);
-  cursor: pointer;
-  padding: 4px 0;
-}
-.backup-advanced[open] > summary {
-  margin-bottom: 14px;
-}
-.backup-fields {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-.backup-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-.backup-scope-list {
-  max-height: 180px;
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.backup-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: #dfb87c;
-  background: #dfb87c0a;
-  border: 1px solid #dfb87c24;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: var(--text-sm);
-  line-height: 1.6;
-  margin: 0;
-}
-.backup-warning svg {
-  flex-shrink: 0;
-  margin-top: 3px;
-}
-.backup-preview-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--text-sm);
-}
-.backup-preview-meta span {
-  color: var(--text-soft);
-}
-.backup-preview {
-  height: 180px;
-  resize: vertical;
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 12px;
-  font:
-    13px/1.6 ui-monospace,
-    monospace;
-  white-space: pre;
-}
-.backup-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--teal);
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.backup-success {
-  color: var(--teal);
-  line-height: 1.6;
-  margin: 0;
-}
-.backup-fields .backup-danger {
-  color: var(--danger);
-}
-@media (max-width: 650px) {
-  .backup-options {
-    grid-template-columns: 1fr;
+/* Backup / Restore sheet content. Header, footer and material come from the
+   shared Sheet (styles/sheet.css). */
+@layer features {
+  .backup-dialog {
+    --group-fill: rgba(255, 255, 255, 0.06);
+  }
+  .backup-mode > button {
+    padding: 0 12px;
+    font-size: var(--text-callout);
+  }
+
+  .backup-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    /* Bottom room for focus rings inside the scroller. */
+    margin-bottom: -4px;
+    padding: 8px 24px 4px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .backup-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Sections: a sentence-case caption over a grouped box. */
+  .backup-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .backup-caption {
+    padding: 0 4px;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .backup-note {
+    margin: 0;
+    padding: 0 4px;
+    color: var(--muted);
+    font-size: var(--text-callout);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .backup-note.warning {
+    color: var(--warning);
+  }
+  .backup-group,
+  .backup-target,
+  .backup-engine,
+  .backup-callout,
+  .backup-progress,
+  .backup-outcome {
+    border-radius: var(--radius-lg);
+    background: var(--group-fill);
+    box-shadow: var(--edge-light);
+  }
+  .backup-group > * + :not(.backup-scope-list) {
+    position: relative;
+  }
+  .backup-group > * + :not(.backup-scope-list)::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 12px;
+    height: var(--hairline);
+    background: var(--line);
+    content: "";
+  }
+
+  /* Rows inside a group: label column, control, trailing detail. */
+  .backup-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    min-height: 44px;
+    padding: 7px 12px;
+  }
+  .backup-row-label {
+    flex: none;
+    width: 108px;
+    color: var(--text-soft);
+  }
+  .backup-row-label.short {
+    width: 44px;
+  }
+  .backup-row-fill {
+    flex: 1;
+    min-width: 0;
+  }
+  div.backup-row-fill {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-wrap: anywhere;
+  }
+  .backup-row-detail {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: var(--text-callout);
+    font-variant-numeric: tabular-nums;
+  }
+  .backup-row-detail.backup-row-fill {
+    margin-left: 0;
+  }
+  .backup-row small,
+  .backup-engine small {
+    color: var(--muted);
+    font-size: var(--text-callout);
+  }
+  .backup-row code,
+  .backup-target code,
+  .backup-engine code,
+  .backup-mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-callout);
+    overflow-wrap: anywhere;
+  }
+  .backup-row > code {
+    flex: none;
+    color: var(--text-soft);
+  }
+  .backup-row small code {
+    font-size: var(--text-2xs);
+  }
+  .backup-row .segmented-capsule > button {
+    padding: 0 12px;
+    font-size: var(--text-callout);
+  }
+  .backup-row input:not([type="checkbox"]) {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+    font-size: var(--text-md);
+  }
+  .backup-row input[aria-invalid="true"] {
+    box-shadow: inset 0 0 0 1px var(--danger);
+  }
+  .backup-dialog input::placeholder {
+    color: var(--muted);
+  }
+  .backup-row > .button {
+    min-height: 28px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Popup buttons (native select, styled as a macOS pop-up). */
+  .backup-select {
+    min-width: 0;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 30px 0 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%2398989d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 6l3-3 3 3M5 10l3 3 3-3'/%3E%3C/svg%3E")
+      no-repeat right 8px center / 14px;
+    box-shadow: var(--edge-light);
+    font-size: var(--text-md);
+    appearance: none;
+  }
+  .restore-execution > .backup-select {
+    align-self: flex-start;
+  }
+
+  /* Tiles: source database (environment-tinted) and backup file. */
+  .backup-tile {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-control);
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .backup-tile.env-local {
+    color: var(--env-local);
+    background: rgba(48, 209, 88, 0.14);
+  }
+  .backup-tile.env-staging {
+    color: var(--env-staging-text);
+    background: rgba(255, 159, 10, 0.16);
+  }
+  .backup-tile.env-production {
+    color: var(--env-production-text);
+    background: rgba(255, 69, 58, 0.18);
+  }
+
+  .backup-target {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .backup-target > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .backup-target strong {
+    font-weight: 600;
+  }
+  .backup-target small {
+    color: var(--muted);
+    font-size: var(--text-md);
+  }
+  .backup-target code {
+    color: var(--muted);
+    font-size: var(--text-2xs);
+  }
+  .backup-target .environment-badge {
+    flex: none;
+  }
+
+  /* Scope picker: two columns of checkboxes under the Scope row. */
+  .backup-scope-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+    max-height: 196px;
+    overflow: auto;
+    padding: 0 12px 10px 126px;
+  }
+  .backup-scope-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: var(--radius-sm);
+  }
+  .backup-scope-item > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .backup-scope-item > small {
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .backup-scope-item input,
+  .backup-check input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+  }
+
+  /* Engine status. */
+  .backup-engine {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .backup-engine > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .backup-engine code {
+    color: var(--muted);
+  }
+  .backup-engine-icon,
+  .backup-outcome-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: var(--success);
+    background: rgba(48, 209, 88, 0.16);
+  }
+
+  /* Disclosures: Advanced settings and task activity. */
+  .backup-advanced > summary,
+  .backup-activity > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+    padding: 0 8px 0 6px;
+    border-radius: 6px;
+    color: var(--text-soft);
+    list-style: none;
+    cursor: default;
+  }
+  .backup-advanced > summary::-webkit-details-marker,
+  .backup-activity > summary::-webkit-details-marker {
+    display: none;
+  }
+  .backup-advanced > summary::before,
+  .backup-activity > summary::before {
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 150ms var(--ease);
+    content: "";
+  }
+  .backup-advanced[open] > summary::before,
+  .backup-activity[open] > summary::before {
+    transform: rotate(45deg);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .backup-advanced > summary:hover,
+    .backup-activity > summary:hover,
+    .backup-scope-item:hover {
+      background: var(--hover);
+    }
+  }
+  .backup-advanced[open] > summary {
+    margin-bottom: 8px;
+  }
+  .backup-advanced > .backup-fields {
+    gap: 6px;
+  }
+  .backup-tools > .backup-row-fill {
+    min-width: 160px;
+  }
+  .backup-activity > ul {
+    max-height: 160px;
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    overflow: auto;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    background: var(--surface-2);
+    box-shadow: var(--edge-light);
+    font-size: var(--text-callout);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.7;
+    list-style: none;
+  }
+
+  /* Restore: file on the left, destination and consent on the right. */
+  .restore-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+    align-items: start;
+    gap: 16px 24px;
+  }
+  .restore-column {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .restore-file strong {
+    font-weight: 600;
+  }
+  .backup-warning,
+  .backup-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 12px;
+    color: var(--text-soft);
+    font-size: var(--text-callout);
+    line-height: 1.45;
+  }
+  .backup-warning > svg {
+    margin-top: 1px;
+    color: var(--warning);
+  }
+  .backup-callout > svg {
+    margin-top: 1px;
+    color: var(--muted);
+  }
+  .backup-preview {
+    width: 100%;
+    height: 280px;
+    padding: 10px 12px;
+    resize: vertical;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    background: var(--bg);
+    box-shadow: inset 0 0 0 var(--hairline) var(--line);
+    font: 11.5px/1.6 var(--font-mono);
+    white-space: pre;
+  }
+  .backup-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 12px;
+    line-height: 1.4;
+  }
+  .backup-check input {
+    margin-top: 1px;
+  }
+  .backup-check.danger {
+    color: var(--env-production-text);
+  }
+  .backup-check.danger input {
+    accent-color: var(--danger-fill);
+  }
+  .backup-check:has(input:disabled) {
+    opacity: 0.45;
+  }
+  .restore-confirm {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--muted);
+    font-size: var(--text-callout);
+  }
+  .restore-confirm strong {
+    color: var(--text);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .restore-confirm-field {
+    position: relative;
+    display: flex;
+    width: 240px;
+    max-width: 100%;
+  }
+  .restore-confirm-field > input {
+    flex: 1;
+    min-width: 0;
+    height: var(--control-height);
+    padding: 0 30px 0 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+    font-size: var(--text-md);
+  }
+  .restore-confirm-field > svg {
+    position: absolute;
+    top: 8px;
+    right: 9px;
+    color: var(--success);
+  }
+
+  /* Status: error, running job, outcome. */
+  .backup-error {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-lg);
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.12);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .backup-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .backup-progress-head {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .backup-elapsed {
+    display: flex;
+    flex-direction: column;
+  }
+  .backup-elapsed small {
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .backup-elapsed strong {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+  .backup-stage {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding-bottom: 4px;
+    color: var(--text-soft);
+    font-size: var(--text-callout);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .backup-stage > svg {
+    color: var(--accent);
+  }
+  .backup-progress-track {
+    position: relative;
+    display: block;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .backup-progress-track > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 28%;
+    border-radius: 2px;
+    background: var(--accent-fill);
+    animation: backup-indeterminate 1.6s var(--ease-in-out) infinite;
+  }
+  .backup-progress.cancelling .backup-stage,
+  .backup-progress.cancelling .backup-stage > svg {
+    color: var(--warning);
+  }
+  .backup-progress.cancelling .backup-progress-track > span {
+    background: var(--env-staging);
+  }
+  @keyframes backup-indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(360%);
+    }
+  }
+  .backup-outcome {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .backup-outcome > p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .backup-progress-track > span {
+      width: 100%;
+      opacity: 0.5;
+      animation: none;
+    }
+    .backup-advanced > summary::before,
+    .backup-activity > summary::before {
+      transition: none;
+    }
+  }
+  @media (max-width: 900px) {
+    .restore-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 600px) {
+    .backup-row-label {
+      width: 100%;
+    }
+    .backup-scope-list {
+      grid-template-columns: minmax(0, 1fr);
+      padding-left: 12px;
+    }
   }
 }

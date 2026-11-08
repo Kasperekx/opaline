@@ -36,12 +36,12 @@ export function TableCellMenu({
       ref={ref}
       role="menu"
       aria-label="Cell actions"
-      className="table-cell-menu"
+      className="desktop-action-menu table-cell-menu"
       style={{
         left: Math.max(8, Math.min(x, window.innerWidth - 240)),
         top: Math.max(
           8,
-          Math.min(y, window.innerHeight - actions.length * 38 - 24),
+          Math.min(y, window.innerHeight - actions.length * 30 - 24),
         ),
       }}
       onKeyDown={(event) => {
@@ -71,13 +71,13 @@ export function TableCellMenu({
           key={action.label}
           role="menuitem"
           disabled={action.disabled}
-          className={`${action.danger ? "danger" : ""} ${action.groupStart ? "menu-group-start" : ""}`}
+          className={`${action.danger ? "danger" : ""} ${action.groupStart ? "menu-separator" : ""}`}
           onClick={() => {
             onClose();
             action.run();
           }}
         >
-          {action.label}
+          <span className="menu-label">{action.label}</span>
           {action.shortcut && <kbd>{action.shortcut}</kbd>}
         </button>
       ))}

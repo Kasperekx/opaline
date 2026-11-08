@@ -1,4 +1,4 @@
-import { ConnectionDialog } from "../connections/ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { useDatabaseSession } from "../connections/SessionContext";
 import { EnvironmentBadge } from "../connections/EnvironmentBadge";
 import type { TableTab } from "../query/query-types";
@@ -18,7 +18,7 @@ export function TableChangesReview({
   const confirming = changes.review === "confirm";
   const deletedRows = `${changes.summary.deleted} ${changes.summary.deleted === 1 ? "row" : "rows"}`;
   return (
-    <ConnectionDialog
+    <Sheet
       title={
         confirming
           ? `Save changes and delete ${deletedRows}?`
@@ -26,8 +26,25 @@ export function TableChangesReview({
       }
       subtitle={`${session.name} · ${session.host}:${session.port} / ${session.database} / ${tab.schema}.${tab.table}`}
       className="table-changes-dialog"
+      size={720}
       onClose={changes.closeReview}
       busy={changes.busy}
+      footer={
+        <>
+          <button
+            className="button secondary"
+            data-initial-focus="true"
+            onClick={changes.closeReview}
+          >
+            {confirming ? "Cancel" : "Close"}
+          </button>
+          {confirming && (
+            <button className="button danger" onClick={changes.confirmReview}>
+              Save and delete {deletedRows}
+            </button>
+          )}
+        </>
+      }
     >
       <div className="table-changes-review">
         <EnvironmentBadge
@@ -53,20 +70,6 @@ export function TableChangesReview({
           />
         ))}
       </div>
-      <footer className="dialog-actions">
-        <button
-          className="button ghost"
-          data-initial-focus="true"
-          onClick={changes.closeReview}
-        >
-          {confirming ? "Cancel" : "Close"}
-        </button>
-        {confirming && (
-          <button className="button danger" onClick={changes.confirmReview}>
-            Save and delete {deletedRows}
-          </button>
-        )}
-      </footer>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

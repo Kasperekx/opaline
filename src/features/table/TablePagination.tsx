@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListFilter } from "lucide-react";
 import type { TableDataController } from "./useTableData";
 export function TablePagination({
   table,
@@ -15,7 +15,10 @@ export function TablePagination({
           {table.data && ` · ${table.data.rows.length} rows`}
         </span>
         {(table.filter || table.conditions.length > 0) && (
-          <span className="filter-active">Filtered</span>
+          <span className="filter-active">
+            <ListFilter size={11} aria-hidden="true" />
+            Filtered
+          </span>
         )}
       </div>
       <label>
@@ -51,14 +54,15 @@ export function TablePagination({
           disabled={table.page === 0 || locked}
           onClick={() => table.setPage(table.page - 1)}
         >
-          <ArrowLeft size={15} />
+          <ChevronLeft size={14} />
         </button>
+        <span className="pagination-divider" aria-hidden="true" />
         <button
           aria-label="Next page"
           disabled={!table.data?.hasMore || locked}
           onClick={() => table.setPage(table.page + 1)}
         >
-          <ArrowRight size={15} />
+          <ChevronRight size={14} />
         </button>
       </div>
     </footer>

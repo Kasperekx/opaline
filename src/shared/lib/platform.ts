@@ -1,3 +1,2 @@
-export const primaryModifierLabel = /Mac|iPhone|iPad/.test(navigator.userAgent)
-  ? "⌘"
-  : "Ctrl";
+export const isMacPlatform = /Mac|iPhone|iPad/.test(navigator.userAgent);
+export const primaryModifierLabel = isMacPlatform ? "⌘" : "Ctrl";

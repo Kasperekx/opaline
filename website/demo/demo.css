@@ -1,0 +1,322 @@
+/* Frame-only composition. Tables, editors, review, dialogs and connection rows
+   retain their production components and CSS from src/. */
+.demo-application {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-width: 0;
+}
+.demo-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+  min-height: 55px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--rail);
+}
+.demo-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+}
+.demo-brand .brand-mark {
+  width: 29px;
+  height: 29px;
+}
+.demo-brand .brand-mark::before {
+  width: 14px;
+  height: 14px;
+}
+.demo-project {
+  display: flex;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.demo-project > span {
+  color: var(--muted);
+}
+.demo-window-bar > button {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.demo-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.demo-navigation .view-tabs {
+  border: 0;
+  padding-left: 8px;
+}
+.demo-guide {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 11px 16px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  border-bottom: 1px solid var(--line);
+  background: #dfbb7905;
+}
+.demo-warning {
+  margin: 0;
+  padding: 10px 16px;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.demo-panel {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+.demo-panel[hidden] {
+  display: none;
+}
+.demo-panel > .table-data-view {
+  width: 100%;
+}
+.demo-connections {
+  display: block;
+  overflow: auto;
+  padding: 28px;
+  container-type: inline-size;
+}
+.demo-connections-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.demo-connections-heading > svg {
+  color: var(--accent);
+}
+.demo-connections-heading h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 560;
+  letter-spacing: -0.5px;
+}
+.demo-connections-heading p,
+.demo-presets-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.demo-presets-note {
+  padding-top: 10px;
+}
+.demo-status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 16px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  border-top: 1px solid var(--line-strong);
+  background: var(--rail);
+}
+.demo-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.demo-storage-label {
+  margin-left: auto;
+}
+.demo-fallback {
+  padding: 32px;
+  line-height: 1.5;
+}
+.demo-table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.demo-table-title > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.demo-table-title > span {
+  color: var(--muted);
+  padding-left: 8px;
+  border-left: 1px solid var(--line-strong);
+}
+.demo-walkthrough {
+  grid-area: guide;
+  min-width: 0;
+  flex-shrink: 0;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line-strong);
+  background: linear-gradient(110deg, #dfbb7908, transparent 65%);
+}
+.demo-steps {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.demo-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.demo-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  font: 10px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.demo-steps [aria-current="step"] {
+  color: var(--text);
+}
+.demo-steps [aria-current="step"] > span,
+.demo-steps [data-complete="true"] > span {
+  color: var(--accent);
+  border-color: #dfbb7955;
+  background: #dfbb790d;
+}
+.demo-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+.demo-prompt p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 70ch;
+}
+.demo-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid #dfbb7940;
+  border-radius: 6px;
+  background: #dfbb7910;
+  color: var(--accent);
+  font-size: 12px;
+}
+.demo-start:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.demo-start:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.demo-guided .demo-status {
+  padding-block: 8px;
+}
+.demo-guided .table-data-view.inline-editing-view {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "guide" "notice" "data" "changes";
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+@media (max-width: 340px) {
+  .demo-guided .demo-brand {
+    display: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .demo-start:hover:not(:disabled) {
+    background: #dfbb7920;
+  }
+}
+@media (max-width: 700px) {
+  .demo-project {
+    display: none;
+  }
+  .demo-window-bar {
+    padding-inline: 12px;
+    gap: 12px;
+  }
+  .demo-connections {
+    padding: 20px 12px;
+  }
+  .demo-status {
+    padding: 9px 12px;
+  }
+  .demo-storage-label {
+    width: 100%;
+    margin: 0;
+  }
+  .demo-table-title > span {
+    display: none;
+  }
+  .demo-walkthrough {
+    padding: 16px 12px 12px;
+  }
+  .demo-steps {
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .demo-steps li {
+    gap: 5px;
+  }
+  .demo-prompt {
+    min-height: 86px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .demo-start {
+    min-height: 40px;
+  }
+}
+@media (max-width: 420px) {
+  .demo-guided .demo-brand strong {
+    display: none;
+  }
+  .demo-steps {
+    gap: 7px;
+    font-size: 11px;
+  }
+  .demo-steps li > span {
+    width: 18px;
+    height: 18px;
+    font-size: 9px;
+  }
+  .demo-connections .connection-row-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .demo-connections .connection-row-environment {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    padding-left: 49px;
+  }
+}

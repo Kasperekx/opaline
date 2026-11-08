@@ -1,17 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Database, Trash2 } from "lucide-react";
 import { errorMessage, isDesktopRuntime } from "../../shared/lib/database-api";
 import { ConnectionDetails } from "./ConnectionDetails";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { ProfileEditor } from "./ProfileEditor";
 import { WorkspaceEditor } from "./WorkspaceEditor";
 import { WorkspaceShelf } from "./WorkspaceShelf";
 import { ConnectionList } from "./ConnectionList";
 import { ProfileOrganization } from "./ProfileOrganization";
 import { ProfileTransferDialog } from "./ProfileTransferDialog";
+import { LibraryWelcome } from "./LibraryWelcome";
 import { readLocalJson, writeLocalJson } from "../../shared/lib/local-storage";
 import "../query/p1.css";
 import { useWorkRisk } from "../../shared/safety/WorkSafety";
 import { connectionApi } from "./connection-api";
+import { readLastProfiles, rememberProfile } from "./last-profile";
 import {
   newProfile,
   profileInput,
@@ -50,6 +53,18 @@ export function ConnectionManager({
     if (workspaceId) writeLocalJson("opaline.last-workspace.v1", workspaceId);
   }, [workspaceId]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Keyboard selection, preselected with the profile last opened here.
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const [lastProfiles, setLastProfiles] = useState(readLastProfiles);
+  // The row whose Connect started the current busy period. busy is global,
+  // so the claim ends when busy ends or the library is used again (it is
+  // inert behind the connect sheet, so any input means that sheet closed).
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy) setConnectingId(null);
+    wasBusy.current = busy;
+  }, [busy]);
   const [search, setSearch] = useState("");
   const [environment, setEnvironment] = useState("all");
   const [editor, setEditor] = useState<ProfileInput | null>(null);
@@ -83,6 +98,16 @@ export function ConnectionManager({
   );
   const selected = profiles.find((p) => p.id === selectedId);
   const available = isDesktopRuntime() && !loading && !busy;
+  const connect = (profile: ConnectionProfile) => {
+    setLastProfiles(rememberProfile(profile.workspaceId, profile.id));
+    setCursorId(profile.id);
+    if (!sessions.some((session) => session.profileId === profile.id))
+      setConnectingId(profile.id);
+    onConnect(profile);
+  };
+  const releaseConnecting = () => {
+    if (!busy && connectingId) setConnectingId(null);
+  };
   const selectWorkspace = (id: string) => {
     setWorkspaceId(id);
     setSelectedId(null);
@@ -94,7 +119,11 @@ export function ConnectionManager({
     else setWorkspaceEditor({ workspace: null });
   };
   return (
-    <main className="connection-manager">
+    <main
+      className="connection-manager"
+      onPointerDownCapture={releaseConnecting}
+      onKeyDownCapture={releaseConnecting}
+    >
       <WorkspaceShelf
         workspaces={catalog.workspaces}
         profiles={catalog.profiles}
@@ -104,6 +133,12 @@ export function ConnectionManager({
         onCreate={() => setWorkspaceEditor({ workspace: null })}
       />
       <div className="library-layout">
+        <LibraryWelcome
+          available={available}
+          canTransfer={Boolean(workspace)}
+          onCreate={createConnection}
+          onTransfer={() => setTransferOpen(true)}
+        />
         <ConnectionList
           workspace={workspace}
           visible={visible}
@@ -116,18 +151,29 @@ export function ConnectionManager({
           onSearch={setSearch}
           onEnvironment={setEnvironment}
           onSelect={setSelectedId}
-          onConnect={onConnect}
+          onConnect={connect}
           onEdit={(profile) => setEditor(profileInput(profile))}
           onRename={() => setWorkspaceEditor({ workspace })}
           onCreate={createConnection}
           onTransfer={() => setTransferOpen(true)}
           onRemoveWorkspace={() => setOrganizing({})}
           selectedId={selected?.id}
+          currentId={
+            profiles.some((profile) => profile.id === cursorId)
+              ? cursorId
+              : workspace && lastProfiles[workspace.id]
+          }
+          onCurrent={setCursorId}
+          connectingId={busy ? connectingId : null}
         />
         {selected && (
-          <ConnectionDialog
+          <Sheet
             title={selected.name}
-            subtitle={`${workspace?.name ?? ""} / PostgreSQL`}
+            subtitle={`${workspace?.name ?? ""} · PostgreSQL`}
+            icon={Database}
+            tone={selected.environment}
+            size={560}
+            className={`connection-details-dialog env-${selected.environment}`}
             onClose={() => setSelectedId(null)}
           >
             <ConnectionDetails
@@ -136,7 +182,7 @@ export function ConnectionManager({
               busy={!available}
               onConnect={() => {
                 setSelectedId(null);
-                onConnect(selected);
+                connect(selected);
               }}
               onEdit={() => {
                 setSelectedId(null);
@@ -156,7 +202,7 @@ export function ConnectionManager({
                 setDeleting(selected);
               }}
             />
-          </ConnectionDialog>
+          </Sheet>
         )}
       </div>
       {workspaceEditor && (
@@ -206,11 +252,43 @@ export function ConnectionManager({
         />
       )}
       {deleting && (
-        <ConnectionDialog
+        <Sheet
           title="Delete connection profile?"
           subtitle={deleting.name}
+          icon={Trash2}
+          tone="danger"
+          size={460}
+          className="connection-delete-dialog"
           busy={deleteBusy}
           onClose={() => setDeleting(null)}
+          footer={
+            <>
+              <button
+                className="button secondary"
+                disabled={deleteBusy}
+                onClick={() => setDeleting(null)}
+              >
+                Keep profile
+              </button>
+              <button
+                className="button danger"
+                disabled={deleteBusy}
+                onClick={() => {
+                  setDeleteBusy(true);
+                  void connectionApi
+                    .delete(deleting.id)
+                    .then((next) => {
+                      onCatalog(next);
+                      setDeleting(null);
+                    })
+                    .catch((e) => setDeleteError(errorMessage(e)))
+                    .finally(() => setDeleteBusy(false));
+                }}
+              >
+                Delete profile
+              </button>
+            </>
+          }
         >
           <div className="profile-fields">
             <p>
@@ -223,33 +301,7 @@ export function ConnectionManager({
               </p>
             )}
           </div>
-          <footer className="connection-dialog-footer">
-            <button
-              className="button ghost"
-              disabled={deleteBusy}
-              onClick={() => setDeleting(null)}
-            >
-              Keep profile
-            </button>
-            <button
-              className="button production-button"
-              disabled={deleteBusy}
-              onClick={() => {
-                setDeleteBusy(true);
-                void connectionApi
-                  .delete(deleting.id)
-                  .then((next) => {
-                    onCatalog(next);
-                    setDeleting(null);
-                  })
-                  .catch((e) => setDeleteError(errorMessage(e)))
-                  .finally(() => setDeleteBusy(false));
-              }}
-            >
-              Delete profile
-            </button>
-          </footer>
-        </ConnectionDialog>
+        </Sheet>
       )}
     </main>
   );

@@ -1,10 +1,9 @@
 // Isolated visual fixture: synthetic profiles, no IPC or real connections.
+import "../src/styles/global-styles";
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import { ConnectionSwitcher } from "../src/features/connections/ConnectionSwitcher";
 import { newProfile } from "../src/features/connections/connection-types";
-import "../src/App.css";
-import "../src/features/connections/connections.css";
 
 const local = {
   ...newProfile("mmo"),

@@ -408,20 +408,23 @@ pub(crate) async fn apply(
             "BEGIN; SET LOCAL statement_timeout = '25000ms'; SET LOCAL lock_timeout = '5000ms';",
         )
         .await
-        .map_err(|_| {
-            ChangeError::rejected("Could not begin schema change. Reconnect and inspect the table.")
+        .map_err(|error| {
+            ChangeError::rejected(super::diagnostics::database_error(
+                "Could not begin schema change",
+                error,
+            ))
         })?;
     let result: Result<(), String> = async {
         if let Some(original) = &input.original {
-            client.batch_execute(&format!("LOCK TABLE ONLY {} IN ACCESS EXCLUSIVE MODE", qualified_table(&input.schema, original))).await.map_err(|e| e.to_string())?;
+            client.batch_execute(&format!("LOCK TABLE ONLY {} IN ACCESS EXCLUSIVE MODE", qualified_table(&input.schema, original))).await.map_err(|e| super::diagnostics::database_error("Could not lock table for schema change", e))?;
             let snapshot = structure::inspect(client, &input.schema, original).await?;
-            let inherited: bool = client.query_one("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1)", &[&snapshot.relation_oid]).await.map_err(|e| e.to_string())?.get(0);
+            let inherited: bool = client.query_one("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1)", &[&snapshot.relation_oid]).await.map_err(|e| super::diagnostics::database_error("Could not inspect table inheritance", e))?.get(0);
             if inherited { return Err("Inherited and partitioned tables require SQL; no changes were applied.".into()); }
             if Some(serde_json::to_value(snapshot).map_err(|e| e.to_string())?) != input.expected { return Err("The table structure changed since this draft was opened. Discard and reopen the editor before applying.".into()); }
         }
         enums::verify(client, &input.enum_changes, false).await?;
-        client.batch_execute("SET LOCAL search_path = pg_catalog").await.map_err(|e| e.to_string())?;
-        client.batch_execute(&plan.sql).await.map_err(|e| e.as_db_error().map(|db| db.message().to_string()).unwrap_or_else(|| "Database connection failed.".into()))?;
+        client.batch_execute("SET LOCAL search_path = pg_catalog").await.map_err(|e| super::diagnostics::database_error("Could not prepare schema change", e))?;
+        client.batch_execute(&plan.sql).await.map_err(|e| super::diagnostics::database_error("Could not apply schema change", e))?;
         enums::verify(client, &input.enum_changes, true).await?;
         enums::verify_references(client, &input.columns).await.map_err(|e| e.message)?;
         Ok(())
@@ -451,9 +454,10 @@ pub(crate) async fn apply(
                     .await,
                 Ok(Ok(()))
             );
-            Err(ChangeError::rejected(
-                "The database rejected the commit. Nothing was applied.",
-            ))
+            Err(ChangeError::rejected(super::diagnostics::database_error(
+                "The database rejected the commit. Nothing was applied",
+                error,
+            )))
         }
         Err(_) => Err(ChangeError::unknown()),
     }

@@ -1,4 +1,4 @@
-import { Plus, X } from "lucide-react";
+import { ChevronRight, Plus, X } from "lucide-react";
 import type { EnumDraft, EnumType } from "../../shared/types/structure";
 import { qualifiedRelationName as qualifiedName } from "../../shared/lib/database-object";
 
@@ -20,7 +20,13 @@ export function SchemaEnums({
   return (
     <details className="schema-enums">
       <summary>
-        Enum types{changes.length > 0 ? ` · ${changes.length} drafts` : ""}
+        <ChevronRight size={11} aria-hidden="true" />
+        <strong>Enum types</strong>
+        {changes.length > 0 && (
+          <span>
+            {changes.length} {changes.length === 1 ? "draft" : "drafts"}
+          </span>
+        )}
       </summary>
       <p className="schema-editor-hint">
         Shared across this database. Renaming a value affects every column using

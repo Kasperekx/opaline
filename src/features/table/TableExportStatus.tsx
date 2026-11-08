@@ -1,10 +1,14 @@
 import { HardDriveDownload } from "lucide-react";
 import type { useTableExport } from "./useTableExport";
 import { formatExportSize } from "./table-export";
+/** `notice` renders in the flow above the grid; `progress` is the floating
+ * capsule that joins the table's bottom stack. */
 export function TableExportStatus({
   exporter,
+  part,
 }: {
   exporter: ReturnType<typeof useTableExport>;
+  part: "notice" | "progress";
 }) {
   const message = exporter.error
     ? `Could not export rows: ${exporter.error}`
@@ -13,7 +17,7 @@ export function TableExportStatus({
       : exporter.statusMessage;
   return (
     <>
-      {message && (
+      {part === "notice" && message && (
         <div
           className={`table-notice ${exporter.error ? "error" : ""}`}
           role={exporter.error ? "alert" : "status"}
@@ -22,8 +26,8 @@ export function TableExportStatus({
           <button onClick={exporter.clearStatus}>Dismiss</button>
         </div>
       )}
-      {exporter.fullExport && (
-        <div className="table-export-progress" role="status">
+      {part === "progress" && exporter.fullExport && (
+        <div className="table-export-progress" role="status" data-hud-avoid="">
           <HardDriveDownload size={16} />
           <span>
             <strong>Exporting all matching rows</strong>

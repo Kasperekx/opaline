@@ -7,7 +7,11 @@ import { WorkSafetyProvider } from "../src/shared/safety/WorkSafety";
 
 function renderDocuments() {
   const editor = {
-    current: { getSubmission: () => undefined, replaceDocument: vi.fn() },
+    current: {
+      getSubmission: () => undefined,
+      replaceDocument: vi.fn(),
+      revealError: vi.fn(),
+    },
   };
   const hook = renderHook(
     () => {

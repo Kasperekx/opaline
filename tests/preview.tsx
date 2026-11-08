@@ -3,12 +3,28 @@
 import { createRoot } from "react-dom/client";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import App from "../src/App";
+import { trackWindowActivity } from "../src/shared/lib/window-activity";
 import { diagramFixture } from "./diagram-fixture";
+import {
+  showcaseCatalog,
+  showcaseDiagram,
+  showcaseStructure,
+  showcaseTablePage,
+} from "./schema-showcase-fixture";
 import { applyFixtureChanges, tableChangePage } from "./table-change-fixture";
+import {
+  workspaceCatalog,
+  workspaceDiagram,
+  workspaceObjects,
+  workspaceStructure,
+  workspaceTablePage,
+  workspaceTableRow,
+} from "./workspace-showcase-fixture";
 import type {
   TableChangesRequest,
   TablePageRequest,
 } from "../src/shared/types/database";
+import type { NamespaceChange } from "../src/shared/types/structure";
 import {
   newProfile,
   type ConnectionCatalog,
@@ -52,6 +68,8 @@ let catalog: ConnectionCatalog = {
 let sessions: SessionInfo[] = [];
 // Explicit URL scenarios keep visual QA independent of the user's saved profiles.
 const scenario = new URLSearchParams(location.search).get("scenario");
+if (scenario === "showcase") catalog = structuredClone(showcaseCatalog);
+if (scenario === "workspace") catalog = structuredClone(workspaceCatalog);
 const inlinePage = structuredClone(tableChangePage);
 inlinePage.hasMore = false;
 if (scenario === "empty")
@@ -68,7 +86,9 @@ if (scenario === "many") {
   );
 }
 mockWindows("main");
+trackWindowActivity();
 mockIPC(async (command, args) => {
+  if (command === "list_schemas") return [{ name: "public" }];
   if (command === "list_enum_types")
     return [
       {
@@ -78,8 +98,83 @@ mockIPC(async (command, args) => {
         values: ["draft", "ready"],
       },
     ];
-  if (command === "database_diagram") return structuredClone(diagramFixture);
+  if (command === "database_diagram")
+    return structuredClone(
+      scenario === "workspace"
+        ? workspaceDiagram
+        : scenario === "showcase"
+          ? showcaseDiagram
+          : diagramFixture,
+    );
   const payload = args as Record<string, unknown>;
+  if (command === "preview_namespace_change") {
+    const input = payload.input as NamespaceChange;
+    const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    return {
+      sql:
+        input.kind === "create"
+          ? `CREATE SCHEMA ${quote(input.name)};`
+          : input.kind === "rename"
+            ? `ALTER SCHEMA ${quote(input.name)} RENAME TO ${quote(input.newName ?? "")};`
+            : `DROP SCHEMA ${quote(input.name)} ${input.dropMode === "cascade" ? "CASCADE" : "RESTRICT"};`,
+      destructive: input.kind === "drop",
+    };
+  }
+  if (command === "apply_namespace_change")
+    throw {
+      kind: "rejected",
+      message: "Visual fixture only: no database operation was performed.",
+    };
+  if (scenario === "workspace") {
+    // Show the normal editable-table UI, but never persist screenshot edits.
+    if (command === "apply_table_changes")
+      throw new Error("The screenshot fixture does not save changes.");
+    if (command === "list_database_objects")
+      return structuredClone(workspaceObjects);
+    if (command === "inspect_relation")
+      return workspaceStructure(String(payload.schema), String(payload.table));
+    if (command === "list_columns")
+      return workspaceStructure(String(payload.schema), String(payload.table))
+        .columns;
+    if (command === "load_table_page")
+      return workspaceTablePage(payload.input as TablePageRequest);
+    if (command === "load_table_row")
+      return workspaceTableRow(
+        payload.input as Parameters<typeof workspaceTableRow>[0],
+      );
+    if (command === "sql_completion_catalog")
+      return workspaceDiagram.tables.flatMap((table) =>
+        table.columns.map((column) => ({
+          schema: table.schema,
+          table: table.name,
+          column: column.name,
+        })),
+      );
+  }
+  if (scenario === "showcase") {
+    if (command === "list_database_objects")
+      return showcaseDiagram.tables.map(({ schema, name }) => ({
+        schema,
+        name,
+        objectType: "table",
+        estimatedRows: name === "players" ? 3 : 0,
+      }));
+    if (command === "inspect_relation")
+      return showcaseStructure(String(payload.schema), String(payload.table));
+    if (command === "list_columns")
+      return showcaseStructure(String(payload.schema), String(payload.table))
+        .columns;
+    if (command === "load_table_page")
+      return showcaseTablePage(payload.input as TablePageRequest);
+    if (command === "sql_completion_catalog")
+      return showcaseDiagram.tables.flatMap((table) =>
+        table.columns.map((column) => ({
+          schema: table.schema,
+          table: table.name,
+          column: column.name,
+        })),
+      );
+  }
   if (command === "preview_schema_change")
     return {
       sql: '-- Visual fixture only — no database changes\nCREATE TABLE "public"."orders" (\n  "id" bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY\n);',
@@ -146,6 +241,8 @@ mockIPC(async (command, args) => {
         ],
       };
     if (command === "load_table_page") {
+      if (scenario === "inline-load-error")
+        throw "Could not load table data: Access denied by PostgreSQL.\nCheck the connected role's schema, table and sequence privileges. A restore may retain ownership or grants from the source database.\nSQLSTATE 42501";
       const input = payload.input as TablePageRequest;
       const page = structuredClone(inlinePage);
       page.rows = page.rows.filter((row) =>
@@ -342,6 +439,21 @@ mockIPC(async (command, args) => {
       editabilityReason: null,
       insertabilityReason: null,
     };
+  if (command === "run_query") {
+    // A typo like "fro" (for FROM) returns a PostgreSQL-style syntax error with
+    // a character position, so inline diagnostics can be checked visually.
+    const sql = String(payload.sql ?? "");
+    const typo = sql.search(/\bfro\b/i);
+    if (typo >= 0)
+      throw {
+        kind: "database",
+        message: 'syntax error at or near "fro"',
+        detail: null,
+        hint: 'Did you mean "from"?',
+        code: "42601",
+        position: typo + 1,
+      };
+  }
   if (command === "run_query")
     return {
       durationMs: 2,

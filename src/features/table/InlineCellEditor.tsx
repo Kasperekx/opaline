@@ -155,7 +155,7 @@ export function InlineCellEditor({
               setExpanded(true);
             }}
           >
-            <Maximize2 size={13} />
+            <Maximize2 size={12} />
           </button>
         )}
         {value === undefined && (
@@ -179,11 +179,30 @@ export function InlineCellEditor({
           {error}
         </small>
       )}
+      {!expanded && !error && (
+        <span className="inline-editor-hint" aria-hidden="true">
+          <span>
+            <b>Return</b> stages
+          </span>
+          <span>
+            <b>Esc</b> restores
+          </span>
+          <span>
+            <b>Tab</b> next cell
+          </span>
+        </span>
+      )}
       {expanded && (
         <footer>
           <span>Stage with ⌘/Ctrl + Enter · save from the table</span>
-          <button onClick={onCancel}>Cancel</button>
-          <button disabled={Boolean(error)} onClick={onCommit}>
+          <button className="button secondary compact" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="button primary compact"
+            disabled={Boolean(error)}
+            onClick={onCommit}
+          >
             Stage value
           </button>
         </footer>
