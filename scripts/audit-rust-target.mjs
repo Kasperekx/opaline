@@ -30,8 +30,10 @@ export function classifyFindings(metadata, audit) {
     ...Object.entries(audit.warnings).flatMap(([kind, entries]) => entries.map(finding => ({ ...finding, kind }))),
   ];
   const scoped = findings.map(finding => {
-    if (!finding.package?.name || !finding.package.version || !finding.advisory?.id) throw new Error("Unrecognized advisory record.");
-    return { id: finding.advisory.id, package: finding.package.name + "@" + finding.package.version,
+    // cargo audit reports a yanked crate with `advisory: null`; nothing else may omit it.
+    const id = finding.kind === "yanked" && finding.advisory === null ? "yanked" : finding.advisory?.id;
+    if (!finding.package?.name || !finding.package.version || !id) throw new Error("Unrecognized advisory record.");
+    return { id, package: finding.package.name + "@" + finding.package.version,
       kind: finding.kind, inTarget: compiled.has(finding.package.name + "@" + finding.package.version) };
   });
   return { packages: compiled.size, findings: scoped,
