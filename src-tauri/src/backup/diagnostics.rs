@@ -1,9 +1,11 @@
 // PostgreSQL stderr can include SQL, row values, paths and credentials. Only
 // return fixed messages: matching a diagnostic never makes its text safe to show.
 const UNKNOWN: &str = "The PostgreSQL tool reported an error. Check the backup's compatibility, required objects and database privileges. Raw tool output is hidden because it can contain data or credentials.";
+const CONNECTION_FAILED: &str = "The database connection failed. Check the host and port, server availability, network access and the server's connection rules or limits.";
 
 pub(super) fn diagnostic(bytes: &[u8]) -> &'static str {
     let text = String::from_utf8_lossy(bytes).to_lowercase();
+    let mut connection_failed = false;
     for line in text.lines() {
         let line = line.trim_start();
         if [
@@ -19,31 +21,49 @@ pub(super) fn diagnostic(bytes: &[u8]) -> &'static str {
         {
             continue;
         }
+        // libpq reports each resolved address and prefixes only the first, so a
+        // refused address (often ::1) can precede the failure that explains it.
+        let next_address = connection_failed && line.starts_with("connection to server");
         // Tools run with LC_ALL=C. Ignore verbose progress and SQL continuation
         // lines; recognize server ERROR/FATAL and the clients' error prefixes.
-        if ![
-            "error:",
-            "fatal:",
-            "pg_dump: error:",
-            "pg_restore: error:",
-            "psql:",
-        ]
-        .iter()
-        .any(|prefix| line.starts_with(prefix))
+        if !next_address
+            && ![
+                "error:",
+                "fatal:",
+                "pg_dump: error:",
+                "pg_restore: error:",
+                "psql:",
+            ]
+            .iter()
+            .any(|prefix| line.starts_with(prefix))
         {
             continue;
         }
-        let Some((_, message)) = line
-            .split_once("error:")
-            .or_else(|| line.split_once("fatal:"))
-        else {
-            continue;
+        if connection_failed && !next_address {
+            break;
+        }
+        let message = if next_address {
+            line
+        } else {
+            let Some((_, message)) = line
+                .split_once("error:")
+                .or_else(|| line.split_once("fatal:"))
+            else {
+                continue;
+            };
+            message
         };
-        if let Some(message) = classify(message) {
-            return message;
+        match classify(message) {
+            Some(CONNECTION_FAILED) => connection_failed = true,
+            Some(message) => return message,
+            None => {}
         }
     }
-    UNKNOWN
+    if connection_failed {
+        CONNECTION_FAILED
+    } else {
+        UNKNOWN
+    }
 }
 
 fn classify(message: &str) -> Option<&'static str> {
@@ -135,7 +155,7 @@ fn classify(message: &str) -> Option<&'static str> {
             "remaining connection slots",
         ]) || (message.contains("connection to server") && message.contains("failed"))
         {
-            "The database connection failed. Check the host and port, server availability, network access and the server's connection rules or limits."
+            CONNECTION_FAILED
         } else if message.contains("does not exist") {
             "A required database object is missing. Check the target database and use a complete dump that includes the required schema and dependencies."
         } else if message.contains("violates") && message.contains("constraint") {
@@ -179,6 +199,36 @@ mod tests {
             assert!(result.contains(advice), "Wrong advice for {stderr}: {result}");
             assert!(!result.contains("private"), "Diagnostic leaked source details");
         }
+    }
+
+    #[test]
+    fn a_later_address_explains_a_refused_connection() {
+        let attempt = |cause: &str| {
+            format!(
+                "psql: error: connection to server at \"private-host\" (::1), port 5432 failed: Connection refused\n\
+                 \tIs the server running on that host and accepting TCP/IP connections?\n\
+                 connection to server at \"private-host\" (127.0.0.1), port 5432 failed: {cause}\n"
+            )
+        };
+        assert!(
+            diagnostic(attempt("SSL error: certificate verify failed").as_bytes())
+                .starts_with("TLS verification failed.")
+        );
+        assert!(diagnostic(
+            attempt("FATAL:  password authentication failed for user \"private-role\"").as_bytes()
+        )
+        .starts_with("Authentication failed."));
+        assert_eq!(
+            diagnostic(attempt("Connection refused").as_bytes()),
+            CONNECTION_FAILED
+        );
+    }
+
+    #[test]
+    fn only_address_attempts_refine_a_connection_failure() {
+        let output = b"pg_restore: error: connection to server at \"private-host\", port 5432 failed: Connection refused\n\
+                       pg_restore: error: could not execute query: ERROR: permission denied\n";
+        assert_eq!(diagnostic(output), CONNECTION_FAILED);
     }
 
     #[test]
