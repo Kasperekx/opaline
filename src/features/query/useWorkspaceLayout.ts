@@ -5,19 +5,26 @@ const STORAGE_KEY = "opaline.workspace-layout.v1";
 const DEFAULT_EXPLORER_WIDTH = 300;
 const DEFAULT_EDITOR_RATIO = 48;
 
-type WorkspaceLayout = {
+type WorkspaceLayoutState = {
   explorerWidth: number;
   editorRatio: number;
+};
+
+export type WorkspaceLayout = WorkspaceLayoutState & {
+  resizeExplorer: (delta: number) => void;
+  resizeEditor: (deltaPercent: number) => void;
+  resetExplorer: () => void;
+  resetEditor: () => void;
 };
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
 
-const loadLayout = (): WorkspaceLayout => {
+const loadLayout = (): WorkspaceLayoutState => {
   const value = readLocalJson<unknown>(STORAGE_KEY, null);
   const stored =
     value && typeof value === "object"
-      ? (value as Partial<WorkspaceLayout>)
+      ? (value as Partial<WorkspaceLayoutState>)
       : {};
   return {
     explorerWidth: clamp(
@@ -33,7 +40,7 @@ const loadLayout = (): WorkspaceLayout => {
   };
 };
 
-export function useWorkspaceLayout() {
+export function useWorkspaceLayout(): WorkspaceLayout {
   const [layout, setLayout] = useState(loadLayout);
 
   useEffect(() => {

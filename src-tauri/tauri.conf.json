@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Opaline",
@@ -27,8 +28,13 @@
         "shadow": true,
         "theme": "Dark",
         "hiddenTitle": true,
-        "titleBarStyle": "Transparent"
-
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": { "x": 22, "y": 25 },
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["sidebar"],
+          "state": "followsWindowActiveState"
+        }
       }
     ],
     "security": {

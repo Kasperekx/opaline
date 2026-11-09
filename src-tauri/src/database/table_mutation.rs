@@ -184,7 +184,12 @@ async fn execute_bulk_mutation(
     let affected_rows: i64 = client
         .query_one(sql, &parameter_refs)
         .await
-        .map_err(|error| format!("Could not {operation} selected rows: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error(
+                &format!("Could not {operation} selected rows"),
+                error,
+            )
+        })?
         .get(0);
     if affected_rows != expected_rows as i64 {
         return Err(

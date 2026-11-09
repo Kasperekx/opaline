@@ -164,7 +164,8 @@ describe("connection launcher", () => {
     screen
       .getByRole("button", { name: "View details for Local database" })
       .focus();
-    await user.keyboard("{Enter}");
+    // Space opens details; Return is reserved for connecting.
+    await user.keyboard(" ");
     const dialog = screen.getByRole("dialog", { name: "Local database" });
     expect(
       within(dialog).getByText("Preferred · may be unencrypted"),

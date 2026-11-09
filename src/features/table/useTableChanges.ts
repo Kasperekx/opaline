@@ -23,6 +23,9 @@ import {
 } from "./table-change-set";
 import type { InsertCellValue } from "./table-types";
 
+/** How long the bar shows its saved check before it leaves. */
+const SAVED_HOLD_MS = 1200;
+
 export function useTableChanges(
   tab: TableTab,
   data: TableDataPage | null,
@@ -48,7 +51,7 @@ export function useTableChanges(
   useEffect(() => () => confirmation.current?.(false), []);
   useEffect(() => {
     if (!saved) return;
-    const timeout = window.setTimeout(() => setSaved(false), 3500);
+    const timeout = window.setTimeout(() => setSaved(false), SAVED_HOLD_MS);
     return () => window.clearTimeout(timeout);
   }, [saved]);
 
@@ -293,6 +296,8 @@ export function useTableChanges(
         throw new Error("Invalid save acknowledgement");
       }
       replaceRows([]);
+      // Confirmed in the changes bar, where the user acted (no HUD: one
+      // feedback channel per event).
       setSaved(true);
       try {
         onSaved(result, submitted);

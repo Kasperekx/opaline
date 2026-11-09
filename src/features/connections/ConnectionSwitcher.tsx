@@ -1,12 +1,19 @@
-import { Database, Plus, Search, Settings2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Database,
+  Plus,
+  Search,
+  Settings2,
+} from "lucide-react";
 import { useState } from "react";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { EnvironmentBadge } from "./EnvironmentBadge";
 import type {
   ConnectionProfile,
   ProductWorkspace,
   SessionInfo,
 } from "./connection-types";
+import { rememberProfile } from "./last-profile";
 import "./connection-switcher.css";
 
 type Props = {
@@ -39,15 +46,45 @@ export function ConnectionSwitcher({
       ),
   );
   return (
-    <ConnectionDialog
+    <Sheet
       title="Switch connection"
       subtitle={workspace?.name ?? "Workspace"}
       className="connection-switcher-dialog"
+      icon={ArrowLeftRight}
+      size={560}
       onClose={onClose}
     >
-      <div className="connection-switcher">
-        <label className="switcher-search">
-          <Search size={17} />
+      <div
+        className="connection-switcher"
+        onKeyDown={(event) => {
+          // Arrows walk search -> rows (and back up to search); Return on a
+          // row is the button's own activation.
+          if (event.metaKey || event.ctrlKey || event.altKey) return;
+          const direction =
+            event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+          if (!direction) return;
+          const stops = [
+            ...event.currentTarget.querySelectorAll<HTMLElement>(
+              ".switcher-search input, .switcher-row:not(:disabled)",
+            ),
+          ];
+          const from = stops.indexOf(event.target as HTMLElement);
+          if (from < 0 || stops.length < 2) return;
+          event.preventDefault();
+          // From search, skip the current connection when another exists.
+          let next = from + direction;
+          if (
+            from === 0 &&
+            direction === 1 &&
+            stops[1]?.getAttribute("aria-current") === "true" &&
+            stops.length > 2
+          )
+            next = 2;
+          stops[Math.min(stops.length - 1, Math.max(0, next))]?.focus();
+        }}
+      >
+        <label className="switcher-search search-capsule">
+          <Search size={13} aria-hidden="true" />
           <input
             data-initial-focus="true"
             aria-label="Find a workspace connection"
@@ -62,17 +99,20 @@ export function ConnectionSwitcher({
             const connected = sessions.some(
               (session) => session.profileId === profile.id,
             );
-            const destination = `${profile.database} · ${profile.host}:${profile.port}`;
+            const destination = `${profile.username}@${profile.host}:${profile.port}/${profile.database}`;
             return (
               <button
                 key={profile.id}
-                className="switcher-row"
+                className={"switcher-row env-" + profile.environment}
                 aria-current={isCurrent || undefined}
                 disabled={busy}
-                onClick={() => onSelect(profile)}
+                onClick={() => {
+                  rememberProfile(profile.workspaceId, profile.id);
+                  onSelect(profile);
+                }}
               >
                 <span className="switcher-icon" aria-hidden="true">
-                  <Database size={19} />
+                  <Database size={16} strokeWidth={1.6} />
                 </span>
                 <span className="switcher-identity">
                   <strong title={profile.name}>{profile.name}</strong>
@@ -106,7 +146,7 @@ export function ConnectionSwitcher({
             disabled={busy}
             onClick={() => onManage(true)}
           >
-            <Plus size={16} />
+            <Plus size={14} />
             New connection
           </button>
           <button
@@ -114,11 +154,11 @@ export function ConnectionSwitcher({
             disabled={busy}
             onClick={() => onManage(false)}
           >
-            <Settings2 size={16} />
+            <Settings2 size={14} />
             Manage workspaces
           </button>
         </footer>
       </div>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

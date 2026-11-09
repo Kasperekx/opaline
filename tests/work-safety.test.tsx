@@ -142,6 +142,7 @@ it.each([
   "setPageSize",
   "applyFilter",
   "clearFilter",
+  "resetView",
   "toggleSort",
   "refresh",
 ] as const)("protects table drafts before %s", async (name) => {

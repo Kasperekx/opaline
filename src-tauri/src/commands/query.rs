@@ -84,7 +84,10 @@ pub(crate) async fn execute_with_mode(
     let (client, tls, lease) = state.begin_operation(session_id, false).await?;
     let read_only = lease.session.info.read_only;
     let database_error = |e: tokio_postgres::Error| {
-        QueryExecutionError::simple(QueryErrorKind::Database, e.to_string())
+        QueryExecutionError::simple(
+            QueryErrorKind::Database,
+            crate::database::diagnostics::database_error("Could not begin query execution", e),
+        )
     };
     if read_only {
         if mode == ExecutionMode::Autocommit {

@@ -1,6 +1,14 @@
-import { Braces, Check, KeyRound, ListTree } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  AlertTriangle,
+  Braces,
+  Check,
+  ChevronDown,
+  ListTree,
+  type LucideIcon,
+} from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "../../shared/components/CopyButton";
+import { useSqlHighlight } from "./sql-highlight";
 import type {
   StructureConstraint,
   StructureIndex,
@@ -9,51 +17,79 @@ import type {
 export function StructureEmpty({
   title,
   description,
+  Icon = ListTree,
 }: {
   title: string;
   description: string;
+  Icon?: LucideIcon;
 }) {
   return (
     <div className="structure-empty">
-      <ListTree size={24} />
+      <Icon size={24} aria-hidden="true" />
       <strong>{title}</strong>
       <p>{description}</p>
     </div>
   );
 }
 
-export function DefinitionDetails({ definition }: { definition: string }) {
+function DefinitionContent({ definition }: { definition: string }) {
+  const code = useRef<HTMLElement>(null);
+  useSqlHighlight(code, definition);
   return (
-    <details className="structure-definition">
-      <summary>SQL definition</summary>
-      <div>
-        <pre>{definition}</pre>
-        <CopyButton value={definition} label="Copy definition" />
-      </div>
-    </details>
+    <div className="structure-definition-content">
+      <pre>
+        <code ref={code}>{definition}</code>
+      </pre>
+      <CopyButton value={definition} label="Copy definition" />
+    </div>
   );
 }
 
-function DefinitionItem({
+export function StructureDefinitionRow({
   name,
-  badge,
   children,
   definition,
+  columnCount,
 }: {
   name: string;
-  badge: ReactNode;
   children: ReactNode;
   definition: string;
+  columnCount: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const definitionId = useId();
   return (
-    <article className="structure-definition-item">
-      <header>
-        <strong>{name}</strong>
-        <div className="structure-badges">{badge}</div>
-      </header>
-      {children}
-      <DefinitionDetails definition={definition} />
-    </article>
+    <tbody className={expanded ? "is-expanded" : undefined}>
+      <tr>
+        {children}
+        <td className="structure-definition-action">
+          <button
+            type="button"
+            className="toolbar-button structure-definition-toggle"
+            aria-label={`${expanded ? "Hide" : "Show"} SQL definition for ${name}`}
+            aria-expanded={expanded}
+            aria-controls={definitionId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            <span>SQL</span>
+            <ChevronDown size={10} aria-hidden="true" />
+          </button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="structure-definition-row">
+          <td colSpan={columnCount}>
+            <div
+              id={definitionId}
+              role="region"
+              aria-label={`SQL definition for ${name}`}
+            >
+              <DefinitionContent definition={definition} />
+            </div>
+          </td>
+        </tr>
+      )}
+    </tbody>
   );
 }
 
@@ -66,70 +102,73 @@ export function StructureIndexes({ indexes }: { indexes: StructureIndex[] }) {
       />
     );
   return (
-    <div className="structure-definition-list">
-      {indexes.map((index) => (
-        <DefinitionItem
-          key={index.name}
-          name={index.name}
-          definition={index.definition}
-          badge={
-            <>
-              {index.primary ? (
-                <span className="structure-badge accent">
-                  <KeyRound size={12} /> Primary
-                </span>
-              ) : (
-                index.unique && (
-                  <span className="structure-badge accent">Unique</span>
-                )
+    <div className="structure-metadata-scroll">
+      <table className="structure-metadata-table indexes" aria-label="Indexes">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Keys</th>
+            <th scope="col">Method</th>
+            <th scope="col">Status</th>
+            <th scope="col">Definition</th>
+          </tr>
+        </thead>
+        {indexes.map((index) => (
+          <StructureDefinitionRow
+            key={index.name}
+            name={index.name}
+            definition={index.definition}
+            columnCount={5}
+          >
+            <th scope="row">
+              <div className="structure-object-name">
+                <code>{index.name}</code>
+                {index.primary ? (
+                  <span className="structure-badge accent">Primary</span>
+                ) : (
+                  index.unique && (
+                    <span className="structure-badge">Unique</span>
+                  )
+                )}
+              </div>
+              {index.constraintName && (
+                <div className="structure-metadata-secondary">
+                  <span>Constraint</span> <code>{index.constraintName}</code>
+                </div>
               )}
-              <span className="structure-badge">{index.method}</span>
+            </th>
+            <td>
+              <code>{index.columns.join(", ")}</code>
+              {index.includedColumns.length > 0 && (
+                <div className="structure-metadata-secondary">
+                  <span>Include</span>{" "}
+                  <code>{index.includedColumns.join(", ")}</code>
+                </div>
+              )}
+              {index.predicate && (
+                <div className="structure-metadata-secondary">
+                  <span>Where</span> <code>{index.predicate}</code>
+                </div>
+              )}
+            </td>
+            <td>
+              <code>{index.method}</code>
+            </td>
+            <td>
               <span
-                className={`structure-badge ${index.valid ? "" : "warning"}`}
+                className={`structure-metadata-status${index.valid ? "" : " warning"}`}
               >
                 {index.valid ? (
-                  <>
-                    <Check size={12} /> Valid
-                  </>
+                  <Check size={12} aria-hidden="true" />
                 ) : (
-                  "Invalid"
+                  <AlertTriangle size={12} aria-hidden="true" />
                 )}
+                {index.valid ? "Valid" : "Invalid"}
               </span>
-            </>
-          }
-        >
-          <dl className="structure-properties">
-            <div>
-              <dt>Keys</dt>
-              <dd>
-                <code>{index.columns.join(", ")}</code>
-              </dd>
-            </div>
-            {index.includedColumns.length > 0 && (
-              <div>
-                <dt>Included</dt>
-                <dd>
-                  <code>{index.includedColumns.join(", ")}</code>
-                </dd>
-              </div>
-            )}
-            {index.predicate && (
-              <div>
-                <dt>Where</dt>
-                <dd>
-                  <code>{index.predicate}</code>
-                </dd>
-              </div>
-            )}
-            {index.constraintName && (
-              <div>
-                <dt>Constraint</dt>
-                <dd>{index.constraintName}</dd>
-              </div>
-            )}
-          </dl>
-        </DefinitionItem>
-      ))}
+            </td>
+          </StructureDefinitionRow>
+        ))}
+      </table>
     </div>
   );
 }
@@ -154,49 +193,71 @@ export function StructureConstraints({
       <StructureEmpty
         title="No table constraints"
         description="Column nullability is shown in Columns. No additional constraints are defined."
+        Icon={Braces}
       />
     );
   return (
-    <div className="structure-definition-list">
-      {constraints.map((constraint) => (
-        <DefinitionItem
-          key={constraint.name}
-          name={constraint.name}
-          definition={constraint.definition}
-          badge={
-            <>
-              <span className="structure-badge accent">
-                <Braces size={12} />{" "}
+    <div className="structure-metadata-scroll">
+      <table
+        className="structure-metadata-table constraints"
+        aria-label="Constraints"
+      >
+        <thead>
+          <tr>
+            <th scope="col">Name / type</th>
+            <th scope="col">Columns</th>
+            <th scope="col">Timing</th>
+            <th scope="col">Validation</th>
+            <th scope="col">Definition</th>
+          </tr>
+        </thead>
+        {constraints.map((constraint) => (
+          <StructureDefinitionRow
+            key={constraint.name}
+            name={constraint.name}
+            definition={constraint.definition}
+            columnCount={5}
+          >
+            <th scope="row">
+              <div className="structure-object-name">
+                <code>{constraint.name}</code>
+              </div>
+              <span className="structure-object-kind">
                 {constraintNames[constraint.kind] ?? constraint.kind}
               </span>
+            </th>
+            <td>
+              {constraint.columns.length > 0 ? (
+                <code>{constraint.columns.join(", ")}</code>
+              ) : (
+                <span className="structure-metadata-secondary">
+                  Table-level
+                </span>
+              )}
+            </td>
+            <td>
+              <span>{constraint.deferrable ? "Deferrable" : "Immediate"}</span>
+              <span className="structure-metadata-secondary">
+                {constraint.deferrable
+                  ? `Initially ${constraint.initiallyDeferred ? "deferred" : "immediate"}`
+                  : "Not deferrable"}
+              </span>
+            </td>
+            <td>
               <span
-                className={`structure-badge ${constraint.validated ? "" : "warning"}`}
+                className={`structure-metadata-status${constraint.validated ? "" : " warning"}`}
               >
+                {constraint.validated ? (
+                  <Check size={12} aria-hidden="true" />
+                ) : (
+                  <AlertTriangle size={12} aria-hidden="true" />
+                )}
                 {constraint.validated ? "Validated" : "Not validated"}
               </span>
-            </>
-          }
-        >
-          <dl className="structure-properties">
-            {constraint.columns.length > 0 && (
-              <div>
-                <dt>Columns</dt>
-                <dd>
-                  <code>{constraint.columns.join(", ")}</code>
-                </dd>
-              </div>
-            )}
-            <div>
-              <dt>Timing</dt>
-              <dd>
-                {constraint.deferrable
-                  ? `Deferrable · initially ${constraint.initiallyDeferred ? "deferred" : "immediate"}`
-                  : "Immediate · not deferrable"}
-              </dd>
-            </div>
-          </dl>
-        </DefinitionItem>
-      ))}
+            </td>
+          </StructureDefinitionRow>
+        ))}
+      </table>
     </div>
   );
 }

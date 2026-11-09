@@ -30,7 +30,9 @@ pub(super) async fn relation(
             &[&schema, &table],
         )
         .await
-        .map_err(|error| format!("Could not inspect this relation: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not inspect this relation", error)
+        })?
         .ok_or_else(|| {
             "This relation no longer exists or is not supported. Refresh the explorer.".to_string()
         })?;
@@ -79,7 +81,9 @@ pub(super) async fn columns(
             &[&oid],
         )
         .await
-        .map_err(|error| format!("Could not inspect columns: {error}"))?;
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not inspect columns", error)
+        })?;
     if columns.len() != details.len() {
         return Err("The table structure changed while loading. Refresh and try again.".into());
     }
@@ -127,7 +131,9 @@ pub(super) async fn indexes(client: &Client, oid: u32) -> Result<Vec<StructureIn
             &[&oid],
         )
         .await
-        .map_err(|error| format!("Could not inspect indexes: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not inspect indexes", error)
+        })?
         .into_iter()
         .map(|row| {
             Ok(StructureIndex {
@@ -163,7 +169,9 @@ pub(super) async fn constraints(
             &[&oid],
         )
         .await
-        .map_err(|error| format!("Could not inspect constraints: {error}"))?
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not inspect constraints", error)
+        })?
         .into_iter()
         .map(|row| {
             Ok(StructureConstraint {
@@ -205,7 +213,7 @@ pub(super) async fn foreign_keys(
            AND (con.conrelid = $1 OR con.conparentid = 0) \
          ORDER BY con.conrelid <> $1, sn.nspname, source.relname, con.conname",
         &[&oid],
-    ).await.map_err(|error| format!("Could not inspect foreign keys: {error}"))?
+    ).await.map_err(|error| crate::database::diagnostics::database_error("Could not inspect foreign keys", error))?
         .into_iter().map(|row| Ok(StructureForeignKey {
             name: row.get(0), direction: row.get(1), source_schema: row.get(2),
             source_table: row.get(3), source_columns: row.get(4), target_schema: row.get(5),

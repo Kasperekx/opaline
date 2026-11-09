@@ -1,9 +1,15 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Check, Database, FileKey2, Loader2, ShieldCheck } from "lucide-react";
-import { EnvironmentBadge } from "./EnvironmentBadge";
+import {
+  Check,
+  Database,
+  Info,
+  Loader2,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { errorMessage } from "../../shared/lib/database-api";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet, SheetFooter } from "../../shared/components/Sheet";
 import { useFormSafety } from "../../shared/safety/useFormSafety";
 import { connectionApi } from "./connection-api";
 import {
@@ -26,6 +32,7 @@ export function ProfileEditor({
   onClose: () => void;
 }) {
   const [value, setValue] = useState(initial);
+  const fieldId = useId();
   const [remember, setRemember] = useState(initial.passwordAction !== "forget");
   const [busy, setBusy] = useState<"test" | "save" | null>(null);
   const closeSafely = useFormSafety(
@@ -103,10 +110,19 @@ export function ProfileEditor({
       setError(errorMessage(error));
     }
   };
+  const workspaceName =
+    workspaces.find((w) => w.id === value.workspaceId)?.name ?? "";
+  const target = `${value.username || "user"}@${value.host || "host"}:${
+    value.port || 5432
+  }/${value.database || "database"}`;
   return (
-    <ConnectionDialog
+    <Sheet
       title={initial.id ? "Edit connection" : "New connection"}
-      subtitle="PostgreSQL · Connection profile"
+      subtitle={`PostgreSQL profile${
+        workspaceName ? ` in ${workspaceName}` : ""
+      }. Test the connection before you save.`}
+      icon={Database}
+      size={800}
       className="profile-editor-dialog"
       busy={!!busy}
       onClose={() => closeSafely(onClose)}
@@ -117,79 +133,97 @@ export function ProfileEditor({
             className="profile-identity-section"
             aria-label="Profile identity"
           >
-            <div className="profile-provider">
-              <Database size={22} />
-              <div>
-                <strong>PostgreSQL</strong>
-                <small>Database connection</small>
+            <label>
+              Connection name
+              <input
+                data-initial-focus={true}
+                required
+                maxLength={255}
+                value={value.name}
+                placeholder="e.g. MMO · Local"
+                onChange={(e) => update("name", e.target.value)}
+              />
+            </label>
+            <label>
+              Workspace
+              <select
+                value={value.workspaceId}
+                onChange={(e) => update("workspaceId", e.target.value)}
+              >
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div
+              className="profile-choice"
+              role="radiogroup"
+              aria-labelledby={`${fieldId}-environment`}
+            >
+              <span id={`${fieldId}-environment`}>Environment</span>
+              <div className="segmented-capsule profile-segments">
+                {environments.map((env) => (
+                  <label key={env} className={`env-${env}`}>
+                    <input
+                      type="radio"
+                      name={`${fieldId}-environment`}
+                      value={env}
+                      checked={value.environment === env}
+                      onChange={() => update("environment", env)}
+                    />
+                    <i aria-hidden="true" />
+                    {environmentLabels[env]}
+                  </label>
+                ))}
               </div>
             </div>
-            <div className="profile-form-grid">
-              <label>
-                Connection name
-                <input
-                  data-initial-focus={true}
-                  required
-                  maxLength={255}
-                  value={value.name}
-                  placeholder="e.g. MMO · Local"
-                  onChange={(e) => update("name", e.target.value)}
-                />
-              </label>
-              <label>
-                Workspace
-                <select
-                  value={value.workspaceId}
-                  onChange={(e) => update("workspaceId", e.target.value)}
-                >
-                  {workspaces.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Environment
-                <select
-                  value={value.environment}
-                  onChange={(e) =>
-                    update(
-                      "environment",
-                      e.target.value as ProfileInput["environment"],
-                    )
-                  }
-                >
-                  {environments.map((env) => (
-                    <option key={env} value={env}>
-                      {environmentLabels[env]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Access
-                <select
-                  value={value.readOnly ? "read" : "write"}
-                  onChange={(e) =>
-                    update("readOnly", e.target.value === "read")
-                  }
-                >
-                  <option value="write">Read & write</option>
-                  <option value="read">Read-only</option>
-                </select>
-              </label>
+            <div
+              className="profile-choice"
+              role="radiogroup"
+              aria-labelledby={`${fieldId}-access`}
+            >
+              <span id={`${fieldId}-access`}>Access</span>
+              <div className="segmented-capsule profile-segments">
+                {(
+                  [
+                    ["write", "Read & write"],
+                    ["read", "Read-only"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <label key={mode}>
+                    <input
+                      type="radio"
+                      name={`${fieldId}-access`}
+                      value={mode}
+                      checked={value.readOnly === (mode === "read")}
+                      onChange={() => update("readOnly", mode === "read")}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
             {value.environment === "production" && (
               <p className="connection-notice production-notice">
-                Production connection.{" "}
-                {value.readOnly
-                  ? "Writes will be blocked."
-                  : "You will be asked to confirm write access each time you connect."}
+                <TriangleAlert size={13} aria-hidden="true" />
+                <span>
+                  Production connection.{" "}
+                  {value.readOnly
+                    ? "Writes will be blocked."
+                    : "You will be asked to confirm write access each time you connect."}
+                </span>
               </p>
             )}
-            <div className="profile-summary">
-              <EnvironmentBadge environment={value.environment} />
+            <div className={`profile-summary env-${value.environment}`}>
+              <strong>
+                <i aria-hidden="true" />
+                {environmentLabels[value.environment]}
+                <span>·</span>
+                <em>{value.readOnly ? "Read-only" : "Read & write"}</em>
+              </strong>
+              <code>{target}</code>
               <p>
                 {value.readOnly
                   ? "Read-only access. Changes to data are blocked."
@@ -202,13 +236,10 @@ export function ProfileEditor({
               className="profile-section"
               aria-label="Server and credentials"
             >
-              <header>
-                <h3>Server & credentials</h3>
-                <p>Where should Opaline connect?</p>
-              </header>
-              <div className="profile-form-grid destination-fields">
-                <label className="host-field">
-                  Host
+              <h3>Server</h3>
+              <div className="form-group-box">
+                <label className="form-row">
+                  <span>Host</span>
                   <input
                     required
                     maxLength={255}
@@ -218,9 +249,10 @@ export function ProfileEditor({
                     onChange={(e) => update("host", e.target.value)}
                   />
                 </label>
-                <label>
-                  Port
+                <label className="form-row">
+                  <span>Port</span>
                   <input
+                    className="port-input"
                     required
                     type="number"
                     min={1}
@@ -229,70 +261,74 @@ export function ProfileEditor({
                     onChange={(e) => update("port", Number(e.target.value))}
                   />
                 </label>
-                <label>
-                  Database
+                <label className="form-row">
+                  <span>Database</span>
                   <input
                     required
                     maxLength={255}
                     value={value.database}
+                    spellCheck={false}
                     onChange={(e) => update("database", e.target.value)}
                   />
                 </label>
-                <label>
-                  Username
+                <label className="form-row">
+                  <span>Username</span>
                   <input
                     required
                     maxLength={255}
                     value={value.username}
                     autoComplete="off"
+                    spellCheck={false}
                     onChange={(e) => update("username", e.target.value)}
                   />
                 </label>
               </div>
-              <label>
-                Password
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={value.password ?? ""}
-                  placeholder={
-                    initial.passwordAction === "keep"
-                      ? "Saved in system vault — leave unchanged"
-                      : "Optional"
-                  }
-                  onChange={(e) => update("password", e.target.value)}
-                />
-              </label>
-              <label className="check-field">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => {
-                    setRemember(e.target.checked);
-                    setTested(false);
-                  }}
-                />
-                <span>
-                  Save password in the system credential store
-                  <small>
-                    {remember
-                      ? "Stored securely by your operating system, never in the profile."
-                      : "The profile will not contain a password. Enter it when connecting."}
-                  </small>
-                </span>
-              </label>
+              <h3>Password</h3>
+              <div className="form-group-box">
+                <label className="form-row">
+                  <span>Password</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={value.password ?? ""}
+                    placeholder={
+                      initial.passwordAction === "keep"
+                        ? "Saved in system vault — leave unchanged"
+                        : "Optional"
+                    }
+                    onChange={(e) => update("password", e.target.value)}
+                  />
+                </label>
+                <label className="form-row switch-row">
+                  <span>
+                    Save password in Keychain
+                    <small>
+                      {remember
+                        ? "Stored securely by your operating system, never in the profile."
+                        : "The profile will not contain a password. Enter it when connecting."}
+                    </small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="switch"
+                    checked={remember}
+                    onChange={(e) => {
+                      setRemember(e.target.checked);
+                      setTested(false);
+                    }}
+                  />
+                </label>
+              </div>
             </section>
             <section
               className="profile-section profile-security-section"
               aria-label="Connection security"
             >
-              <header>
-                <h3>Connection security</h3>
-                <p>Choose how traffic to your database is protected.</p>
-              </header>
-              <div className="profile-form-grid">
-                <label>
-                  TLS
+              <h3>Security</h3>
+              <div className="form-group-box">
+                <label className="form-row">
+                  <span>TLS</span>
                   <select
                     value={value.sslMode}
                     onChange={(e) => {
@@ -308,30 +344,35 @@ export function ProfileEditor({
                     <option value="disable">Disable — unencrypted</option>
                   </select>
                 </label>
-                <div className="ca-field">
-                  <span>Custom CA certificate</span>
+                <div className="form-row ca-field">
+                  <span>Custom CA</span>
+                  {value.caPath ? (
+                    <code className="ca-path" title={value.caPath}>
+                      {value.caPath}
+                    </code>
+                  ) : (
+                    <em className="ca-path is-empty">System trust store</em>
+                  )}
                   <button
-                    className="button ghost"
+                    className={
+                      "button compact " + (value.caPath ? "ghost" : "secondary")
+                    }
                     type="button"
                     onClick={() => void chooseCa()}
                   >
-                    <FileKey2 size={16} />
                     {value.caPath ? "Change certificate" : "Choose PEM file"}
                   </button>
+                  {value.caPath && (
+                    <button
+                      type="button"
+                      className="button compact ghost ca-remove"
+                      onClick={() => update("caPath", null)}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               </div>
-              {value.caPath && (
-                <div className="ca-path">
-                  <code>{value.caPath}</code>
-                  <button
-                    type="button"
-                    className="button ghost"
-                    onClick={() => update("caPath", null)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
               <p className="form-help">
                 {value.sslMode === "require"
                   ? "Verified TLS checks the server certificate and hostname. Your custom CA is used when selected."
@@ -342,7 +383,13 @@ export function ProfileEditor({
             </section>
           </div>
         </fieldset>
-        <div className="profile-validation" aria-live="polite">
+        <div
+          className={
+            "profile-validation" +
+            (error ? " is-error" : tested ? " is-verified" : "")
+          }
+          aria-live="polite"
+        >
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -350,42 +397,61 @@ export function ProfileEditor({
           )}
           {tested && (
             <p className="connection-success">
-              <Check size={16} />
-              Connection verified · {server}
+              <span className="status-glyph" aria-hidden="true">
+                <Check size={11} strokeWidth={3} />
+              </span>
+              <span>
+                <strong>Connection verified</strong> · {server}
+              </span>
             </p>
           )}
           {!tested && !error && (
             <p className="profile-test-hint">
+              {busy === "test" ? (
+                <Loader2 size={15} className="spin" aria-hidden="true" />
+              ) : (
+                <Info size={15} aria-hidden="true" />
+              )}
               {busy === "test"
                 ? "Checking the server and credentials…"
                 : "Test the connection to enable saving. Your data will not be modified."}
             </p>
           )}
         </div>
-        <footer className="connection-dialog-footer">
-          <span>
-            <ShieldCheck size={16} /> Profiles never contain passwords
-          </span>
-          <div>
-            <button type="submit" className="button ghost" disabled={!!busy}>
-              {busy === "test" && <Loader2 size={16} className="spin" />}Test
-              connection
-            </button>
-            <button
-              type="button"
-              className="button primary"
-              disabled={!tested || !!busy}
-              title={
-                tested ? "Save verified profile" : "Test the connection first"
-              }
-              onClick={() => void save()}
-            >
-              {busy === "save" && <Loader2 size={16} className="spin" />}Save
-              profile
-            </button>
-          </div>
-        </footer>
+        <SheetFooter
+          start={
+            <>
+              <ShieldCheck size={12} aria-hidden="true" /> Profiles never
+              contain passwords
+            </>
+          }
+        >
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!!busy}
+            onClick={() => closeSafely(onClose)}
+          >
+            Cancel
+          </button>
+          <button type="submit" className="button secondary" disabled={!!busy}>
+            {busy === "test" && <Loader2 size={14} className="spin" />}Test
+            connection
+          </button>
+          <button
+            type="button"
+            className="button primary"
+            disabled={!tested || !!busy}
+            title={
+              tested ? "Save verified profile" : "Test the connection first"
+            }
+            onClick={() => void save()}
+          >
+            {busy === "save" && <Loader2 size={14} className="spin" />}Save
+            profile
+          </button>
+        </SheetFooter>
       </form>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

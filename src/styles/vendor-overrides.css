@@ -1,0 +1,24 @@
+/* Overrides for styles that libraries inject at runtime without a cascade
+   layer (CodeMirror). Unlayered rules beat every layer, so keep this file
+   tiny and scoped to vendor class names. */
+.code-editor .cm-editor,
+.code-editor .cm-scroller {
+  height: 100%;
+}
+.code-editor .cm-editor.cm-focused {
+  outline: 0;
+}
+.structure-ddl-editor .cm-scroller {
+  overflow: auto;
+}
+/* The editor theme fades the caret blink (sql-editor-theme.ts). With reduced
+   motion the caret blinks on/off and the inline error banner appears still.
+   :root lifts specificity over the theme's scoped rules. */
+@media (prefers-reduced-motion: reduce) {
+  :root .cm-editor.cm-focused > .cm-scroller > .cm-cursorLayer {
+    animation-timing-function: steps(1);
+  }
+  :root .cm-editor .cm-sql-error-banner[data-entering] {
+    animation: none;
+  }
+}

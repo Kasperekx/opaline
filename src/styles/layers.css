@@ -1,0 +1,7 @@
+/* Cascade order for the whole app, declared before any other stylesheet.
+   Later layers win regardless of selector specificity:
+   tokens → vendor (React Flow) → base → controls → shell → features.
+   Feature styles can therefore refine shared controls deliberately, without
+   doubled selectors or !important. Unlayered CSS (vendor-overrides.css,
+   CodeMirror's injected theme) beats every layer. */
+@layer tokens, vendor, base, controls, shell, features;

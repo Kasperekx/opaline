@@ -1,0 +1,345 @@
+/* Schema sheet: create, rename and delete a namespace. Header, footer and
+   material come from the shared Sheet; contents use grouped boxes. */
+@layer features {
+  .namespace-dialog {
+    overflow: hidden;
+  }
+  .namespace-dialog > form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .namespace-dialog code {
+    font-family: var(--font-mono);
+  }
+  .namespace-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 4px 24px 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: var(--text-md);
+    line-height: 1.45;
+  }
+  .namespace-description {
+    margin: 0;
+    color: var(--text-soft);
+    text-wrap: pretty;
+  }
+
+  /* Where the change happens. */
+  .namespace-summary {
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: var(--edge-light);
+  }
+  .namespace-destination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 14px;
+  }
+  .namespace-glyph {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .namespace-destination > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .namespace-destination strong {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .namespace-destination > div > span {
+    color: var(--muted);
+    font-size: var(--text-callout);
+    overflow-wrap: anywhere;
+  }
+  .namespace-destination .environment-badge {
+    flex: none;
+  }
+  .namespace-target {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+    padding: 6px 14px;
+  }
+  .namespace-target::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 50px;
+    height: var(--hairline);
+    background: var(--line-strong);
+    content: "";
+  }
+  .namespace-target > span {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .namespace-target > span > svg {
+    width: 24px;
+  }
+  .namespace-target > code {
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .namespace-target code,
+  .namespace-field code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  /* Fields. */
+  .namespace-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .namespace-field > span:first-child {
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .namespace-field > span:first-child:has(code) {
+    color: var(--text-soft);
+    font-size: var(--text-callout);
+    font-weight: 400;
+  }
+  .namespace-field > span:first-child code {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .namespace-field input {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+    font: inherit;
+    font-size: var(--text-md);
+  }
+  .namespace-review ~ .namespace-field input {
+    font-family: var(--font-mono);
+  }
+  .namespace-field input::placeholder {
+    color: var(--tertiary);
+  }
+  .namespace-field input:focus-visible {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 var(--hairline) var(--line-strong),
+      0 0 0 3px var(--accent-line);
+  }
+  .namespace-field input:disabled {
+    opacity: 0.45;
+  }
+  .namespace-help {
+    color: var(--muted);
+    font-size: var(--text-callout);
+  }
+
+  /* Deletion behaviour: a grouped list of two radio rows. */
+  .namespace-drop-options {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .namespace-drop-options legend {
+    margin-bottom: 6px;
+    padding: 0 4px;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .namespace-drop-list {
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: var(--edge-light);
+  }
+  .namespace-drop-options label {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: var(--radius-lg);
+  }
+  .namespace-drop-options label + label {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+  .namespace-drop-options label:first-child {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .namespace-drop-options label + label::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 42px;
+    height: var(--hairline);
+    background: var(--line-strong);
+    content: "";
+  }
+  .namespace-drop-options label > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .namespace-drop-options label strong {
+    font-weight: 600;
+  }
+  .namespace-drop-options label span > span {
+    color: var(--muted);
+    font-size: var(--text-callout);
+  }
+  .namespace-drop-options:disabled {
+    opacity: 0.45;
+  }
+  .namespace-drop-options input,
+  .namespace-ack input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 1px 0 0;
+  }
+  .namespace-ack {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0 2px;
+    color: var(--text-soft);
+  }
+
+  /* Notices. */
+  .namespace-notice {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    background: var(--accent-soft);
+    font-size: var(--text-callout);
+  }
+  .namespace-notice-danger,
+  .namespace-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .namespace-notice-danger {
+    color: color-mix(in srgb, var(--warning) 70%, white);
+    background: rgba(255, 159, 10, 0.12);
+  }
+  .namespace-notice-danger > svg {
+    color: var(--warning);
+  }
+  .namespace-notice-danger > svg,
+  .namespace-error > svg {
+    flex: none;
+    margin-top: 1px;
+  }
+  .namespace-notice p,
+  .namespace-error p {
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .namespace-error {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: rgba(255, 69, 58, 0.12);
+    font-size: var(--text-callout);
+  }
+  .namespace-error > svg {
+    color: var(--danger);
+  }
+  .namespace-error strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .namespace-error p {
+    color: color-mix(in srgb, var(--danger) 50%, white);
+  }
+  .namespace-error p + p {
+    margin-top: 8px;
+    color: var(--text-soft);
+  }
+
+  /* SQL preview. */
+  .namespace-review {
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    background: rgba(0, 0, 0, 0.25);
+    box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  }
+  .namespace-review > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 14px;
+    box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--line);
+    font-size: var(--text-callout);
+  }
+  .namespace-review strong {
+    font-weight: 600;
+  }
+  .namespace-review span {
+    color: var(--muted);
+  }
+  .namespace-review pre {
+    margin: 0;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    line-height: 21px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .namespace-drop-options:not(:disabled) label:hover {
+      background: var(--hover);
+    }
+  }
+  @media (max-width: 480px) {
+    .namespace-content {
+      gap: 16px;
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+    .namespace-destination {
+      flex-wrap: wrap;
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { ConnectionDialog } from "../../features/connections/ConnectionDialog";
+import { Sheet } from "./Sheet";
 import type { useGridInteractions } from "./GridInteractions";
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -33,6 +33,7 @@ export function GridFeedback({
           {grid.message}
           {grid.copyFailed && (
             <button
+              className="button secondary compact"
               aria-label="Dismiss clipboard error"
               onClick={grid.dismissMessage}
             >
@@ -55,7 +56,7 @@ export function GridFeedback({
         >
           <header>
             <div>
-              <span>VALUE INSPECTOR</span>
+              <span>Value inspector</span>
               <h3>
                 {grid.inspecting.label ??
                   (grid.inspecting.value === null ? "SQL NULL" : "Cell value")}
@@ -66,7 +67,7 @@ export function GridFeedback({
               aria-label="Close value inspector"
               onClick={grid.closeInspector}
             >
-              <X size={17} />
+              <X size={15} />
             </button>
           </header>
           <p>
@@ -87,7 +88,7 @@ export function GridFeedback({
         </aside>
       )}
       {grid.inspecting && !sidePanel && (
-        <ConnectionDialog
+        <Sheet
           title={grid.inspecting.value === null ? "NULL value" : "Cell value"}
           subtitle="Read-only · full text, no numeric conversion"
           onClose={grid.closeInspector}
@@ -106,7 +107,7 @@ export function GridFeedback({
               value={grid.inspecting.value ?? "NULL"}
             />
           </div>
-        </ConnectionDialog>
+        </Sheet>
       )}
     </>
   );

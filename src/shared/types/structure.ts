@@ -110,3 +110,14 @@ export type ConstraintChange =
       onUpdate: string;
     };
 export type SchemaPlan = { sql: string; destructive: boolean };
+
+export type NamespaceKind = "create" | "rename" | "drop";
+export type NamespaceDropMode = "restrict" | "cascade";
+export type NamespaceChange = {
+  kind: NamespaceKind;
+  name: string;
+  newName?: string | null;
+  dropMode?: NamespaceDropMode;
+};
+export type NamespacePlan = { sql: string; destructive: boolean };
+export type SchemaInfo = { name: string };

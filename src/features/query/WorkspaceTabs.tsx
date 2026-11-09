@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { handleWindowDrag } from "../../shared/lib/window-drag";
+import { isMacPlatform } from "../../shared/lib/platform";
 import type { QueryTab, WorkspaceTab } from "./query-types";
 
 type WorkspaceTabsProps = {
@@ -62,6 +63,25 @@ export function WorkspaceTabs({
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [activeTabId]);
 
+  // Cmd/Ctrl+1…8 selects that tab and Cmd/Ctrl+9 the last one, like Safari.
+  // Instant by design: tab switching never animates.
+  useEffect(() => {
+    const selectByNumber = (event: KeyboardEvent) => {
+      const modifier = isMacPlatform ? event.metaKey : event.ctrlKey;
+      if (!modifier || event.shiftKey || event.altKey) return;
+      if (!/^[1-9]$/.test(event.key)) return;
+      if (!listRef.current?.offsetParent) return; // another session is in front
+      if (document.querySelector("dialog[open]")) return;
+      const number = Number(event.key);
+      const target = number === 9 ? tabs[tabs.length - 1] : tabs[number - 1];
+      if (!target) return;
+      event.preventDefault();
+      onSelect(target.id);
+    };
+    window.addEventListener("keydown", selectByNumber);
+    return () => window.removeEventListener("keydown", selectByNumber);
+  }, [tabs, onSelect]);
+
   const startRenaming = (tab: QueryTab) => {
     setEditingTabId(tab.id);
     setDraftTitle(tab.title);
@@ -96,6 +116,12 @@ export function WorkspaceTabs({
             <div
               className={`editor-tab ${tab.kind} ${active ? "active" : ""}`}
               key={tab.id}
+              onAuxClick={(event) => {
+                // Middle-click closes, as in every tabbed Mac app.
+                if (event.button !== 1 || running) return;
+                event.preventDefault();
+                onClose(tab.id);
+              }}
             >
               {tab.kind === "query" && editingTabId === tab.id ? (
                 <div

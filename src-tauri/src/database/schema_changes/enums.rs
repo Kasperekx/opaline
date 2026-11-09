@@ -28,7 +28,7 @@ pub(crate) struct EnumRef {
 }
 
 pub(crate) async fn catalog(client: &tokio_postgres::Client) -> Result<Vec<EnumType>, String> {
-    let rows = client.query("SELECT n.nspname::text, t.typname::text, t.oid, ARRAY(SELECT e.enumlabel::text FROM pg_catalog.pg_enum e WHERE e.enumtypid = t.oid ORDER BY e.enumsortorder) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE t.typtype = 'e' AND n.nspname <> 'information_schema' AND n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' ORDER BY n.nspname, t.typname LIMIT 1001", &[]).await.map_err(|_| "Could not load enum types.")?;
+    let rows = client.query("SELECT n.nspname::text, t.typname::text, t.oid, ARRAY(SELECT e.enumlabel::text FROM pg_catalog.pg_enum e WHERE e.enumtypid = t.oid ORDER BY e.enumsortorder) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE t.typtype = 'e' AND n.nspname <> 'information_schema' AND n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' ORDER BY n.nspname, t.typname LIMIT 1001", &[]).await.map_err(|e| crate::database::diagnostics::database_error("Could not load enum types", e))?;
     if rows.len() > 1000 {
         return Err("More than 1,000 enum types. Use SQL to manage this catalog.".into());
     }
@@ -158,7 +158,7 @@ pub(crate) async fn verify_references(
 ) -> Result<(), ChangeError> {
     for column in columns.iter().filter(|c| !c.removed) {
         if let Some(reference) = &column.enum_type {
-            let exists: bool = client.query_one("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE t.typtype = 'e' AND n.nspname = $1 AND t.typname = $2)", &[&reference.schema, &reference.name]).await.map_err(|_| ChangeError::rejected("Could not verify enum type."))?.get(0);
+            let exists: bool = client.query_one("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE t.typtype = 'e' AND n.nspname = $1 AND t.typname = $2)", &[&reference.schema, &reference.name]).await.map_err(|e| ChangeError::rejected(crate::database::diagnostics::database_error("Could not verify enum type", e)))?.get(0);
             if !exists {
                 return Err(ChangeError::rejected(
                     "The selected enum type no longer exists.",

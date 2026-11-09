@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet } from "../../shared/components/Sheet";
 import { connectionApi } from "./connection-api";
 import { errorMessage } from "../../shared/lib/database-api";
 import { useWorkRisk } from "../../shared/safety/WorkSafety";
@@ -72,11 +72,33 @@ export function ProfileOrganization({
       }
     });
   return (
-    <ConnectionDialog
+    <Sheet
       title={profile ? "Move connection" : "Remove workspace"}
       subtitle={profile?.name ?? workspace.name}
+      className="profile-organization-dialog"
+      size={520}
       busy={busy}
       onClose={onClose}
+      footer={
+        <>
+          <button className="button ghost" disabled={busy} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className={`button ${profile ? "primary" : "danger"}`}
+            disabled={
+              busy || active || !confirmed || (needsDestination && !destination)
+            }
+            onClick={() => void move()}
+          >
+            {busy
+              ? "Saving…"
+              : profile
+                ? "Move connection"
+                : "Remove workspace"}
+          </button>
+        </>
+      }
     >
       <div className="p1-panel">
         <p className="p1-muted">
@@ -136,20 +158,6 @@ export function ProfileOrganization({
           </p>
         )}
       </div>
-      <footer className="dialog-actions">
-        <button className="button ghost" disabled={busy} onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          className={`button ${profile ? "primary" : "danger"}`}
-          disabled={
-            busy || active || !confirmed || (needsDestination && !destination)
-          }
-          onClick={() => void move()}
-        >
-          {busy ? "Saving…" : profile ? "Move connection" : "Remove workspace"}
-        </button>
-      </footer>
-    </ConnectionDialog>
+    </Sheet>
   );
 }

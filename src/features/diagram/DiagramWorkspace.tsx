@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
   applyNodeChanges,
   type ReactFlowInstance,
   type Viewport,
@@ -39,7 +37,6 @@ import {
 } from "./diagram-model";
 import { DiagramTableNode, DiagramRelationEdge } from "./DiagramTableNode";
 import { DiagramInspector } from "./DiagramInspector";
-import "@xyflow/react/dist/style.css";
 import "./diagram.css";
 
 const nodeTypes = { table: DiagramTableNode };
@@ -279,37 +276,34 @@ export default function DiagramWorkspace({
       onKeyDownCapture={() => setPointerSelection(false)}
     >
       <header className="diagram-toolbar">
+        <div className="diagram-heading">
+          <strong>Database diagram</strong>
+          <span>
+            {session.database} <span aria-hidden="true">·</span> PostgreSQL
+          </span>
+        </div>
         {onCreateTable && (
           <button
-            className="toolbar-button"
+            className="toolbar-button diagram-new-table"
             disabled={session.readOnly || !online}
             onClick={onCreateTable}
           >
-            <Plus size={15} />
+            <Plus size={13} />
             New table
           </button>
         )}
-        <div className="diagram-heading">
-          <Network size={18} />
-          <div>
-            <strong>Database diagram</strong>
-            <span>
-              {session.database} <span aria-hidden="true">/</span> PostgreSQL
-            </span>
-          </div>
-        </div>
         <div className="diagram-search-wrap">
           <form
-            className="diagram-search"
+            className="search-capsule diagram-search"
             onSubmit={(event) => {
               event.preventDefault();
               if (matches[0]) center(matches[0].id);
             }}
           >
-            <Search size={15} />
+            <Search size={14} aria-hidden="true" />
             <input
               aria-label="Find a table in diagram"
-              placeholder="Find a table…"
+              placeholder="Find a table"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
@@ -322,17 +316,17 @@ export default function DiagramWorkspace({
             {search && (
               <button
                 type="button"
-                className="icon-button"
+                className="icon-button subtle"
                 aria-label="Clear table search"
                 onClick={() => setSearch("")}
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             )}
           </form>
           {search.trim() && (
             <div
-              className="diagram-search-results"
+              className="desktop-action-menu diagram-search-results"
               aria-label="Matching tables"
             >
               {matches.slice(0, 20).map((node) => (
@@ -352,6 +346,7 @@ export default function DiagramWorkspace({
           )}
         </div>
         <select
+          className="diagram-schema-select"
           aria-label="Diagram schema"
           value={schema}
           onChange={(event) => {
@@ -365,28 +360,30 @@ export default function DiagramWorkspace({
             <option key={name}>{name}</option>
           ))}
         </select>
-        <button
-          className="toolbar-button"
-          disabled={busy || !nodes.length}
-          onClick={() => {
-            positions.current = {};
-            viewport.current = undefined;
-            setArrangement((value) => value + 1);
-          }}
-          title="Reset table positions and arrange automatically"
-        >
-          <LayoutGrid size={15} />
-          Arrange
-        </button>
-        <button
-          className="icon-button"
-          disabled={busy || !online}
-          onClick={() => setRevision((value) => value + 1)}
-          title="Refresh database diagram"
-          aria-label="Refresh database diagram"
-        >
-          <RefreshCw size={16} />
-        </button>
+        <div className="toolbar-capsule">
+          <button
+            type="button"
+            disabled={busy || !nodes.length}
+            onClick={() => {
+              positions.current = {};
+              viewport.current = undefined;
+              setArrangement((value) => value + 1);
+            }}
+            title="Reset table positions and arrange automatically"
+          >
+            <LayoutGrid size={14} />
+            Arrange
+          </button>
+          <button
+            type="button"
+            disabled={busy || !online}
+            onClick={() => setRevision((value) => value + 1)}
+            title="Refresh database diagram"
+            aria-label="Refresh database diagram"
+          >
+            <RefreshCw size={15} />
+          </button>
+        </div>
       </header>
       {error && (
         <div className="diagram-notice" role="alert">
@@ -494,23 +491,16 @@ export default function DiagramWorkspace({
               persist();
             }}
             onMoveEnd={saveViewport}
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1}
-              color="var(--line-strong)"
-            />
-          </ReactFlow>
+          ></ReactFlow>
           {busy && (
             <div className="diagram-progress" role="status">
-              <Loader2 size={15} className="spin" />
+              <Loader2 size={14} className="spin" />
               {loading ? "Reading database structure…" : "Arranging tables…"}
             </div>
           )}
           {!busy && snapshot && !nodes.length && (
             <div className="diagram-empty">
-              <Network size={30} />
+              <Network size={28} strokeWidth={1.5} />
               <h2>No tables to map</h2>
               <p>
                 This view shows accessible user tables and declared foreign
@@ -529,7 +519,7 @@ export default function DiagramWorkspace({
                   })
                 }
               >
-                <ZoomOut size={17} />
+                <ZoomOut size={15} />
               </button>
               <button
                 className="icon-button"
@@ -540,7 +530,7 @@ export default function DiagramWorkspace({
                   })
                 }
               >
-                <ZoomIn size={17} />
+                <ZoomIn size={15} />
               </button>
               <button
                 className="toolbar-button"
@@ -551,7 +541,7 @@ export default function DiagramWorkspace({
                   })
                 }
               >
-                <Focus size={16} />
+                <Focus size={14} />
                 Fit
               </button>
               <span />
@@ -586,7 +576,7 @@ export default function DiagramWorkspace({
                 disabled={!selected && !selectedEdge}
                 onClick={() => setDetails(!details)}
               >
-                <Info size={17} />
+                <Info size={15} />
               </button>
             </div>
           )}

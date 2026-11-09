@@ -1,16 +1,53 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="116" fill="#101215"/>
-  <rect x="80" y="80" width="352" height="352" rx="90" fill="url(#paint0)" fill-opacity="0.12"/>
-  <path d="M256 126C184.203 126 126 184.203 126 256C126 327.797 184.203 386 256 386C327.797 386 386 327.797 386 256C386 184.203 327.797 126 256 126ZM256 185C295.212 185 327 216.788 327 256C327 295.212 295.212 327 256 327C216.788 327 185 295.212 185 256C185 216.788 216.788 185 256 185Z" fill="url(#paint1)"/>
-  <circle cx="353" cy="159" r="24" fill="#C8F26A"/>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Opaline app icon source. Regenerate platform icons with:
+       npx tauri icon src-tauri/icons/app-icon.svg -o src-tauri/icons -->
   <defs>
-    <linearGradient id="paint0" x1="103" y1="92" x2="425" y2="431" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#C8F26A"/>
-      <stop offset="1" stop-color="#72D6C9"/>
+    <filter id="shadow" x="40" y="60" width="944" height="944" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="12"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="base" x1="140" y1="120" x2="900" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FB0FF"/>
+      <stop offset="0.45" stop-color="#B9A0F2"/>
+      <stop offset="1" stop-color="#8EDCC8"/>
     </linearGradient>
-    <linearGradient id="paint1" x1="157" y1="148" x2="363" y2="376" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#EFF4E8"/>
-      <stop offset="1" stop-color="#93A390"/>
-    </linearGradient>
+    <radialGradient id="pink" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(790 300) rotate(120) scale(420)">
+      <stop stop-color="#F6AACB"/>
+      <stop offset="1" stop-color="#F6AACB" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="peach" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(700 800) rotate(-90) scale(360)">
+      <stop stop-color="#F7D6A4"/>
+      <stop offset="1" stop-color="#F7D6A4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(230 640) rotate(-40) scale(380)">
+      <stop stop-color="#7FA6FF"/>
+      <stop offset="1" stop-color="#7FA6FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gloss" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(330 210) rotate(35) scale(520 360)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="well" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 520) scale(150)">
+      <stop offset="0.72" stop-color="#2A1E5A" stop-opacity="0"/>
+      <stop offset="1" stop-color="#2A1E5A" stop-opacity="0.28"/>
+    </radialGradient>
+    <clipPath id="squircle">
+      <rect x="100" y="100" width="824" height="824" rx="186"/>
+    </clipPath>
   </defs>
+  <g filter="url(#shadow)">
+    <g clip-path="url(#squircle)">
+      <rect x="100" y="100" width="824" height="824" fill="url(#base)"/>
+      <rect x="100" y="100" width="824" height="824" fill="url(#pink)"/>
+      <rect x="100" y="100" width="824" height="824" fill="url(#peach)"/>
+      <rect x="100" y="100" width="824" height="824" fill="url(#blue)"/>
+      <rect x="100" y="100" width="824" height="824" fill="url(#gloss)"/>
+      <circle cx="512" cy="520" r="150" fill="url(#well)"/>
+      <circle cx="512" cy="520" r="182" stroke="#2A1E5A" stroke-opacity="0.18" stroke-width="72" transform="translate(0 10)"/>
+      <circle cx="512" cy="520" r="182" stroke="#FFFFFF" stroke-opacity="0.94" stroke-width="64"/>
+      <rect x="100.5" y="100.5" width="823" height="823" rx="185.5" stroke="#FFFFFF" stroke-opacity="0.35"/>
+    </g>
+  </g>
 </svg>

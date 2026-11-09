@@ -1,0 +1,460 @@
+.motionSection {
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  position: relative;
+}
+
+.principles {
+  --diagram-line: #42484e;
+  --diagram-detail: #30363c;
+  --diagram-accent: var(--accent, #dfbb79);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--background);
+}
+
+.principle {
+  min-width: 0;
+  padding: 0 32px 8px;
+}
+
+.principle:first-child {
+  padding-left: 0;
+}
+.principle:last-child {
+  padding-right: 0;
+}
+.principle + .principle {
+  border-left: 1px solid #24272c;
+}
+
+.figure {
+  color: #81868e;
+  font-family: var(--font-code), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.visual {
+  height: 270px;
+  display: flex;
+  align-items: center;
+  margin-block: 14px 28px;
+}
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.principle h3 {
+  margin: 0 0 12px;
+  color: #eceeeb;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.principle p {
+  max-width: 32ch;
+  margin: 0;
+  color: #949ba2;
+  font-size: 15px;
+  line-height: 1.7;
+  letter-spacing: -0.012em;
+}
+
+.guide {
+  stroke: #272c31;
+  stroke-dasharray: 2 5;
+}
+
+.slabSide {
+  fill: #090b0d;
+  stroke: var(--diagram-detail);
+}
+
+.slab {
+  fill: #0c0f12;
+  stroke: var(--diagram-line);
+}
+
+.slabActive {
+  fill: #19160f;
+  stroke: #7d6c50;
+}
+
+.detail {
+  stroke: var(--diagram-detail);
+}
+.dataBlock {
+  fill: #161512;
+  stroke: var(--diagram-line);
+}
+.accent {
+  stroke: var(--diagram-accent);
+}
+.accentDot {
+  fill: var(--diagram-accent);
+}
+.dot {
+  fill: #7c7567;
+}
+.keySymbol {
+  stroke: #c9c0af;
+  stroke-width: 1.5;
+}
+.checkSurface {
+  stroke: #776442;
+  fill: #2b2417;
+}
+.flowPath {
+  stroke: #4a4235;
+  stroke-dasharray: 3 5;
+}
+.signalPath {
+  stroke: var(--diagram-accent);
+  opacity: 0.6;
+}
+.parallelPaths {
+  stroke: #3f3b33;
+}
+.flowHighlight {
+  opacity: 0.75;
+}
+
+.legend {
+  stroke: #30373b;
+}
+.legend text,
+.stepLabels,
+.flowMarks {
+  font-family: var(--font-code), monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  fill: #7a8588;
+  stroke: none;
+}
+
+.flowMarks path {
+  stroke: #6c614d;
+}
+
+.environmentLight,
+.saveLight {
+  stroke: var(--diagram-accent);
+  stroke-width: 1.5;
+  opacity: 0;
+}
+.saveLight {
+  fill: #dfbb7914;
+}
+.reviewImpulse,
+.keyboardImpulse {
+  opacity: 0;
+}
+
+.motionControl {
+  position: absolute;
+  top: -16px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 116px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  visibility: hidden;
+  transition: color 160ms ease;
+}
+
+/* Explanatory artwork, not live application state. CSS owns the timelines;
+   the shared observer only gates playback, including explicit user pause.
+   Without JS or with reduced motion the complete static illustrations remain. */
+@media (prefers-reduced-motion: no-preference) {
+  .motionSection[data-managed] .motionControl {
+    visibility: visible;
+  }
+  .principle[data-managed] .environmentLayer {
+    animation: environment-base 8s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] [data-environment="STAGING"] {
+    animation-name: environment-middle;
+  }
+  .principle[data-managed] [data-environment="LOCAL"] {
+    animation-name: environment-top;
+  }
+  .principle[data-managed] .environmentLight {
+    animation: environment-light 8s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] .editLines {
+    animation: edit-change 6s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] .reviewImpulse {
+    animation: review-transfer 6s linear infinite paused;
+  }
+  .principle[data-managed] .reviewLines {
+    animation: review-change 6s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] .saveConfirmation {
+    animation: save-confirmation 6s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] .saveLight {
+    animation: save-light 6s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-managed] .commandKey,
+  .principle[data-managed] .returnKey {
+    animation: shortcut-press 4.8s var(--ease) infinite paused;
+  }
+  .principle[data-managed] .returnKey {
+    animation-delay: 80ms;
+  }
+  .principle[data-managed] .keyboardImpulse {
+    animation: shortcut-signal 4.8s linear infinite paused;
+  }
+  .principle[data-managed] .resultLight {
+    animation: shortcut-result 4.8s var(--ease-in-out) infinite paused;
+  }
+  .principle[data-active]
+    :is(
+      .environmentLayer,
+      .environmentLight,
+      .editLines,
+      .reviewImpulse,
+      .reviewLines,
+      .saveConfirmation,
+      .saveLight,
+      .commandKey,
+      .returnKey,
+      .keyboardImpulse,
+      .resultLight
+    ) {
+    animation-play-state: running;
+  }
+}
+
+/* Environment layers separate together; the selected local surface lights up. */
+@keyframes environment-base {
+  0%,
+  12%,
+  88%,
+  100% {
+    transform: translateY(0);
+  }
+  42%,
+  58% {
+    transform: translateY(4px);
+  }
+}
+@keyframes environment-middle {
+  0%,
+  12%,
+  88%,
+  100% {
+    transform: translateY(0);
+  }
+  42%,
+  58% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes environment-top {
+  0%,
+  12%,
+  88%,
+  100% {
+    transform: translateY(0);
+  }
+  42%,
+  58% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes environment-light {
+  0%,
+  16%,
+  88%,
+  100% {
+    opacity: 0;
+  }
+  42%,
+  58% {
+    opacity: 0.65;
+  }
+}
+
+/* A change is edited, passed to review, then confirmed. No flashing or resets. */
+@keyframes edit-change {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateX(0);
+  }
+  12%,
+  22% {
+    opacity: 1;
+    transform: translateX(3px);
+  }
+  36%,
+  84% {
+    opacity: 0.55;
+    transform: translateX(0);
+  }
+}
+@keyframes review-transfer {
+  0%,
+  20% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  26% {
+    opacity: 1;
+  }
+  47% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    transform: translateX(185px);
+    opacity: 0;
+  }
+}
+@keyframes review-change {
+  0%,
+  24%,
+  84%,
+  100% {
+    opacity: 0.45;
+  }
+  42%,
+  54% {
+    opacity: 1;
+  }
+}
+@keyframes save-confirmation {
+  0%,
+  44%,
+  94%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  62%,
+  78% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+@keyframes save-light {
+  0%,
+  48%,
+  94%,
+  100% {
+    opacity: 0;
+  }
+  62%,
+  78% {
+    opacity: 0.8;
+  }
+}
+
+/* A short key chord launches a one-way signal along the existing data rails. */
+@keyframes shortcut-press {
+  0%,
+  6%,
+  18%,
+  100% {
+    transform: translateY(0);
+  }
+  10%,
+  12% {
+    transform: translateY(4px);
+  }
+}
+@keyframes shortcut-signal {
+  0%,
+  18% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.9;
+  }
+  66% {
+    opacity: 0.9;
+  }
+  78%,
+  100% {
+    transform: translateX(430px);
+    opacity: 0;
+  }
+}
+@keyframes shortcut-result {
+  0%,
+  56%,
+  94%,
+  100% {
+    opacity: 0.4;
+  }
+  70%,
+  80% {
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motionControl:hover {
+    color: var(--accent);
+  }
+}
+
+@media (max-width: 1000px) {
+  .principle {
+    padding-inline: 22px;
+  }
+  .visual {
+    height: 230px;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 700px) {
+  .principles {
+    grid-template-columns: 1fr;
+  }
+  .motionControl {
+    top: 16px;
+  }
+  .principle,
+  .principle:first-child,
+  .principle:last-child {
+    padding: 28px 0 32px;
+  }
+  .principle + .principle {
+    border-left: 0;
+    border-top: 1px solid #24272c;
+  }
+  .visual {
+    height: 260px;
+    max-width: 360px;
+    margin: 2px auto 26px;
+  }
+  .principle p {
+    max-width: 45ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motionControl {
+    transition: none;
+  }
+}

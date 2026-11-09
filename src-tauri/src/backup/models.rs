@@ -32,6 +32,10 @@ pub(crate) struct TableName {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RestoreInput {
+    #[serde(default = "single_job")]
+    pub jobs: u8,
+    #[serde(default)]
+    pub confirm_parallel: bool,
     #[serde(default)]
     pub new_database: Option<String>,
     #[serde(default)]
@@ -45,6 +49,9 @@ pub(crate) struct RestoreInput {
     pub clean: bool,
     pub confirm_clean: bool,
     pub preserve_ownership: bool,
+}
+fn single_job() -> u8 {
+    1
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

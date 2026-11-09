@@ -68,6 +68,9 @@ a role with only the required privileges, not real production data.
 - Diagram shows catalog relationships. Table structure edits share a DDL review;
   review the target and destructive changes before applying. Diagram animations
   do not represent live data traffic.
+- Schema folders support New schema / Rename / Drop with SQL review. Drops use
+  RESTRICT by default; CASCADE needs an explicit checkbox and typed name.
+  See [schema-namespace-editor.md](schema-namespace-editor.md).
 - JSON/JSONB cells have a bounded syntax-colored preview. Inspect opens the full
   value; preview truncation never truncates the stored value.
 - Enum types can be selected, created, and have labels renamed/appended in the
@@ -86,6 +89,13 @@ warnings. Creating a database requires CREATEDB privileges, a new name of at mos
 Creation is outside the restore transaction: after failure the new database is
 kept for inspection, not dropped. The original profile is unchanged; add a profile
 for the new database after success.
+
+Custom archives default to **Safe restore** (one transaction). When creating a
+new database, **Restore mode** also offers 2 or 4 parallel workers. This can help
+with multi-table archives, but needs separate consent: an error or cancellation
+can leave partial data. The incomplete database is kept, never automatically
+deleted or retried. Use a new target for another attempt. Existing databases and
+SQL scripts always keep their original single-process behavior.
 
 Only same-major PostgreSQL 14–18 operations are supported. Custom archives are
 limited to 100 GiB, plain UTF-8 SQL to 64 MiB; these limits are not promises of

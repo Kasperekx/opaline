@@ -6,7 +6,9 @@ pub(crate) async fn inspect(client: &Client) -> Result<serde_json::Value, String
     let row = client
         .query_one(include_str!("diagram.sql"), &[])
         .await
-        .map_err(|error| format!("Could not load database diagram: {error}"))?;
+        .map_err(|error| {
+            crate::database::diagnostics::database_error("Could not load database diagram", error)
+        })?;
     let text: String = row.get(0);
     let mut snapshot: serde_json::Value = serde_json::from_str(&text)
         .map_err(|_| "The database returned invalid diagram metadata.")?;

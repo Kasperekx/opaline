@@ -19,6 +19,7 @@ import type {
   TablePageRequest,
 } from "../src/shared/types/database";
 import { applyFixtureChanges, tableChangePage } from "./table-change-fixture";
+import { tableViewKey } from "../src/features/table/table-view-state";
 
 it("keeps value-option clicks inside the editor and focuses the enabled value", () => {
   const props = {
@@ -130,6 +131,181 @@ it("fills the table viewport without adding interactive data cells", async () =>
   });
 });
 
+it("clicking a cell selects its row and opens the record inspector without taking focus", async () => {
+  const { save } = mount(true);
+  const user = userEvent.setup();
+  const cell = await screen.findByRole("gridcell", { name: "Ada" });
+  const panel = () =>
+    screen.getByRole("complementary", { name: "Record inspector" });
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  await user.click(cell);
+  // The whole row is selected and the clicked cell is marked inside it.
+  expect(cell.closest("tr")!.classList.contains("current")).toBe(true);
+  expect(cell.closest("tr")!.getAttribute("aria-current")).toBe("true");
+  expect(cell.getAttribute("data-cell-focus")).toBe("true");
+  expect(
+    within(panel()).getByLabelText("Record value for name"),
+  ).toHaveProperty("value", "Ada");
+  expect(document.activeElement).toBe(cell);
+  // The inspector follows the row as the arrow keys move.
+  await user.keyboard("{ArrowDown}");
+  const grace = screen.getByRole("gridcell", { name: "Grace" });
+  expect(grace.closest("tr")!.classList.contains("current")).toBe(true);
+  expect(cell.closest("tr")!.classList.contains("current")).toBe(false);
+  expect(
+    within(panel()).getByLabelText("Record value for name"),
+  ).toHaveProperty("value", "Grace");
+  expect(document.activeElement).toBe(grace);
+  // Escape deselects the row, which closes the inspector; focus stays.
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  expect(grace.closest("tr")!.classList.contains("current")).toBe(false);
+  expect(document.activeElement).toBe(grace);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("Space and the toolbar turn the record inspector off and on", async () => {
+  const { save } = mount(true);
+  const user = userEvent.setup();
+  const cell = await screen.findByRole("gridcell", { name: "Ada" });
+  await user.click(cell);
+  const panel = () =>
+    screen.getByRole("complementary", { name: "Record inspector" });
+  const toggle = screen.getByRole("button", { name: "Hide record inspector" });
+  expect(toggle.getAttribute("aria-pressed")).toBe("true");
+  await user.keyboard(" ");
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  // Off stays off while selecting other rows.
+  await user.click(screen.getByRole("gridcell", { name: "Grace" }));
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  await user.keyboard(" ");
+  expect(
+    within(panel()).getByLabelText("Record value for name"),
+  ).toHaveProperty("value", "Grace");
+  await user.click(
+    screen.getByRole("button", { name: "Hide record inspector" }),
+  );
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Show record inspector" }),
+  );
+  expect(panel()).toBeTruthy();
+  // The close button turns it off too, and the choice is remembered.
+  await user.click(
+    within(panel()).getByRole("button", { name: "Close record inspector" }),
+  );
+  expect(
+    screen.queryByRole("complementary", { name: "Record inspector" }),
+  ).toBeNull();
+  expect(localStorage.getItem("opaline.table.record-inspector.v1")).toBe(
+    '"off"',
+  );
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("stages an inspector edit like a cell edit, without writing", async () => {
+  const { save } = mount();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("gridcell", { name: "Ada" }));
+  const panel = screen.getByRole("complementary", { name: "Record inspector" });
+  const field = within(panel).getByLabelText("Record value for name");
+  await user.clear(field);
+  await user.type(field, "Ada from inspector{Enter}");
+  expect(screen.getByText("1 unsaved change")).toBeTruthy();
+  const cell = screen.getByRole("gridcell", { name: /Ada from inspector/ });
+  expect(cell.classList.contains("pending-cell")).toBe(true);
+  expect(within(cell).getByLabelText("Unsaved change")).toBeTruthy();
+  expect(within(panel).getByText("Local changes · not saved")).toBeTruthy();
+  expect(within(panel).getByText("Ada")).toBeTruthy();
+  // Booleans are a TRUE/FALSE choice that stages immediately.
+  await user.selectOptions(
+    within(panel).getByLabelText("Record value for enabled"),
+    "false",
+  );
+  const enabled = document.querySelector(
+    '[data-grid-row="0"][data-grid-column="3"]',
+  )!;
+  expect(enabled.classList.contains("pending-cell")).toBe(true);
+  expect(screen.getByText("2 unsaved changes")).toBeTruthy();
+  // Escape restores a draft that was not staged yet.
+  const note = within(panel).getByLabelText("Record value for note");
+  await user.type(note, "draft");
+  await user.keyboard("{Escape}");
+  expect(note).toHaveProperty("value", "");
+  expect(screen.getByText("2 unsaved changes")).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("searches the inspector's fields by name and keeps read-only rows read-only", async () => {
+  mount(true);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("gridcell", { name: "Ada" }));
+  const panel = screen.getByRole("complementary", { name: "Record inspector" });
+  // Name on the left, PostgreSQL's short type on the right.
+  expect(within(panel).getByText("int8")).toBeTruthy();
+  expect(within(panel).getByText("bool")).toBeTruthy();
+  await user.type(
+    within(panel).getByRole("searchbox", { name: "Search for field" }),
+    "na",
+  );
+  expect(within(panel).getByLabelText("Record value for name")).toBeTruthy();
+  expect(within(panel).queryByLabelText("Record value for counter")).toBeNull();
+  expect(within(panel).getByLabelText("Record value for name")).toHaveProperty(
+    "readOnly",
+    true,
+  );
+  expect(
+    within(panel).getByLabelText("Record value for enabled"),
+  ).toHaveProperty("disabled", true);
+});
+
+it("Escape in the grid clears the row selection", async () => {
+  mount();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Select row 1" }),
+  );
+  expect(screen.getByText("1 row selected")).toBeTruthy();
+  await user.click(screen.getByRole("gridcell", { name: "Ada" }));
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("group", { name: "Selected row actions" }),
+  ).toBeNull();
+});
+
+it("Set value opens a popover above its button that only stages", async () => {
+  const { save } = mount();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Select row 1" }),
+  );
+  const button = screen.getByRole("button", { name: "Set value…" });
+  await user.click(button);
+  const popover = screen.getByRole("dialog", {
+    name: "Update 1 selected row",
+  });
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  expect(
+    within(popover).getByRole("button", { name: "Stage 1 row" }),
+  ).toBeTruthy();
+  fireEvent.keyDown(popover, { key: "Escape" });
+  expect(
+    screen.queryByRole("dialog", { name: "Update 1 selected row" }),
+  ).toBeNull();
+  expect(document.activeElement).toBe(button);
+  expect(save).not.toHaveBeenCalled();
+});
+
 it("keeps selection separate from unsaved changes and uses the existing export menu", async () => {
   const { save } = mount();
   const user = userEvent.setup();
@@ -171,23 +347,28 @@ it("inspects complete records without numeric conversion and restores keyboard f
   await user.click(screen.getByRole("menuitem", { name: "Inspect record" }));
   const panel = screen.getByRole("complementary", { name: "Record inspector" });
   expect(
-    within(panel).getByLabelText("Record value for counter").textContent,
-  ).toBe("9007199254740993");
-  expect(
-    within(panel).getByLabelText("Record value for note").textContent,
-  ).toBe("NULL");
+    within(panel).getByLabelText("Record value for counter"),
+  ).toHaveProperty("value", "9007199254740993");
+  const note = within(panel).getByLabelText("Record value for note");
+  expect(note).toHaveProperty("value", "");
+  expect(note.getAttribute("placeholder")).toBe("NULL");
   expect(
     within(panel).getByRole("button", { name: "Previous record" }),
   ).toHaveProperty("disabled", true);
   await user.click(within(panel).getByRole("button", { name: "Next record" }));
-  expect(
-    within(panel).getByLabelText("Record value for name").textContent,
-  ).toBe("Grace");
+  expect(within(panel).getByLabelText("Record value for name")).toHaveProperty(
+    "value",
+    "Grace",
+  );
+  // The grid selection followed the inspector to Grace's row.
+  const grace = screen.getByRole("gridcell", { name: "Grace" });
+  expect(grace.closest("tr")!.classList.contains("current")).toBe(true);
   await user.keyboard("{Escape}");
   expect(
     screen.queryByRole("complementary", { name: "Record inspector" }),
   ).toBeNull();
-  expect(document.activeElement).toBe(cell);
+  expect(document.activeElement).toBe(grace);
+  expect(cell.closest("tr")!.classList.contains("current")).toBe(false);
   expect(save).not.toHaveBeenCalled();
 });
 
@@ -201,9 +382,10 @@ it("shows staged and original values in the record inspector without saving", as
   await user.click(screen.getByRole("menuitem", { name: "Inspect record" }));
   const panel = screen.getByRole("complementary", { name: "Record inspector" });
   expect(within(panel).getByText("Local changes · not saved")).toBeTruthy();
-  expect(
-    within(panel).getByLabelText("Record value for name").textContent,
-  ).toBe("Changed locally");
+  expect(within(panel).getByLabelText("Record value for name")).toHaveProperty(
+    "value",
+    "Changed locally",
+  );
   expect(within(panel).getByText("Ada")).toBeTruthy();
   expect(save).not.toHaveBeenCalled();
 });
@@ -257,7 +439,7 @@ it("keeps the local changes bar compact and the edited cell marked after Enter",
   expect(save).not.toHaveBeenCalled();
 });
 
-it("offers a read retry with technical details after a load error", async () => {
+it("shows the cause immediately and offers a read-only retry with diagnostic context", async () => {
   const { load, save } = mount();
   const user = userEvent.setup();
   await screen.findByText("Ada");
@@ -265,13 +447,72 @@ it("offers a read retry with technical details after a load error", async () => 
   await user.click(screen.getByRole("button", { name: "Refresh table data" }));
   const notice = await screen.findByRole("alert");
   expect(within(notice).getByText("Could not load table")).toBeTruthy();
-  await user.click(within(notice).getByText("Technical details"));
   expect(
     within(notice).getByText("Synthetic connection unavailable"),
   ).toBeTruthy();
+  await user.click(within(notice).getByText("Diagnostic context"));
+  expect(within(notice).getByText(/Operation: load_table_page/)).toBeTruthy();
   await user.click(within(notice).getByRole("button", { name: "Retry" }));
   await screen.findByText("Ada");
   expect(screen.queryByRole("alert")).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("preserves IPC error details, excludes filter values from context and resets stale view settings", async () => {
+  localStorage.setItem(
+    tableViewKey("profile", "public", "users"),
+    JSON.stringify({
+      page: 2,
+      pageSize: 50,
+      filter: "private-search-value",
+      sort: { column: "removed_column", direction: "asc" },
+      conditions: [
+        {
+          column: "removed_column",
+          operator: "eq",
+          value: "private-condition-value",
+        },
+      ],
+    }),
+  );
+  const { load, save } = mount();
+  const user = userEvent.setup();
+  await screen.findByText("Ada");
+  load.mockRejectedValueOnce({
+    message: "A referenced column no longer exists.",
+    code: "42703",
+    hint: "Reset saved filters and sorting, then reload the table.",
+  });
+  await user.click(screen.getByRole("button", { name: "Refresh table data" }));
+  const notice = await screen.findByRole("alert");
+  expect(
+    within(notice).getByText(/A referenced column no longer exists/)
+      .textContent,
+  ).toContain("SQLSTATE 42703");
+  await user.click(within(notice).getByText("Diagnostic context"));
+  const context = notice.querySelector("pre")!.textContent!;
+  expect(context).toContain("Page: 3");
+  expect(context).toContain("Column filters: 1");
+  expect(context).not.toContain("private-search-value");
+  expect(context).not.toContain("private-condition-value");
+  const clipboard = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue();
+  await user.click(
+    within(notice).getByRole("button", { name: "Copy diagnostic details" }),
+  );
+  expect(clipboard.mock.calls[0][0]).toContain("SQLSTATE 42703");
+  expect(clipboard.mock.calls[0][0]).not.toContain("private-");
+  await user.click(
+    within(notice).getByRole("button", { name: "Reset filters & sorting" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(load.mock.calls[load.mock.calls.length - 1]?.[0]).toMatchObject({
+    page: 0,
+    filter: null,
+    sort: null,
+    conditions: [],
+  });
   expect(save).not.toHaveBeenCalled();
 });
 

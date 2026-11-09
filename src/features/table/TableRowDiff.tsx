@@ -61,8 +61,46 @@ export function TableRowDiff({
       setBusy(false);
     }
   };
+  const kind = row.deleted ? "delete" : row.original ? "update" : "insert";
+  const fields = columns.flatMap((column, i) => {
+    if (
+      row.original &&
+      !row.deleted &&
+      row.values[i] === row.original.values[i] &&
+      (!current?.row || current.row.values[i] === row.original.values[i])
+    )
+      return [];
+    return [
+      <div
+        className={`table-field-diff ${current?.row ? "with-current" : ""}`}
+        key={column.name}
+      >
+        <strong>{column.name}</strong>
+        <div>
+          <small>Original</small>
+          <pre aria-label={`Original ${column.name}`}>
+            {row.original ? printable(row.original.values[i]) : "—"}
+          </pre>
+        </div>
+        {current?.row && (
+          <div>
+            <small>Database now</small>
+            <pre aria-label={`Database now ${column.name}`}>
+              {printable(current.row.values[i])}
+            </pre>
+          </div>
+        )}
+        <div className="table-pending-value">
+          <small>Pending</small>
+          <pre aria-label={`Pending ${column.name}`}>
+            {row.deleted ? "DELETE" : printable(row.values[i])}
+          </pre>
+        </div>
+      </div>,
+    ];
+  });
   return (
-    <section className="table-row-diff">
+    <section className="table-row-diff" data-kind={kind}>
       <h3>
         {row.deleted ? "Delete" : row.original ? "Update" : "Insert"} ·{" "}
         {row.original
@@ -74,7 +112,7 @@ export function TableRowDiff({
       {canCompare && row.original && (
         <div className="table-diff-compare">
           <button
-            className="button ghost"
+            className="button secondary compact"
             disabled={busy}
             onClick={() => void compare()}
           >
@@ -94,43 +132,18 @@ export function TableRowDiff({
           )}
         </div>
       )}
-      {columns.map((column, i) => {
-        if (
-          row.original &&
-          !row.deleted &&
-          row.values[i] === row.original.values[i] &&
-          (!current?.row || current.row.values[i] === row.original.values[i])
-        )
-          return null;
-        return (
-          <div
-            className={`table-field-diff ${current?.row ? "with-current" : ""}`}
-            key={column.name}
-          >
-            <strong>{column.name}</strong>
-            <div>
-              <small>Original</small>
-              <pre aria-label={`Original ${column.name}`}>
-                {row.original ? printable(row.original.values[i]) : "—"}
-              </pre>
-            </div>
-            {current?.row && (
-              <div>
-                <small>Database now</small>
-                <pre aria-label={`Database now ${column.name}`}>
-                  {printable(current.row.values[i])}
-                </pre>
-              </div>
-            )}
-            <div className="table-pending-value">
-              <small>Pending</small>
-              <pre aria-label={`Pending ${column.name}`}>
-                {row.deleted ? "DELETE" : printable(row.values[i])}
-              </pre>
-            </div>
-          </div>
-        );
-      })}
+      {fields.length > 0 && (
+        <div
+          className={`table-field-diff table-field-diff-head ${current?.row ? "with-current" : ""}`}
+          aria-hidden="true"
+        >
+          <span>Column</span>
+          <span>Original</span>
+          {current?.row && <span>Database now</span>}
+          <span>Pending</span>
+        </div>
+      )}
+      {fields}
     </section>
   );
 }

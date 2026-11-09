@@ -126,7 +126,7 @@ pub(crate) async fn list_columns(
                     FROM pg_catalog.pg_index i
                     WHERE i.indrelid = a.attrelid
                       AND i.indisprimary
-                      AND a.attnum = ANY(i.indkey)
+                      AND a.attnum = ANY(i.indkey[0:i.indnkeyatts - 1])
                 ),
                 a.attidentity <> '',
                 a.attgenerated <> '',
@@ -393,14 +393,14 @@ async fn open_client(
 }
 
 fn database_error(context: &str, error: Error) -> String {
-    format!("{context}: {error}")
+    super::diagnostics::database_error(context, error)
 }
 
 fn query_error(error: Error) -> QueryExecutionError {
     let Some(database_error) = error.as_db_error() else {
         return QueryExecutionError::simple(
             QueryErrorKind::Database,
-            format!("Query failed: {error}"),
+            database_error("Query failed", error),
         );
     };
 

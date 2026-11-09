@@ -1,0 +1,588 @@
+/* SQL workspace: editor pane, divider, results pane and workspace notices.
+   Solid content surfaces; capsule controls; SF Mono only for SQL. */
+@layer features {
+  /* Split: editor above, results below, with a grab-handle divider. */
+  .workspace-content > .sql-workbench {
+    flex: 1;
+  }
+  .sql-workbench {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows:
+      minmax(130px, var(--editor-ratio, 48fr)) 9px
+      minmax(130px, var(--results-ratio, 52fr));
+    background: var(--bg);
+  }
+
+  .editor-pane,
+  .results-pane {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+  }
+  .editor-pane {
+    grid-template-rows: auto minmax(0, 1fr);
+    container-type: inline-size;
+  }
+
+  /* Editor toolbar: document title and state, then mode, tools and Run. */
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 12px 0 20px;
+  }
+  .query-path {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .query-title {
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-headline);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .query-subtitle {
+    display: flex;
+    min-width: 0;
+    color: var(--muted);
+    font-size: var(--text-2xs);
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .query-subtitle > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .query-subtitle > span + span::before {
+    margin: 0 5px;
+    content: "·";
+  }
+
+  .editor-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Execution mode: a quiet pop-up button; Autocommit is tinted and named. */
+  .query-execution-control {
+    display: inline-flex;
+  }
+  .query-execution-control select {
+    height: 28px;
+    max-width: 140px;
+    padding: 0 26px 0 10px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238E8E93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 6l3-3 3 3M5 10l3 3 3-3'/%3E%3C/svg%3E")
+      no-repeat right 9px center / 10px 10px;
+    font-size: var(--text-md);
+    appearance: none;
+  }
+  .query-execution-control select:hover:not(:disabled) {
+    color: var(--text);
+    background-color: var(--hover);
+  }
+  .query-execution-control select:disabled {
+    opacity: 0.6;
+  }
+  .query-execution-control.autocommit select {
+    color: var(--warning);
+    background-color: rgba(255, 159, 10, 0.14);
+  }
+
+  /* Quiet text button used in toolbars across the app. */
+  .toolbar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--text-soft);
+    background: transparent;
+    font-size: var(--text-md);
+    white-space: nowrap;
+  }
+  .toolbar-button:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  .editor-capsule > .action-menu-trigger {
+    min-width: 30px;
+    padding: 0 7px;
+  }
+  .editor-capsule > .action-menu-trigger svg {
+    width: 16px;
+    height: 16px;
+  }
+  .editor-capsule > .action-menu-trigger[aria-expanded="true"] {
+    color: var(--text);
+    background: var(--pressed);
+  }
+
+  /* Run is the toolbar's prominent capsule. While SQL executes it morphs, in
+     place, into a danger-tinted Running/Cancel capsule with elapsed time:
+     the width eases and the label crossfades through a 2px blur. */
+  .run-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 16px 0 12px;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    color: var(--accent-ink);
+    background: var(--accent-fill);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+    font-size: var(--text-md);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .run-button:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .run-button-content,
+  .run-button-label {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .run-button kbd {
+    color: inherit;
+    font-size: var(--text-md);
+    font-weight: 400;
+    opacity: 0.75;
+  }
+  .run-button.is-running {
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.16);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 69, 58, 0.32);
+  }
+  .run-button.is-running:hover:not(:disabled) {
+    background: rgba(255, 69, 58, 0.24);
+  }
+  .run-button.is-running:disabled {
+    opacity: 1;
+    color: var(--muted);
+  }
+  /* "Running" and "Cancel" share one cell; hover or focus reveals the action. */
+  .run-button-swap {
+    display: inline-grid;
+  }
+  .run-button-swap > span {
+    grid-area: 1 / 1;
+  }
+  .run-button-action {
+    opacity: 0;
+  }
+  .run-button:hover .run-button-status,
+  .run-button:focus-visible .run-button-status {
+    opacity: 0;
+  }
+  .run-button:hover .run-button-action,
+  .run-button:focus-visible .run-button-action {
+    opacity: 1;
+  }
+  .run-button-elapsed {
+    min-width: 3.4ch;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .run-button {
+      transition:
+        width 220ms var(--ease),
+        transform 120ms var(--ease),
+        background-color 180ms ease,
+        box-shadow 180ms ease,
+        color 180ms ease;
+    }
+    .run-button-swap > span {
+      transition:
+        opacity 140ms ease,
+        filter 140ms ease;
+    }
+    .run-button:hover .run-button-status,
+    .run-button:focus-visible .run-button-status,
+    .run-button-action {
+      filter: blur(2px);
+    }
+    .run-button:hover .run-button-action,
+    .run-button:focus-visible .run-button-action {
+      filter: none;
+    }
+    .run-button-label[data-entering] {
+      animation: run-label-in 200ms var(--ease) both;
+    }
+  }
+  @keyframes run-label-in {
+    from {
+      opacity: 0;
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      filter: none;
+    }
+  }
+
+  /* Editor surface. Syntax colours live in shared/lib/sql-editor-theme.ts. */
+  .code-editor {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-top: var(--hairline) solid var(--line);
+  }
+  /* The editor/results divider shows a grab handle. */
+  .sql-resize-handle {
+    cursor: row-resize;
+  }
+  .sql-resize-handle:focus-visible {
+    outline: 0;
+  }
+  .sql-resize-handle::before {
+    position: absolute;
+    top: 4px;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background: var(--line-strong);
+    content: "";
+  }
+  .sql-resize-handle::after {
+    top: 2px;
+    left: calc(50% - 18px);
+    width: 36px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .sql-resize-handle:hover::after,
+  .sql-resize-handle:focus-visible::after,
+  body[data-resizing="horizontal"] .sql-resize-handle::after {
+    background: var(--accent);
+  }
+  body[data-resizing="vertical"] {
+    cursor: col-resize;
+  }
+  body[data-resizing="horizontal"] {
+    cursor: row-resize;
+  }
+  body[data-resizing] * {
+    user-select: none !important;
+  }
+
+  /* Results: output segment, row count and timing, then the grid. */
+  .results-pane {
+    grid-template-rows: 48px minmax(0, 1fr);
+  }
+  .results-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 0 16px 0 20px;
+  }
+  .results-tabs.segmented-capsule > button,
+  .result-set-switcher.segmented-capsule > button {
+    height: 22px;
+    padding: 0 12px;
+    font-size: var(--text-callout);
+  }
+  .result-set-switcher.segmented-capsule > button {
+    min-width: 28px;
+    padding: 0 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-meta {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    color: var(--muted);
+    font-size: var(--text-callout);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .result-meta > span + span::before {
+    margin: 0 6px;
+    color: var(--muted);
+    content: "·";
+  }
+  .result-meta .truncated {
+    color: var(--warning);
+  }
+  .result-meta .result-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-soft);
+  }
+  .result-meta .result-done svg {
+    color: var(--success);
+  }
+
+  .result-table-wrap {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  /* Grid structure for SQL results (visual treatment: table/table-base.css). */
+  .result-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-variant-numeric: tabular-nums;
+    user-select: text;
+  }
+  .result-table th,
+  .result-table td {
+    height: 30px;
+    max-width: 420px;
+    padding: 0 12px;
+    overflow: hidden;
+    border-right: var(--hairline) solid var(--line);
+    border-bottom: var(--hairline) solid var(--line);
+    color: var(--text);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result-table th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    height: 28px;
+    color: var(--muted);
+    background: var(--bg);
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .result-table .row-number {
+    position: sticky;
+    left: 0;
+    width: 44px;
+    min-width: 44px;
+    color: var(--tertiary);
+    background: var(--bg);
+    font-size: var(--text-2xs);
+    text-align: right;
+    user-select: none;
+  }
+  .result-table th.row-number {
+    z-index: 2;
+  }
+  .result-table td.null-cell {
+    color: var(--tertiary);
+    font-style: italic;
+  }
+
+  /* Run, empty, success and error states. */
+  .results-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 48px 32px;
+    color: var(--muted);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    text-align: center;
+  }
+  .results-state-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 4px;
+    border-radius: 11px;
+    color: var(--muted);
+    background: var(--field);
+  }
+  .results-state strong {
+    color: var(--text);
+    font-size: var(--text-headline);
+    font-weight: 600;
+  }
+  .results-state kbd {
+    padding: 1px 6px;
+    border-radius: 5px;
+    color: var(--text-soft);
+    background: var(--field);
+    box-shadow: inset 0 0 0 0.5px var(--line-strong);
+  }
+  .results-state.error-state {
+    max-width: 560px;
+    margin: auto;
+    padding: 24px;
+    color: var(--text-soft);
+    user-select: text;
+  }
+  .results-state.error-state .results-state-icon {
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.14);
+  }
+  .results-state.error-state .error-detail,
+  .results-state.error-state .error-hint {
+    color: var(--muted);
+  }
+  .results-state.error-state small {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Links back to the inline diagnostic in the editor. */
+  .results-state .error-location {
+    padding: 0;
+    border: 0;
+    color: var(--accent);
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .results-state .error-location:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .results-state-count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A query that returned columns but no rows: header stays, calm note below. */
+  .results-empty {
+    position: sticky;
+    left: 0;
+    padding: 28px 16px;
+    color: var(--muted);
+    font-size: var(--text-md);
+    text-align: center;
+  }
+
+  /* While a re-run is in flight the previous outcome stays, dimmed — after a
+     short delay so fast queries never flicker. */
+  .results-pane [aria-busy="true"],
+  .result-meta[aria-busy="true"] {
+    opacity: 0.45;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .results-pane [aria-busy="true"],
+    .result-meta[aria-busy="true"] {
+      transition: opacity 200ms ease 160ms;
+    }
+    /* New outcomes arrive once (tab switches never replay; see useEntrance). */
+    .results-pane .paged-results[data-entering],
+    .results-pane .results-state[data-entering] {
+      animation: results-in 180ms var(--ease) both;
+    }
+    .results-pane .results-running[data-entering] {
+      animation: results-fade 200ms ease 240ms both;
+    }
+    .result-meta .fade-in[data-entering] {
+      animation: results-fade 200ms ease both;
+    }
+  }
+  @keyframes results-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes results-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Workspace notices: calm inline callouts above the active document. */
+  .workspace-notices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px 0;
+  }
+  .workspace-notices .workspace-notice {
+    gap: 6px 12px;
+    min-height: 40px;
+    padding: 6px 8px 6px 14px;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    background: var(--surface-2);
+    box-shadow: var(--edge-light);
+    font-size: var(--text-md);
+    line-height: 1.4;
+  }
+  .workspace-notices .workspace-notice[role="alert"] {
+    color: var(--text);
+    background: rgba(255, 159, 10, 0.14);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 159, 10, 0.32);
+  }
+  .workspace-notices .workspace-notice .button {
+    min-height: 26px;
+    padding: 0 10px;
+    border-radius: var(--radius-capsule);
+    color: var(--text);
+    background: var(--hover);
+    font-size: var(--text-callout);
+  }
+  .workspace-notices .workspace-notice .button:hover:not(:disabled) {
+    background: var(--pressed);
+  }
+
+  /* Narrow editor pane: let the title take its own line. */
+  @container (max-width: 520px) {
+    .editor-toolbar {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-block: 8px;
+    }
+    .query-path {
+      flex-basis: 100%;
+    }
+    .editor-actions {
+      margin-left: auto;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .result-set-switcher.segmented-capsule {
+      display: none;
+    }
+  }
+
+  :root[data-density="compact"] .results-pane {
+    grid-template-rows: 38px minmax(0, 1fr);
+  }
+}

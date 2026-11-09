@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, RotateCcw, Trash2, Columns3 } from "lucide-react";
+import {
+  Columns3,
+  FileText,
+  Plus,
+  RotateCcw,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import type { SchemaTab } from "../query/query-types";
 import type {
   ColumnDraft,
@@ -19,6 +26,7 @@ import { ColumnDefault } from "./ColumnDefault";
 import { SchemaConstraints } from "./SchemaConstraints";
 import { SchemaEnums } from "./SchemaEnums";
 import { qualifiedRelationName } from "../../shared/lib/database-object";
+import { useSqlHighlight } from "./sql-highlight";
 
 const types = [
   "text",
@@ -165,6 +173,8 @@ function SchemaDraftEditor({
   const [constraintRevision, setConstraintRevision] = useState(0);
   const editorRef = useRef<HTMLElement>(null);
   const reviewRef = useRef<HTMLElement>(null);
+  const sqlRef = useRef<HTMLPreElement>(null);
+  useSqlHighlight(sqlRef, plan?.sql);
   useEffect(() => {
     if (plan) reviewRef.current?.focus();
   }, [plan]);
@@ -256,7 +266,9 @@ function SchemaDraftEditor({
       aria-busy={busy}
     >
       <header className="schema-editor-header">
-        <Columns3 size={19} />
+        <span className="schema-editor-icon" aria-hidden="true">
+          <Columns3 size={22} strokeWidth={1.5} />
+        </span>
         <div>
           <h1>{tab.table ? "Edit table structure" : "New table"}</h1>
           <p>
@@ -269,400 +281,438 @@ function SchemaDraftEditor({
         />
       </header>
       <div className="schema-editor-body">
-        {!editable && (
-          <p role="status">
-            {unknown
-              ? "Verify the database, then close and reopen this editor. Automatic retry is disabled."
-              : session.readOnly
-                ? "This connection is read-only."
-                : "Use SQL to edit views, partitions and foreign tables."}
-          </p>
-        )}
-        <fieldset disabled={!editable || busy}>
-          <div className="schema-editor-identity">
-            <label>
-              Schema
-              <input
-                aria-label="Table schema"
-                value={draft.schema}
-                readOnly={!!initial}
-                onChange={(e) => change({ schema: e.target.value })}
-              />
-            </label>
-            <label>
-              Table name
-              <input
-                aria-label="Table name"
-                value={draft.table}
-                disabled={draft.dropTable}
-                placeholder="e.g. orders"
-                onChange={(e) => change({ table: e.target.value })}
-              />
-            </label>
-          </div>
-          {draft.dropTable ? (
-            <div className="schema-drop-summary">
-              <h2>Drop {target}</h2>
-              <p>
-                This permanently removes the table, its data, indexes and table
-                constraints. There is no undo after applying.
-              </p>
-              <p>
-                External dependencies are not removed automatically. PostgreSQL
-                will reject the operation when they prevent a restricted drop.
-              </p>
-              <button
-                className="button secondary"
-                onClick={() => change({ dropTable: false })}
-              >
-                Keep table
-              </button>
+        <div className="schema-editor-main">
+          {!editable && (
+            <p role="status" className="schema-editor-status">
+              {unknown
+                ? "Verify the database, then close and reopen this editor. Automatic retry is disabled."
+                : session.readOnly
+                  ? "This connection is read-only."
+                  : "Use SQL to edit views, partitions and foreign tables."}
+            </p>
+          )}
+          <fieldset disabled={!editable || busy}>
+            <div className="schema-editor-identity">
+              <label>
+                Schema
+                <input
+                  aria-label="Table schema"
+                  value={draft.schema}
+                  readOnly={!!initial}
+                  onChange={(e) => change({ schema: e.target.value })}
+                />
+              </label>
+              <label>
+                Table name
+                <input
+                  aria-label="Table name"
+                  value={draft.table}
+                  disabled={draft.dropTable}
+                  placeholder="e.g. orders"
+                  onChange={(e) => change({ table: e.target.value })}
+                />
+              </label>
             </div>
-          ) : (
-            <>
-              <div className="schema-section-heading">
-                <h2>
-                  Columns{" "}
-                  <span>{draft.columns.filter((c) => !c.removed).length}</span>
-                </h2>
+            {draft.dropTable ? (
+              <div className="schema-drop-summary">
+                <h2>Drop {target}</h2>
+                <p>
+                  This permanently removes the table, its data, indexes and
+                  table constraints. There is no undo after applying.
+                </p>
+                <p>
+                  External dependencies are not removed automatically.
+                  PostgreSQL will reject the operation when they prevent a
+                  restricted drop.
+                </p>
                 <button
-                  className="button ghost"
-                  onClick={() => {
-                    change({ columns: [...draft.columns, newColumn()] });
-                    requestAnimationFrame(() =>
-                      editorRef.current
-                        ?.querySelector<HTMLInputElement>(
-                          `[aria-label="Column ${draft.columns.length + 1} name"]`,
-                        )
-                        ?.focus(),
-                    );
-                  }}
+                  className="button secondary"
+                  onClick={() => change({ dropTable: false })}
                 >
-                  <Plus size={15} />
-                  Add column
+                  Keep table
                 </button>
               </div>
-              <div className="schema-columns-scroll">
-                <table className="schema-columns">
-                  <colgroup>
-                    <col />
-                    <col />
-                    <col className="schema-boolean-column" />
-                    <col className="schema-boolean-column" />
-                    <col className="schema-boolean-column" />
-                    <col />
-                    <col className="schema-action-column" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Type</th>
-                      <th>Nullable</th>
-                      <th>Primary key</th>
-                      <th>Identity</th>
-                      <th>Default</th>
-                      <th>
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {draft.columns.map((column, index) => (
-                      <tr
-                        key={index}
-                        data-state={
-                          column.removed
-                            ? "removed"
-                            : column.original === null
-                              ? "added"
-                              : column.original !== column.name
-                                ? "changed"
-                                : undefined
-                        }
-                      >
-                        <td>
-                          <input
-                            aria-label={`Column ${index + 1} name`}
-                            disabled={column.removed}
-                            value={column.name}
-                            placeholder="column_name"
-                            onChange={(e) =>
-                              columnChange(index, { name: e.target.value })
-                            }
-                          />
-                          {column.original &&
-                            column.original !== column.name && (
-                              <small>Was {column.original}</small>
-                            )}
-                        </td>
-                        <td>
-                          <select
-                            aria-label={`Column ${index + 1} type`}
-                            disabled={
-                              column.removed ||
-                              (!!column.original &&
-                                (column.identity ||
-                                  !!initial?.columns.find(
-                                    (c) => c.name === column.original,
-                                  )?.generated))
-                            }
-                            value={column.dataType}
-                            onChange={(e) =>
-                              columnChange(index, {
-                                dataType: e.target.value,
-                                enumType: (() => {
-                                  const selected = enumOptions.find(
-                                    (item) =>
-                                      qualifiedRelationName(
-                                        item.schema,
-                                        item.name,
-                                      ) === e.target.value,
-                                  );
-                                  return selected
-                                    ? {
-                                        schema: selected.schema,
-                                        name: selected.name,
-                                      }
-                                    : null;
-                                })(),
-                                identity: column.original
-                                  ? column.identity
-                                  : false,
-                              })
-                            }
-                          >
-                            {!types.includes(column.dataType) &&
-                              !enumOptions.some(
-                                (item) =>
-                                  qualifiedRelationName(
-                                    item.schema,
-                                    item.name,
-                                  ) === column.dataType,
-                              ) && <option>{column.dataType}</option>}
-                            {types.map((type) => (
-                              <option key={type}>{type}</option>
-                            ))}
-                            {enumOptions.length > 0 && (
-                              <optgroup label="Enum types">
-                                {enumOptions.map((item, i) => (
-                                  <option
-                                    key={i}
-                                    value={qualifiedRelationName(
-                                      item.schema,
-                                      item.name,
-                                    )}
-                                  >
-                                    {item.schema}.{item.name}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Column ${index + 1} nullable`}
-                            checked={column.nullable}
-                            disabled={
-                              !!initial?.columns.find(
-                                (c) => c.name === column.original,
-                              )?.generated ||
-                              column.primaryKey ||
-                              column.identity ||
-                              column.removed
-                            }
-                            onChange={(e) =>
-                              columnChange(index, {
-                                nullable: e.target.checked,
-                              })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Column ${index + 1} primary key`}
-                            checked={column.primaryKey}
-                            disabled={!!initial || column.removed}
-                            onChange={(e) =>
-                              columnChange(index, {
-                                primaryKey: e.target.checked,
-                                nullable: e.target.checked
-                                  ? false
-                                  : column.nullable,
-                              })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Column ${index + 1} identity`}
-                            checked={column.identity}
-                            disabled={
-                              !!column.original ||
-                              column.removed ||
-                              !["smallint", "integer", "bigint"].includes(
-                                column.dataType,
-                              )
-                            }
-                            onChange={(e) =>
-                              columnChange(index, {
-                                identity: e.target.checked,
-                                defaultValue: null,
-                                defaultMode: "drop",
-                                nullable: e.target.checked
-                                  ? false
-                                  : column.nullable,
-                              })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <ColumnDefault
-                            column={column}
-                            index={index}
-                            originalDefault={
-                              initial?.columns.find(
-                                (c) => c.name === column.original,
-                              )?.defaultValue ?? null
-                            }
-                            disabled={
-                              column.removed ||
-                              column.identity ||
-                              !!initial?.columns.find(
-                                (c) => c.name === column.original,
-                              )?.generated
-                            }
-                            onChange={(patch) => columnChange(index, patch)}
-                          />
-                        </td>
-                        <td>
-                          <button
-                            className="icon-button"
-                            aria-label={`${column.removed ? "Restore" : "Remove"} column ${index + 1}`}
-                            onClick={() =>
-                              column.original
-                                ? columnChange(index, {
-                                    removed: !column.removed,
-                                  })
-                                : change({
-                                    columns: draft.columns.filter(
-                                      (_, i) => i !== index,
-                                    ),
-                                  })
-                            }
-                          >
-                            {column.removed ? (
-                              <RotateCcw size={15} />
-                            ) : (
-                              <Trash2 size={15} />
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="schema-editor-hint">
-                Literal defaults are values, not SQL. Keep existing preserves
-                the original expression. Type changes use PostgreSQL assignment
-                casts; unsupported conversions are rejected.
-              </p>
-              <SchemaConstraints
-                key={constraintRevision}
-                draft={draft}
-                onEditingChange={setConstraintEditing}
-                onChange={(constraints) => change({ constraints })}
-              />
-              {enumError && (
-                <p role="alert" className="schema-editor-error">
-                  {enumError}{" "}
+            ) : (
+              <>
+                <div className="schema-section-heading">
+                  <h2>
+                    Columns{" "}
+                    <span>
+                      {draft.columns.filter((c) => !c.removed).length}
+                    </span>
+                  </h2>
                   <button
                     className="button ghost"
-                    onClick={() => setEnumRevision((v) => v + 1)}
+                    onClick={() => {
+                      change({ columns: [...draft.columns, newColumn()] });
+                      requestAnimationFrame(() =>
+                        editorRef.current
+                          ?.querySelector<HTMLInputElement>(
+                            `[aria-label="Column ${draft.columns.length + 1} name"]`,
+                          )
+                          ?.focus(),
+                      );
+                    }}
                   >
-                    Reload enum types
+                    <Plus size={15} />
+                    Add column
                   </button>
+                </div>
+                <div className="schema-columns-scroll">
+                  <table className="schema-columns">
+                    <colgroup>
+                      <col />
+                      <col />
+                      <col className="schema-boolean-column" />
+                      <col className="schema-boolean-column" />
+                      <col className="schema-boolean-column" />
+                      <col />
+                      <col className="schema-action-column" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Nullable</th>
+                        <th>Primary key</th>
+                        <th>Identity</th>
+                        <th>Default</th>
+                        <th>
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {draft.columns.map((column, index) => (
+                        <tr
+                          key={index}
+                          data-state={
+                            column.removed
+                              ? "removed"
+                              : column.original === null
+                                ? "added"
+                                : column.original !== column.name
+                                  ? "changed"
+                                  : undefined
+                          }
+                        >
+                          <td>
+                            <input
+                              aria-label={`Column ${index + 1} name`}
+                              disabled={column.removed}
+                              value={column.name}
+                              placeholder="column_name"
+                              onChange={(e) =>
+                                columnChange(index, { name: e.target.value })
+                              }
+                            />
+                            {column.original &&
+                              column.original !== column.name && (
+                                <small>Was {column.original}</small>
+                              )}
+                          </td>
+                          <td>
+                            <select
+                              aria-label={`Column ${index + 1} type`}
+                              disabled={
+                                column.removed ||
+                                (!!column.original &&
+                                  (column.identity ||
+                                    !!initial?.columns.find(
+                                      (c) => c.name === column.original,
+                                    )?.generated))
+                              }
+                              value={column.dataType}
+                              onChange={(e) =>
+                                columnChange(index, {
+                                  dataType: e.target.value,
+                                  enumType: (() => {
+                                    const selected = enumOptions.find(
+                                      (item) =>
+                                        qualifiedRelationName(
+                                          item.schema,
+                                          item.name,
+                                        ) === e.target.value,
+                                    );
+                                    return selected
+                                      ? {
+                                          schema: selected.schema,
+                                          name: selected.name,
+                                        }
+                                      : null;
+                                  })(),
+                                  identity: column.original
+                                    ? column.identity
+                                    : false,
+                                })
+                              }
+                            >
+                              {!types.includes(column.dataType) &&
+                                !enumOptions.some(
+                                  (item) =>
+                                    qualifiedRelationName(
+                                      item.schema,
+                                      item.name,
+                                    ) === column.dataType,
+                                ) && <option>{column.dataType}</option>}
+                              {types.map((type) => (
+                                <option key={type}>{type}</option>
+                              ))}
+                              {enumOptions.length > 0 && (
+                                <optgroup label="Enum types">
+                                  {enumOptions.map((item, i) => (
+                                    <option
+                                      key={i}
+                                      value={qualifiedRelationName(
+                                        item.schema,
+                                        item.name,
+                                      )}
+                                    >
+                                      {item.schema}.{item.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Column ${index + 1} nullable`}
+                              checked={column.nullable}
+                              disabled={
+                                !!initial?.columns.find(
+                                  (c) => c.name === column.original,
+                                )?.generated ||
+                                column.primaryKey ||
+                                column.identity ||
+                                column.removed
+                              }
+                              onChange={(e) =>
+                                columnChange(index, {
+                                  nullable: e.target.checked,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Column ${index + 1} primary key`}
+                              checked={column.primaryKey}
+                              disabled={!!initial || column.removed}
+                              onChange={(e) =>
+                                columnChange(index, {
+                                  primaryKey: e.target.checked,
+                                  nullable: e.target.checked
+                                    ? false
+                                    : column.nullable,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Column ${index + 1} identity`}
+                              checked={column.identity}
+                              disabled={
+                                !!column.original ||
+                                column.removed ||
+                                !["smallint", "integer", "bigint"].includes(
+                                  column.dataType,
+                                )
+                              }
+                              onChange={(e) =>
+                                columnChange(index, {
+                                  identity: e.target.checked,
+                                  defaultValue: null,
+                                  defaultMode: "drop",
+                                  nullable: e.target.checked
+                                    ? false
+                                    : column.nullable,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <ColumnDefault
+                              column={column}
+                              index={index}
+                              originalDefault={
+                                initial?.columns.find(
+                                  (c) => c.name === column.original,
+                                )?.defaultValue ?? null
+                              }
+                              disabled={
+                                column.removed ||
+                                column.identity ||
+                                !!initial?.columns.find(
+                                  (c) => c.name === column.original,
+                                )?.generated
+                              }
+                              onChange={(patch) => columnChange(index, patch)}
+                            />
+                          </td>
+                          <td>
+                            <button
+                              className="icon-button"
+                              aria-label={`${column.removed ? "Restore" : "Remove"} column ${index + 1}`}
+                              onClick={() =>
+                                column.original
+                                  ? columnChange(index, {
+                                      removed: !column.removed,
+                                    })
+                                  : change({
+                                      columns: draft.columns.filter(
+                                        (_, i) => i !== index,
+                                      ),
+                                    })
+                              }
+                            >
+                              {column.removed ? (
+                                <RotateCcw size={15} />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="schema-editor-hint">
+                  Literal defaults are values, not SQL. Keep existing preserves
+                  the original expression. Type changes use PostgreSQL
+                  assignment casts; unsupported conversions are rejected.
                 </p>
-              )}
-              <SchemaEnums
-                catalog={enumCatalog}
-                schema={draft.schema}
-                changes={draft.enumChanges ?? []}
-                onChange={(enumChanges) => change({ enumChanges })}
-              />
-              {initial && (
-                <button
-                  className="button danger schema-drop-action"
-                  disabled={
-                    constraintEditing ||
-                    !!draft.constraints?.length ||
-                    !!draft.enumChanges?.length
-                  }
-                  onClick={() => change({ dropTable: true })}
-                >
-                  <Trash2 size={15} />
-                  Drop table…
-                </button>
-              )}
-            </>
-          )}
-        </fieldset>
-        {error && (
-          <p className="schema-editor-error" role="alert">
-            {error}
-          </p>
-        )}
-        {plan && (
-          <section
-            ref={reviewRef}
-            tabIndex={-1}
-            className="schema-review"
-            aria-label="Review schema changes"
-          >
-            <h2>Review changes</h2>
-            <p>
-              {session.host}:{session.port} / {session.database} ·{" "}
-              {session.environment}
-            </p>
-            <pre tabIndex={0}>{plan.sql}</pre>
-            {plan.destructive && (
-              <>
-                <p className="schema-editor-error">
-                  This change can remove data or constraints, convert stored
-                  values, or enable cascading changes. There is no undo after
-                  commit. Dropping a column also removes its dependent indexes
-                  and constraints.
-                </p>
-                <label>
-                  Type {target} to confirm
-                  <input
-                    aria-label="Confirm table name"
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={confirmation}
-                    disabled={busy}
-                    onChange={(e) => setConfirmation(e.target.value)}
-                  />
-                </label>
+                <SchemaConstraints
+                  key={constraintRevision}
+                  draft={draft}
+                  onEditingChange={setConstraintEditing}
+                  onChange={(constraints) => change({ constraints })}
+                />
+                {enumError && (
+                  <p role="alert" className="schema-editor-error">
+                    {enumError}{" "}
+                    <button
+                      className="button ghost"
+                      onClick={() => setEnumRevision((v) => v + 1)}
+                    >
+                      Reload enum types
+                    </button>
+                  </p>
+                )}
+                <SchemaEnums
+                  catalog={enumCatalog}
+                  schema={draft.schema}
+                  changes={draft.enumChanges ?? []}
+                  onChange={(enumChanges) => change({ enumChanges })}
+                />
+                {initial && (
+                  <button
+                    className="button danger schema-drop-action"
+                    disabled={
+                      constraintEditing ||
+                      !!draft.constraints?.length ||
+                      !!draft.enumChanges?.length
+                    }
+                    onClick={() => change({ dropTable: true })}
+                  >
+                    <Trash2 size={15} />
+                    Drop table…
+                  </button>
+                )}
               </>
             )}
-            {session.environment === "production" && (
-              <p className="schema-editor-error">
-                Production database — applying changes affects the live schema.
-              </p>
-            )}
-            <p className="schema-editor-hint">
-              Changes may briefly block other database operations. Lock waits
-              are limited; failed changes are rolled back before commit.
+          </fieldset>
+          {error && (
+            <p className="schema-editor-error" role="alert">
+              {error}
             </p>
-          </section>
-        )}
+          )}
+        </div>
+        <aside className="schema-editor-aside">
+          {plan ? (
+            <section
+              ref={reviewRef}
+              tabIndex={-1}
+              className="schema-review"
+              aria-label="Review schema changes"
+            >
+              <div className="schema-review-heading">
+                <h2>Review changes</h2>
+                <p>
+                  <code>
+                    {session.host}:{session.port} / {session.database}
+                  </code>{" "}
+                  · {session.environment}
+                </p>
+              </div>
+              <pre ref={sqlRef} tabIndex={0}>
+                {plan.sql}
+              </pre>
+              {plan.destructive && (
+                <>
+                  <p className="schema-editor-warning">
+                    <TriangleAlert size={15} aria-hidden="true" />
+                    <span>
+                      This change can remove data or constraints, convert stored
+                      values, or enable cascading changes. There is no undo
+                      after commit. Dropping a column also removes its dependent
+                      indexes and constraints.
+                    </span>
+                  </p>
+                  <label className="schema-review-confirm">
+                    <span>
+                      Type <code>{target}</code> to confirm
+                    </span>
+                    <input
+                      aria-label="Confirm table name"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={confirmation}
+                      disabled={busy}
+                      onChange={(e) => setConfirmation(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+              {session.environment === "production" && (
+                <p className="schema-editor-warning">
+                  <TriangleAlert size={15} aria-hidden="true" />
+                  <span>
+                    Production database — applying changes affects the live
+                    schema.
+                  </span>
+                </p>
+              )}
+              <p className="schema-editor-hint">
+                Changes may briefly block other database operations. Lock waits
+                are limited; failed changes are rolled back before commit.
+              </p>
+            </section>
+          ) : (
+            <div className="schema-review-placeholder">
+              <span aria-hidden="true">
+                <FileText size={22} strokeWidth={1.5} />
+              </span>
+              <strong>Review the SQL before applying</strong>
+              <p>
+                Opaline generates the exact statements for this draft. Nothing
+                runs until you apply, and any edit clears the review.
+              </p>
+            </div>
+          )}
+        </aside>
       </div>
       <footer className="schema-editor-footer">
+        <span
+          className="schema-editor-dirty"
+          data-dirty={dirty || unknown}
+          aria-hidden="true"
+        />
         <span role="status">
           {unknown
             ? "Outcome unknown"

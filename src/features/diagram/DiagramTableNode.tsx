@@ -26,7 +26,7 @@ export const DiagramTableNode = memo(function DiagramTableNode({
     >
       <header>
         <span>
-          <Table2 size={15} />
+          <Table2 size={11} aria-hidden="true" />
           {data.table.schema}
         </span>
         <strong title={data.table.name}>{data.table.name}</strong>
@@ -44,13 +44,15 @@ export const DiagramTableNode = memo(function DiagramTableNode({
               id={columnHandle(column.name, "in")}
               isConnectable={false}
             />
-            <span className="diagram-column-key">
+            <span
+              className={`diagram-column-key${column.primaryKey ? " is-primary" : ""}`}
+            >
               {column.primaryKey ? (
-                <KeyRound size={12} aria-label="Primary key" />
+                <KeyRound size={11} aria-label="Primary key" />
               ) : data.foreignColumns.includes(column.name) ? (
-                <Link2 size={12} aria-label="Foreign key" />
+                <Link2 size={11} aria-label="Foreign key" />
               ) : (
-                <span>·</span>
+                <span aria-hidden="true">·</span>
               )}
             </span>
             <span className="diagram-column-name">{column.name}</span>
@@ -105,12 +107,7 @@ export const DiagramRelationEdge = memo(function DiagramRelationEdge(
     (props.source === props.target
       ? `M ${props.sourceX},${props.sourceY} C ${props.sourceX + 90},${props.sourceY} ${props.sourceX + 90},${props.sourceY - 110} ${props.sourceX},${props.sourceY - 110} L ${props.targetX - 50},${props.sourceY - 110} Q ${props.targetX - 75},${props.sourceY - 110} ${props.targetX - 75},${props.targetY} L ${props.targetX},${props.targetY}`
       : normalPath);
-  return (
-    <BaseEdge
-      id={props.id}
-      path={path}
-      style={props.style}
-      interactionWidth={20}
-    />
-  );
+  // No DOM id: edge ids are JSON keys (quotes, commas) that break selector-
+  // based tooling, and nothing references the path by id.
+  return <BaseEdge path={path} style={props.style} interactionWidth={20} />;
 });

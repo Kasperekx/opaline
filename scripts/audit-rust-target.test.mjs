@@ -19,7 +19,15 @@ test("compiled unsound dependencies fail; excluded platforms remain visible", ()
 test("compiled vulnerabilities fail regardless of warning policy", () => {
   assert.equal(classifyFindings(metadata, { vulnerabilities: { list: [finding("used")] }, warnings: {} }).blocked, true);
 });
+test("yanked crates carry no advisory record and still fail when compiled", () => {
+  const yanked = name => ({ advisory: null, package: { name, version: "1" } });
+  const result = classifyFindings(metadata, { vulnerabilities: { list: [] }, warnings: { yanked: [yanked("used")] } });
+  assert.equal(result.blocked, true);
+  assert.equal(result.findings[0].id, "yanked");
+  assert.equal(classifyFindings(metadata, { vulnerabilities: { list: [] }, warnings: { yanked: [yanked("other")] } }).blocked, false);
+});
 test("incomplete security evidence fails closed", () => {
   assert.throws(() => classifyFindings({}, {}));
   assert.throws(() => classifyFindings(metadata, { vulnerabilities: { list: [] }, warnings: { unsound: [{}] } }));
+  assert.throws(() => classifyFindings(metadata, { vulnerabilities: { list: [] }, warnings: { unsound: [{ advisory: null, package: { name: "used", version: "1" } }] } }));
 });

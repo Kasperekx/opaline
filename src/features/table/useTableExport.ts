@@ -12,9 +12,13 @@ import type {
 } from "../../shared/types/database";
 import {
   chooseTableExportPath,
+  formatExportSize,
   saveTableExport,
   type TableExportFormat,
 } from "./table-export";
+import { useHud } from "../../shared/components/Hud";
+
+const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 type UseTableExportOptions = {
   schema: string;
@@ -48,6 +52,29 @@ export function useTableExport({
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fullExport, setFullExport] = useState<FullTableExport | null>(null);
+  const hud = useHud();
+  // A finished export is a confirmation: the HUD shows it when present,
+  // otherwise the inline notice keeps the file name on screen.
+  const finished = useCallback(
+    (path: string, rows: number | null, bytes: number | null) => {
+      if (!hud.available) {
+        setSavedFilename(fileName(path));
+        return;
+      }
+      hud.show({
+        title:
+          rows === null
+            ? "Export finished"
+            : `Exported ${rows.toLocaleString()} ${rows === 1 ? "row" : "rows"}`,
+        detail:
+          bytes === null
+            ? fileName(path)
+            : `${fileName(path)} · ${formatExportSize(bytes)}`,
+        tone: "success",
+      });
+    },
+    [hud],
+  );
   useWorkRisk({
     sessionId: session.id,
     tabId: `table:${databaseObjectKey({ schema, name: table })}`,
@@ -72,7 +99,7 @@ export function useTableExport({
           format,
         });
         if (!path) return false;
-        setSavedFilename(path.split(/[\\/]/).pop() ?? path);
+        finished(path, rows.length, null);
         return true;
       } catch (caughtError) {
         setError(errorMessage(caughtError));
@@ -81,7 +108,7 @@ export function useTableExport({
         setBusy(false);
       }
     },
-    [busy, columns, schema, selectedRows, table, visibleRows],
+    [busy, columns, finished, schema, selectedRows, table, visibleRows],
   );
 
   const exportAllRows = useCallback(
@@ -100,7 +127,7 @@ export function useTableExport({
           bytesWritten: 0,
           cancelling: false,
         });
-        await databaseApi.exportTableData(
+        const result = await databaseApi.exportTableData(
           {
             schema,
             table,
@@ -116,7 +143,11 @@ export function useTableExport({
             );
           },
         );
-        setSavedFilename(path.split(/[\\/]/).pop() ?? path);
+        finished(
+          path,
+          typeof result?.rowsExported === "number" ? result.rowsExported : null,
+          typeof result?.bytesWritten === "number" ? result.bytesWritten : null,
+        );
         return true;
       } catch (caughtError) {
         const message = errorMessage(caughtError);
@@ -131,7 +162,7 @@ export function useTableExport({
         setBusy(false);
       }
     },
-    [databaseApi, busy, filter, schema, sort, table, conditions],
+    [databaseApi, busy, filter, finished, schema, sort, table, conditions],
   );
 
   const cancelFullExport = useCallback(async () => {

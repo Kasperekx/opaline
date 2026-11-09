@@ -9,6 +9,8 @@ Thanks for helping build a database client that stays fast, calm, and useful.
 2. Do not add telemetry, accounts, or persistence of credentials without an
    explicit design and security review.
 3. Preserve keyboard access, visible focus states, and reduced-motion support.
+   For application UI work, follow the [design guidelines](docs/design-system.md)
+   and reuse the established controls, dialog shell and work-safety patterns.
 4. Use Node 22.13+ (or 24+) and the pinned Rust toolchain. Run `npm run check`,
    `cargo fmt --manifest-path src-tauri/Cargo.toml --check`,
    `cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`,

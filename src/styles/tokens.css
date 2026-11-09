@@ -1,54 +1,167 @@
-/* Opaline — warm graphite, restrained amber, semantic environments.
-   App text uses the platform font; only database values and SQL use monospace. */
+/* Opaline Native — dark. A Mac app first: system type, real materials on
+   floating chrome, solid content, one accent, environments in colour + words.
+   Legacy token names are kept so every surface follows the new palette. */
 :root {
   color-scheme: dark;
-  --bg: #161719;
-  --rail: #1b1c1e;
-  --surface: #1e1f21;
-  --surface-2: #252628;
-  --surface-3: #303133;
-  --line: #ffffff0d;
-  --line-strong: #ffffff1c;
-  --text: #eeede9;
-  --text-soft: #bcbcb7;
-  --muted: #999b97;
-  --accent: #dfbb79;
-  --accent-hover: #edcc91;
-  --accent-ink: #292318;
-  --accent-soft: #dfbb7912;
-  --accent-line: #dfbb7947;
-  --teal: #8bd0bd;
-  --danger: #f1a09b;
+
+  /* Content surfaces stay solid. Translucency is reserved for chrome. */
+  --window: #232327;
+  --bg: #1c1c1f;
+  --rail: transparent;
+  --surface: #202024;
+  --surface-2: #2a2a2f;
+  --surface-3: #3a3a40;
+  --field: rgba(255, 255, 255, 0.07);
+  --hover: rgba(255, 255, 255, 0.07);
+  --pressed: rgba(255, 255, 255, 0.12);
+  --stripe: rgba(255, 255, 255, 0.035);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --hairline: 0.5px;
+  --edge-light: inset 0 0.5px 0 rgba(255, 255, 255, 0.12);
+
+  /* Labels (macOS dark label colours). */
+  --text: #f5f5f7;
+  --text-soft: #d1d1d6;
+  --muted: #98989d;
+  --tertiary: #636366;
+
+  /* One accent. --accent is for text, icons and focus on dark surfaces;
+     --accent-fill carries white text (selected rows, primary buttons). */
+  --accent: #a7a6f0;
+  --accent-fill: #5e5ce6;
+  --accent-hover: #6e6cf0;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(94, 92, 230, 0.22);
+  --accent-line: rgba(124, 122, 255, 0.55);
+
+  /* Semantic. Environment colours always travel with a text label. */
+  --env-local: #30d158;
+  --env-staging: #ff9f0a;
+  --env-staging-text: #ffb340;
+  --env-production: #ff453a;
+  --env-production-text: #ff8a80;
+  --teal: #30d158;
+  --success: #30d158;
+  --warning: #ffb340;
+  --danger: #ff6961;
+  --danger-fill: #ff453a;
+
+  /* SQL syntax (Xcode Default Dark). One palette for the CodeMirror editor,
+     read-only DDL and the CSS Custom Highlight API previews. */
+  --syntax-plain: #f5f5f7;
+  --syntax-keyword: #ff7ab2;
+  --syntax-function: #67b7a4;
+  --syntax-string: #ff8170;
+  --syntax-number: #d9c97c;
+  --syntax-comment: #7f8c98;
+  --syntax-gutter: #5a5a60;
+  --syntax-active-line: rgba(255, 255, 255, 0.045);
+
+  /* Materials (floating chrome only — never glass on glass). */
+  --material-sidebar: rgba(255, 255, 255, 0.045);
+  --material-sidebar-edge: 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --material-popover: rgba(48, 48, 54, 0.86);
+  --material-sheet: rgba(42, 42, 48, 0.92);
+  --material-bar: rgba(52, 52, 58, 0.74);
+  --material-blur: blur(24px) saturate(180%);
+  --material-blur-strong: blur(40px) saturate(180%);
+  --shadow-popover:
+    0 14px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.14),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.12);
+  --shadow-sheet:
+    0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
+  --shadow-bar:
+    0 12px 36px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.14);
+  --scrim: rgba(0, 0, 0, 0.42);
+
+  /* Shape. */
   --radius: 10px;
-  --navigator-width: 224px;
-  --editor-font-size: 15px;
+  --radius-sm: 7px;
+  --radius-control: 8px;
+  --radius-lg: 12px;
+  --radius-sheet: 18px;
+  --radius-capsule: 999px;
+  --control-height: 30px;
+  --toolbar-height: 52px;
+
+  --navigator-width: 260px;
+  --editor-font-size: 13px;
+
+  /* Motion: strong ease-out for UI, drawer curve for panels. */
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* macOS type scale. Body is 13pt; captions 11pt semibold. */
   --text-2xs: 11px;
   --text-xs: 13px;
-  --text-sm: 14px;
-  --text-md: 14px;
-  --text-lg: 18px;
-  --text-xl: 28px;
-  --font-mono: "SFMono-Regular", "Cascadia Code", ui-monospace, monospace;
+  --text-sm: 13px;
+  --text-md: 13px;
+  --text-callout: 12px;
+  --text-headline: 15px;
+  --text-lg: 17px;
+  --text-xl: 30px;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 :root[data-font-size="large"] {
   --text-2xs: 12px;
   --text-xs: 14px;
-  --text-sm: 15px;
-  --text-md: 15px;
-  --editor-font-size: 17px;
+  --text-sm: 14px;
+  --text-md: 14px;
+  --text-callout: 13px;
+  --text-headline: 16px;
+  --editor-font-size: 15px;
+}
+
+/* Inactive window (AppKit): selections and default buttons turn grey, accent
+   text and icons lose their tint. Set by shared/lib/window-activity.ts. */
+:root[data-window-inactive] {
+  --accent: #b8b8bd;
+  --accent-fill: #505055;
+  --accent-hover: #505055;
+  --accent-soft: rgba(255, 255, 255, 0.1);
+}
+
+/* Native vibrancy on macOS: the window is transparent and the sidebar
+   material shows through. Everywhere else the window colour is solid. */
+:root[data-material="native"] {
+  --window: transparent;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --window: #232327;
+    --material-sidebar: #26262a;
+    --material-popover: #303036;
+    --material-sheet: #2a2a30;
+    --material-bar: #34343a;
+    --material-blur: none;
+    --material-blur-strong: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: rgba(255, 255, 255, 0.2);
+    --line-strong: rgba(255, 255, 255, 0.32);
+    --muted: #aeaeb2;
+  }
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #ffffff26 transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 ::selection {
   color: var(--text);
-  background: var(--accent-line);
+  background: var(--accent-soft);
 }

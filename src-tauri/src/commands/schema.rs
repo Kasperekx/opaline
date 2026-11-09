@@ -25,6 +25,64 @@ pub(crate) fn preview_schema_change(
 }
 
 #[tauri::command]
+pub(crate) async fn list_schemas(
+    session_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<crate::database::namespace_changes::SchemaInfo>, String> {
+    let client = state.client(&session_id).await?;
+    client
+        .bounded(crate::database::namespace_changes::list_schemas(&client))
+        .await
+}
+
+#[tauri::command]
+pub(crate) fn preview_namespace_change(
+    input: crate::database::namespace_changes::NamespaceChange,
+) -> Result<crate::database::namespace_changes::Plan, String> {
+    crate::database::namespace_changes::plan(&input)
+}
+
+#[tauri::command]
+pub(crate) async fn apply_namespace_change(
+    session_id: String,
+    input: crate::database::namespace_changes::NamespaceChange,
+    confirmation: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), crate::database::namespace_changes::ChangeError> {
+    use crate::database::namespace_changes::{apply, ChangeError};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let (client, _, lease) = state
+        .begin_operation(&session_id, true)
+        .await
+        .map_err(|e| ChangeError::rejected(e.message))?;
+    let committing = AtomicBool::new(false);
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        apply(
+            &client,
+            &input,
+            &confirmation,
+            &committing,
+            lease.session.tls.clone(),
+        ),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            lease.invalidate();
+            if committing.load(Ordering::SeqCst) {
+                Err(ChangeError::unknown())
+            } else {
+                Err(ChangeError::rejected(
+                    "Schema change timed out before commit. Nothing was committed. Reconnect before trying again.",
+                ))
+            }
+        }
+    }
+}
+
+#[tauri::command]
 pub(crate) async fn apply_schema_change(
     session_id: String,
     input: crate::database::schema_changes::SchemaChange,
@@ -76,7 +134,7 @@ pub(crate) async fn sql_completion_catalog(
 ) -> Result<Vec<CompletionColumn>, String> {
     let client = state.client(&session_id).await?;
     client.bounded(async {
-        let rows = client.query("SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name, ordinal_position LIMIT 10001", &[]).await.map_err(|_| "Cannot load SQL suggestions. Refresh metadata to retry.")?;
+        let rows = client.query("SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name, ordinal_position LIMIT 10001", &[]).await.map_err(|e| crate::database::diagnostics::database_error("Could not load SQL suggestions", e))?;
         if rows.len() > 10000 { return Err("Column autocomplete is limited to 10,000 columns. Table and keyword suggestions remain available.".into()); }
         Ok(rows.into_iter().map(|row| CompletionColumn { schema: row.get(0), table: row.get(1), column: row.get(2) }).collect())
     }).await

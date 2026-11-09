@@ -488,6 +488,59 @@ export function useWorkspaceTabs(profileId: string) {
         setActiveTabId(remaining[remaining.length - 1]?.id ?? "");
       }
     },
+    namespaceApplied: (change: {
+      kind: "create" | "rename" | "drop";
+      name: string;
+      newName?: string | null;
+    }) => {
+      if (change.kind === "create") return;
+      if (change.kind === "drop") {
+        const remaining = latestTabs.current.filter((tab) => {
+          if (tab.kind === "table" || tab.kind === "schema") {
+            return tab.schema !== change.name;
+          }
+          return true;
+        });
+        setTabs(remaining);
+        setActiveTabId(remaining[remaining.length - 1]?.id ?? "");
+        return;
+      }
+      const nextName = change.newName?.trim();
+      if (!nextName) return;
+      const remapped = latestTabs.current.map((tab) => {
+        if (tab.kind === "table" && tab.schema === change.name) {
+          const next = createTableTab({
+            schema: nextName,
+            name: tab.table,
+            objectType: "table",
+            estimatedRows: 0,
+          });
+          return { ...next, title: tab.title };
+        }
+        if (tab.kind === "schema" && tab.schema === change.name) {
+          const id = `schema:${JSON.stringify([nextName, tab.table])}`;
+          return {
+            ...tab,
+            id,
+            schema: nextName,
+            title: tab.table ? `${tab.table} · structure` : tab.title,
+          };
+        }
+        return tab;
+      });
+      const active = latestTabs.current.find((tab) => tab.id === activeTabId);
+      setTabs(remapped);
+      if (active?.kind === "table" && active.schema === change.name) {
+        setActiveTabId(
+          `table:${databaseObjectKey({
+            schema: nextName,
+            name: active.table,
+          })}`,
+        );
+      } else if (active?.kind === "schema" && active.schema === change.name) {
+        setActiveTabId(`schema:${JSON.stringify([nextName, active.table])}`);
+      }
+    },
     openRelatedTable,
     closeTab,
     renameQueryTab,

@@ -1,0 +1,188 @@
+/* Transient feedback: the HUD capsule (useHud) and quiet loading skeletons.
+   Motion is transform/opacity only; reduced motion keeps a plain fade. */
+@layer controls {
+  /* HUD: a glass capsule that confirms an action, then gets out of the way.
+     The layer never takes pointer events; only the capsule does (hover pauses
+     the dismissal, a click dismisses it early). */
+  .hud-viewport {
+    position: fixed;
+    z-index: 900;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .hud {
+    position: absolute;
+    bottom: var(--hud-bottom, 96px);
+    left: var(--hud-x, 50%);
+    display: flex;
+    align-items: center;
+    max-width: min(440px, calc(100vw - 32px));
+    min-height: 36px;
+    gap: 8px;
+    padding: 0 16px;
+    border-radius: var(--radius-capsule);
+    color: var(--text);
+    background: var(--material-popover);
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+    box-shadow: var(--shadow-popover);
+    font-size: var(--text-md);
+    pointer-events: auto;
+    translate: -50% 0;
+    user-select: none;
+    transition:
+      opacity 200ms var(--ease),
+      transform 200ms var(--ease);
+  }
+
+  .hud:has(> .hud-icon) {
+    padding-left: 12px;
+  }
+
+  .hud[data-state="entering"],
+  .hud[data-state="leaving"] {
+    opacity: 0;
+  }
+
+  .hud[data-state="leaving"],
+  .hud[data-replacing] {
+    transition-duration: 150ms;
+  }
+
+  .hud[data-state="leaving"] {
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hud[data-state="entering"] {
+      transform: translateY(8px) scale(0.96);
+    }
+
+    /* Replacing a message is a quick crossfade in place, not a second rise. */
+    .hud[data-state="entering"][data-replacing],
+    .hud[data-state="leaving"]:has(~ .hud) {
+      transform: scale(0.98);
+    }
+
+    .hud[data-state="leaving"] {
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  .hud-icon {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    color: var(--text-soft);
+  }
+
+  .hud[data-tone="success"] .hud-icon {
+    color: var(--success);
+  }
+
+  .hud[data-tone="warning"] .hud-icon {
+    color: var(--warning);
+  }
+
+  .hud[data-tone="danger"] .hud-icon {
+    color: var(--danger);
+  }
+
+  .hud-text {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    gap: 8px;
+    line-height: 1.3;
+  }
+
+  .hud-text strong {
+    flex: none;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .hud-text span {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--text-callout);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hud {
+      transition: opacity 150ms ease;
+    }
+  }
+
+  /* CopyButton: with a HUD present the glyph swaps to a check in place. */
+  @media (prefers-reduced-motion: no-preference) {
+    .copy-button[data-status="copied"] > svg {
+      animation: copy-check-in 200ms var(--ease) both;
+    }
+  }
+
+  @keyframes copy-check-in {
+    from {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+  }
+
+  /* Skeletons: static blocks at the real row rhythm with one gentle pulse.
+     They appear only if loading takes a moment, so quick loads never flash. */
+  .skeleton {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .skeleton-row {
+    display: flex;
+    align-items: center;
+    height: var(--skeleton-row-height, 30px);
+    gap: 24px;
+    padding: 0 12px;
+    border-radius: 7px;
+  }
+
+  .skeleton-row:nth-child(even) {
+    background: var(--stripe);
+  }
+
+  .skeleton-row > i {
+    display: block;
+    flex: 0 1 var(--skeleton-width, 96px);
+    min-width: 24px;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--hover);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton {
+      animation:
+        skeleton-appear 200ms var(--ease) 120ms both,
+        skeleton-breathe 1.2s ease-in-out 320ms infinite alternate;
+    }
+  }
+
+  @keyframes skeleton-appear {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes skeleton-breathe {
+    to {
+      opacity: 0.55;
+    }
+  }
+}

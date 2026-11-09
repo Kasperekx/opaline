@@ -3,7 +3,8 @@ import type { LucideIcon } from "lucide-react";
 type ViewTab<T extends string> = {
   id: T;
   label: string;
-  Icon: LucideIcon;
+  /** Accepted for compatibility; segmented controls show words only. */
+  Icon?: LucideIcon;
   count?: number;
 };
 
@@ -13,18 +14,25 @@ type ViewTabsProps<T extends string> = {
   tabs: ViewTab<T>[];
   active: T;
   onChange: (id: T) => void;
+  className?: string;
 };
 
+/** A tablist rendered as a native segmented capsule. Switching is instant. */
 export function ViewTabs<T extends string>({
   id,
   label,
   tabs,
   active,
   onChange,
+  className,
 }: ViewTabsProps<T>) {
   return (
-    <div className="view-tabs" role="tablist" aria-label={label}>
-      {tabs.map(({ id: value, label: title, Icon, count }, index) => (
+    <div
+      className={`view-tabs segmented-capsule${className ? ` ${className}` : ""}`}
+      role="tablist"
+      aria-label={label}
+    >
+      {tabs.map(({ id: value, label: title, count }, index) => (
         <button
           type="button"
           role="tab"
@@ -51,7 +59,6 @@ export function ViewTabs<T extends string>({
             button?.scrollIntoView({ block: "nearest", inline: "nearest" });
           }}
         >
-          <Icon size={15} />
           <span>{title}</span>
           {count !== undefined && <small>{count}</small>}
         </button>

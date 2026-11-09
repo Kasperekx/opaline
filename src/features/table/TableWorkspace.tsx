@@ -1,10 +1,10 @@
-import { Columns3, Table2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ViewTabs } from "../../shared/components/ViewTabs";
 import type { TableTab } from "../query/query-types";
 import { StructureInspector } from "../structure/StructureInspector";
 import { TableDataView } from "./TableDataView";
 import type { OpenRelatedTable } from "./table-relations";
+import { TableToolbarSlot } from "./table-toolbar-slot";
 
 type TableWorkspaceProps = {
   onEditStructure?: () => void;
@@ -28,21 +28,34 @@ export function TableWorkspace({
   const id = useId();
   const [view, setView] = useState<"data" | "structure">("data");
   const [structureVisited, setStructureVisited] = useState(false);
+  const [subtitle, setSubtitle] = useState<HTMLSpanElement | null>(null);
+  const [actions, setActions] = useState<HTMLDivElement | null>(null);
+  const slots = useMemo(() => ({ subtitle, actions }), [subtitle, actions]);
   return (
     <section className="table-workspace">
-      <ViewTabs
-        id={id}
-        label="Table view"
-        active={view}
-        tabs={[
-          { id: "data", label: "Data", Icon: Table2 },
-          { id: "structure", label: "Structure", Icon: Columns3 },
-        ]}
-        onChange={(next) => {
-          setView(next);
-          if (next === "structure") setStructureVisited(true);
-        }}
-      />
+      <header className="table-workspace-bar">
+        <div className="table-title">
+          <strong title={`${tab.schema}.${tab.table}`}>{tab.table}</strong>
+          <span className="table-subtitle">
+            {tab.schema}
+            <span ref={setSubtitle} />
+          </span>
+        </div>
+        <ViewTabs
+          id={id}
+          label="Table view"
+          active={view}
+          tabs={[
+            { id: "data", label: "Data" },
+            { id: "structure", label: "Structure" },
+          ]}
+          onChange={(next) => {
+            setView(next);
+            if (next === "structure") setStructureVisited(true);
+          }}
+        />
+        <div className="table-workspace-actions" ref={setActions} />
+      </header>
       <div
         className="table-view-panel"
         role="tabpanel"
@@ -50,13 +63,15 @@ export function TableWorkspace({
         aria-labelledby={`${id}-tab-data`}
         hidden={view !== "data"}
       >
-        <TableDataView
-          tab={tab}
-          active={active && view === "data"}
-          onDirtyChange={onDirtyChange}
-          onOpenQuery={onOpenQuery}
-          onOpenRelated={onOpenRelated}
-        />
+        <TableToolbarSlot.Provider value={view === "data" ? slots : null}>
+          <TableDataView
+            tab={tab}
+            active={active && view === "data"}
+            onDirtyChange={onDirtyChange}
+            onOpenQuery={onOpenQuery}
+            onOpenRelated={onOpenRelated}
+          />
+        </TableToolbarSlot.Provider>
       </div>
       <div
         className="table-view-panel"
@@ -65,14 +80,16 @@ export function TableWorkspace({
         aria-labelledby={`${id}-tab-structure`}
         hidden={view !== "structure"}
       >
-        {structureVisited && (
-          <StructureInspector
-            onEditStructure={onEditStructure}
-            tab={tab}
-            onOpenQuery={onOpenQuery}
-            onOpenTable={onOpenTable}
-          />
-        )}
+        <TableToolbarSlot.Provider value={view === "structure" ? slots : null}>
+          {structureVisited && (
+            <StructureInspector
+              onEditStructure={onEditStructure}
+              tab={tab}
+              onOpenQuery={onOpenQuery}
+              onOpenTable={onOpenTable}
+            />
+          )}
+        </TableToolbarSlot.Provider>
       </div>
     </section>
   );

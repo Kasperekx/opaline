@@ -4,6 +4,9 @@ import type {
   SchemaChange,
   SchemaPlan,
   EnumType,
+  NamespaceChange,
+  NamespacePlan,
+  SchemaInfo,
 } from "../types/structure";
 import type { DatabaseDiagram } from "../types/diagram";
 import type {
@@ -32,11 +35,7 @@ import type {
 
 export const isDesktopRuntime = () => "__TAURI_INTERNALS__" in window;
 
-export const errorMessage = (error: unknown) => {
-  if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
-  return "Something went wrong. Please try again.";
-};
+export { errorMessage } from "./error-message";
 
 export const isQueryExecutionError = (
   error: unknown,
@@ -59,6 +58,11 @@ export const createDatabaseApi = (sessionId: string) => {
       scopedInvoke<SchemaPlan>("preview_schema_change", { input }),
     applySchemaChange: (input: SchemaChange, confirmation: string) =>
       scopedInvoke<void>("apply_schema_change", { input, confirmation }),
+    listSchemas: () => scopedInvoke<SchemaInfo[]>("list_schemas"),
+    previewNamespaceChange: (input: NamespaceChange) =>
+      scopedInvoke<NamespacePlan>("preview_namespace_change", { input }),
+    applyNamespaceChange: (input: NamespaceChange, confirmation: string) =>
+      scopedInvoke<void>("apply_namespace_change", { input, confirmation }),
     diagram: () => scopedInvoke<DatabaseDiagram>("database_diagram"),
     completionCatalog: () =>
       scopedInvoke<{ schema: string; table: string; column: string }[]>(

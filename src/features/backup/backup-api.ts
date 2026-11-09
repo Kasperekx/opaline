@@ -7,6 +7,7 @@ export type ToolInfo = {
   source: "bundled" | "custom";
 };
 export type DumpFormat = "custom" | "sql";
+export type RestoreJobs = 1 | 2 | 4;
 export type RestorePreview = {
   id: string;
   format: DumpFormat;
@@ -27,6 +28,8 @@ export type DumpOptions = {
   password: string | null;
 };
 export type RestoreOptions = {
+  jobs?: RestoreJobs;
+  confirmParallel?: boolean;
   newDatabase?: string | null;
   confirmCreate?: boolean;
   preparedId: string;

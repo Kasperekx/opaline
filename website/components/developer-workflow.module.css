@@ -1,0 +1,341 @@
+.section {
+  isolation: isolate;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 64px;
+  padding-block: 28px 20px;
+}
+.copy h2 {
+  font-size: clamp(38px, 4.5vw, 60px);
+}
+.copy h2 span {
+  color: var(--accent);
+}
+.description {
+  max-width: 420px;
+  margin-top: 25px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.shortcuts {
+  list-style: none;
+  padding: 0;
+  margin-block: 30px 18px;
+  max-width: 420px;
+}
+.step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: #d5d1c9;
+}
+.step::before {
+  position: absolute;
+  content: "";
+  inset: 0 -10px;
+  border-radius: 6px;
+  background: #dfbb790a;
+  border-left: 2px solid var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.stepNumber {
+  color: #938a7c;
+  font:
+    10px var(--font-code),
+    monospace;
+}
+.keyCombination {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+}
+.keyCombination kbd {
+  display: grid;
+  place-items: center;
+  min-width: 25px;
+  height: 26px;
+  border: 1px solid #ffffff19;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #1a1b1d;
+  color: #c8c3ba;
+  font:
+    12px var(--font-body),
+    sans-serif;
+}
+.figure {
+  min-width: 0;
+  margin: 0;
+}
+.artwork {
+  position: relative;
+}
+.artwork::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -30% -10%;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #dfbb790a, transparent 62%);
+}
+.annotation {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 30px;
+  color: #89847b;
+  font:
+    9px var(--font-code),
+    monospace;
+  letter-spacing: 0.07em;
+}
+.keyboard {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.guides {
+  stroke: #e0c59520;
+  fill: none;
+}
+.route {
+  stroke: #d7c09b20;
+  stroke-width: 1;
+  fill: none;
+}
+.keyShadow {
+  fill: #0006;
+}
+.keyEdge {
+  stroke: #ffffff21;
+  stroke-width: 1;
+}
+.keyInset {
+  fill: none;
+  stroke: #ffffff09;
+}
+.keyLight {
+  fill: #dfbb7912;
+  stroke: #dfbb7970;
+  opacity: 0;
+}
+.keyGlyph {
+  text-anchor: middle;
+  fill: #e9e5dc;
+  font:
+    44px var(--font-body),
+    sans-serif;
+}
+.keyName {
+  fill: #aaa59b;
+  font:
+    10px var(--font-code),
+    monospace;
+}
+.action {
+  text-anchor: middle;
+  fill: var(--ink);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.actionDetail {
+  text-anchor: middle;
+  fill: var(--muted);
+  font-size: 13px;
+}
+.scene {
+  opacity: 0;
+}
+.scene[data-step="0"] {
+  opacity: 1;
+}
+.impulse {
+  opacity: 0;
+}
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 50px;
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.motionControl {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 72px;
+  min-height: 44px;
+  border-radius: 5px;
+  color: #b3aa9a;
+  font-size: 11px;
+  transition:
+    transform 160ms var(--ease),
+    color 160ms ease;
+}
+.motionControl:active {
+  transform: scale(0.97);
+}
+
+/* A nine-second explanatory loop; each shortcut gets three readable seconds.
+   Only the illustration animates. These are not keyboard event handlers. */
+@media (prefers-reduced-motion: no-preference) {
+  .section[data-managed] .motionControl {
+    display: inline-flex;
+  }
+  .section[data-managed] .scene,
+  .section[data-managed] .step::before {
+    animation: shortcut-scene 9s linear infinite paused;
+  }
+  .section[data-managed] [data-step="1"],
+  .section[data-managed] [data-step="1"]::before {
+    animation-delay: -6s;
+  }
+  .section[data-managed] [data-step="2"],
+  .section[data-managed] [data-step="2"]::before {
+    animation-delay: -3s;
+  }
+  .section[data-managed] .keyPress {
+    animation: key-press 3s var(--ease) infinite paused;
+  }
+  .section[data-managed] .keyLight {
+    animation: key-light 3s var(--ease) infinite paused;
+  }
+  .section[data-managed] .impulse {
+    animation: shortcut-impulse 3s linear infinite paused;
+  }
+  .section[data-active] .scene,
+  .section[data-active] .step::before,
+  .section[data-active] .keyPress,
+  .section[data-active] .keyLight,
+  .section[data-active] .impulse {
+    animation-play-state: running;
+  }
+}
+@keyframes shortcut-scene {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  33.333%,
+  96.666% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes key-press {
+  0%,
+  8%,
+  16%,
+  100% {
+    transform: translateY(0);
+  }
+  12% {
+    transform: translateY(5px);
+  }
+}
+@keyframes key-light {
+  0%,
+  6%,
+  40%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  20% {
+    opacity: 1;
+  }
+}
+@keyframes shortcut-impulse {
+  0%,
+  18% {
+    transform: translateX(120px);
+    opacity: 0;
+  }
+  24% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  82%,
+  100% {
+    transform: translateX(650px);
+    opacity: 0;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .motionControl:hover {
+    color: var(--accent);
+  }
+}
+@media (max-width: 1100px) {
+  .layout {
+    gap: 36px;
+  }
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 54px;
+    padding-block: 0;
+  }
+  .copy {
+    max-width: 560px;
+  }
+  .description,
+  .shortcuts {
+    max-width: none;
+  }
+  .figure {
+    width: 100%;
+    max-width: 650px;
+    margin-inline: auto;
+  }
+}
+@media (max-width: 480px) {
+  .layout {
+    gap: 38px;
+  }
+  .description {
+    font-size: 14px;
+  }
+  .step {
+    gap: 10px;
+    font-size: 12px;
+  }
+  .annotation {
+    padding-inline: 0;
+    font-size: 8px;
+  }
+  .caption {
+    margin-top: 14px;
+  }
+  .actionDetail {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motionControl {
+    transition: none;
+  }
+}

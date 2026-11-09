@@ -1,0 +1,205 @@
+.aperture {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #08090b;
+  pointer-events: none;
+  user-select: none;
+}
+
+.installation {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.parallax {
+  position: absolute;
+  inset: -12px;
+}
+
+.drift {
+  width: 100%;
+  height: 100%;
+  animation: rim-drift 32s cubic-bezier(0.77, 0, 0.175, 1) infinite;
+  animation-play-state: paused;
+}
+
+.sheen {
+  opacity: 0;
+  animation: light-travel 22s linear infinite;
+  animation-play-state: paused;
+}
+
+.aperture[data-active] .drift,
+.aperture[data-active] .sheen {
+  animation-play-state: running;
+}
+
+.aperture[data-managed]:not([data-active]) .rim,
+.aperture[data-managed]:not([data-active]) .light,
+.aperture[data-managed]:not([data-active]) .engraving {
+  animation-play-state: paused;
+}
+
+.aperture[data-managed] + .motionControl {
+  display: flex;
+}
+
+.motionControl {
+  position: absolute;
+  z-index: 2;
+  right: 32px;
+  bottom: 18px;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 10px;
+  color: #b1a995;
+  font:
+    10px var(--font-code),
+    monospace;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #08090b80;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motionControl:hover {
+    color: var(--accent);
+    border-color: #dfbb7930;
+  }
+}
+
+@keyframes rim-drift {
+  0%,
+  100% {
+    transform: rotate(-0.6deg) scale(1.012) translateY(-3px);
+  }
+  50% {
+    transform: rotate(0.6deg) scale(1.025) translateY(3px);
+  }
+}
+
+@keyframes light-travel {
+  0% {
+    opacity: 0;
+    transform: translateX(-500px);
+  }
+  12% {
+    opacity: 0.75;
+  }
+  78% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(2100px);
+  }
+}
+
+.rim,
+.light,
+.engraving {
+  transform-box: view-box;
+  transform-origin: 50% 51.2%;
+}
+
+.rim {
+  animation: aperture-open 1600ms var(--ease, cubic-bezier(0.23, 1, 0.32, 1))
+    both;
+}
+
+.light {
+  animation: light-settle 1400ms 120ms
+    var(--ease, cubic-bezier(0.23, 1, 0.32, 1)) both;
+}
+
+.engraving {
+  animation: engraving-in 1000ms 200ms
+    var(--ease, cubic-bezier(0.23, 1, 0.32, 1)) both;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    #08090b38,
+    transparent 16%,
+    transparent 84%,
+    #08090b38
+  );
+}
+
+@keyframes aperture-open {
+  from {
+    opacity: 0.2;
+    transform: translateY(28px) scale(0.955);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes light-settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes engraving-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  .motionControl {
+    right: 19px;
+    bottom: 8px;
+    font-size: 9px;
+  }
+  .installation {
+    width: 150%;
+    max-width: none;
+    margin-left: -25%;
+    opacity: 0.8;
+  }
+
+  .vignette {
+    background: linear-gradient(
+      180deg,
+      transparent 8%,
+      #08090b38 38%,
+      #08090b7a 70%,
+      #08090b
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drift,
+  .sheen,
+  .rim,
+  .light,
+  .engraving {
+    animation: none;
+  }
+  .aperture[data-managed] + .motionControl {
+    display: none;
+  }
+}

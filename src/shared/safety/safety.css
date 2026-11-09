@@ -1,94 +1,135 @@
-.retained-table-workspace {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  overflow: hidden;
-}
-.retained-table-workspace[hidden] {
-  display: none;
-}
-.retained-table-workspace > .table-workspace {
-  flex: 1;
-  min-width: 0;
-}
-.storage-warning,
-.workspace-notice {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 18px;
-  background: #392e1a;
-  color: #ffe0a4;
-  font-size: var(--text-sm);
-}
-.storage-warning > span,
-.workspace-notice > span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.storage-warning .button,
-.workspace-notice .button {
-  flex-shrink: 0;
-}
-.workspace-notice {
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  padding: 8px 18px;
-  line-height: 1.5;
-}
-.workspace-notice .button {
-  padding: 6px 10px;
-  font-size: inherit;
-  color: inherit;
-}
-.safety-content {
-  padding: 4px 24px 20px;
-  line-height: 1.6;
-}
-.safety-content ul {
-  max-height: 200px;
-  overflow: auto;
-  padding-left: 20px;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--line);
-}
-button.explorer-connection {
-  width: 100%;
-  text-align: left;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  cursor: pointer;
-  font: inherit;
-}
-button.explorer-connection:hover {
-  background: var(--surface-3);
-}
-.result-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--line);
-  font-size: var(--text-sm);
-}
-.paged-results {
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.paged-results .result-table-wrap {
-  flex: 1;
-  min-height: 0;
+/* Work-safety UI: confirmation content for safety sheets (shared Sheet,
+   styles/sheet.css), storage warnings and in-workspace notices. */
+@layer features {
+  /* Confirmation content: a grouped list of what is at risk. */
+  .safety-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    padding: 8px 24px 0;
+    overflow: auto;
+    line-height: 1.5;
+  }
+  .safety-content p {
+    margin: 0;
+  }
+  .safety-risks {
+    max-height: 200px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+    border-radius: var(--radius-lg);
+    background: var(--hover);
+    box-shadow: var(--edge-light);
+  }
+  .safety-risks > li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    overflow-wrap: anywhere;
+  }
+  .safety-risks > li + li {
+    border-top: var(--hairline) solid var(--line);
+  }
+  .safety-risks > li > p {
+    color: var(--warning);
+    font-size: var(--text-callout);
+  }
+  .safety-error {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.12);
+    font-size: var(--text-callout);
+  }
+
+  /* Storage and workspace notices: calm, in-flow bars. Alerts are tinted. */
+  .storage-warning,
+  .workspace-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 7px 10px 7px 16px;
+    color: var(--text-soft);
+    background: var(--surface-2);
+    border-bottom: var(--hairline) solid var(--line);
+    font-size: var(--text-callout);
+    line-height: 1.45;
+  }
+  .storage-warning,
+  .workspace-notice[role="alert"] {
+    color: var(--text);
+    background: rgba(255, 159, 10, 0.12);
+    border-bottom-color: rgba(255, 159, 10, 0.24);
+  }
+  .storage-warning::before,
+  .workspace-notice[role="alert"]::before {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--env-staging);
+    content: "";
+  }
+  .storage-warning > span,
+  .workspace-notice > span {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .storage-warning .button,
+  .workspace-notice .button {
+    flex-shrink: 0;
+    min-height: 24px;
+    padding: 0 10px;
+    font-size: var(--text-callout);
+  }
+  .storage-warning .button.ghost,
+  .workspace-notice .button.ghost {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: var(--edge-light);
+  }
+  .workspace-notice {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+  }
+
+  .retained-table-workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+  .retained-table-workspace[hidden] {
+    display: none;
+  }
+  .retained-table-workspace > .table-workspace {
+    flex: 1;
+    min-width: 0;
+  }
+  .result-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 6px 16px;
+    border-top: var(--hairline) solid var(--line);
+    font-size: var(--text-callout);
+    font-variant-numeric: tabular-nums;
+  }
+  .paged-results {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .paged-results .result-table-wrap {
+    flex: 1;
+    min-height: 0;
+  }
 }

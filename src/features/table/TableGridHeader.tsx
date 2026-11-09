@@ -1,5 +1,4 @@
 import {
-  ArrowDown,
   ArrowUp,
   ArrowUpDown,
   KeyRound,
@@ -7,6 +6,8 @@ import {
   Pin,
   PinOff,
   MoveHorizontal,
+  Search,
+  EyeOff,
 } from "lucide-react";
 import { ActionMenu } from "../../shared/components/ActionMenu";
 import { GridColumnResize } from "../../shared/components/GridInteractions";
@@ -22,6 +23,9 @@ export function TableGridHeader({
   leftOffsets,
   onPin,
   onFit,
+  hidden,
+  onHide,
+  onSearchColumn,
 }: {
   table: TableDataController;
   widths: Record<string, number>;
@@ -31,7 +35,13 @@ export function TableGridHeader({
   leftOffsets: number[];
   onPin: (index: number) => void;
   onFit: (index: number) => void;
+  hidden: ReadonlySet<string>;
+  onHide: (name: string) => void;
+  onSearchColumn?: (name: string) => void;
 }) {
+  const visibleCount =
+    table.data?.columns.filter((column) => !hidden.has(column.name)).length ??
+    0;
   return (
     <thead>
       <tr>
@@ -45,15 +55,15 @@ export function TableGridHeader({
           />
         </th>
         {table.data?.columns.map((column, index) => {
+          if (hidden.has(column.name)) return null;
           const active = table.sort?.column === column.name;
-          const SortIcon = !active
-            ? ArrowUpDown
-            : table.sort?.direction === "asc"
-              ? ArrowUp
-              : ArrowDown;
+          // One arrow that turns for descending, so flipping the order reads
+          // as the same indicator rotating rather than a glyph swap.
+          const SortIcon = active ? ArrowUp : ArrowUpDown;
           return (
             <th
               key={column.name}
+              data-column-index={index}
               className={index <= pinnedThrough ? "pinned-column" : undefined}
               aria-sort={
                 active
@@ -95,8 +105,24 @@ export function TableGridHeader({
               <ActionMenu
                 label={`Column options for ${column.name}`}
                 actions={[
+                  ...(onSearchColumn
+                    ? [
+                        {
+                          label: "Search in this column",
+                          icon: Search,
+                          onSelect: () => onSearchColumn(column.name),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Hide column",
+                    icon: EyeOff,
+                    disabled: visibleCount <= 1,
+                    onSelect: () => onHide(column.name),
+                  },
                   {
                     label: "Fit to visible values",
+                    separator: true,
                     icon: MoveHorizontal,
                     onSelect: () => onFit(index),
                   },

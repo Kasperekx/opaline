@@ -1,0 +1,19 @@
+/* Read-only SQL uses the shared syntax palette (--syntax-* in tokens.css),
+   the same colours as the CodeMirror editor. */
+@layer features {
+  ::highlight(sql-keyword) {
+    color: var(--syntax-keyword);
+  }
+  ::highlight(sql-function) {
+    color: var(--syntax-function);
+  }
+  ::highlight(sql-string) {
+    color: var(--syntax-string);
+  }
+  ::highlight(sql-number) {
+    color: var(--syntax-number);
+  }
+  ::highlight(sql-comment) {
+    color: var(--syntax-comment);
+  }
+}

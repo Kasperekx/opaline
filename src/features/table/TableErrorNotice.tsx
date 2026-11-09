@@ -1,27 +1,41 @@
 import type { ReactNode } from "react";
+import { CopyButton } from "../../shared/components/CopyButton";
 
 export function TableErrorNotice({
   title,
   message,
   hint,
+  context,
   children,
 }: {
   title: string;
   message: string;
-  hint: string;
+  hint?: string;
+  context?: string;
   children?: ReactNode;
 }) {
   return (
     <div className="table-error-notice" role="alert">
       <div>
         <strong>{title}</strong>
-        <p>{hint}</p>
+        <p className="table-error-message">{message}</p>
+        {hint && <p>{hint}</p>}
       </div>
       {children}
-      <details>
-        <summary>Technical details</summary>
-        <pre tabIndex={0}>{message}</pre>
-      </details>
+      {context && (
+        <details>
+          <summary>Diagnostic context</summary>
+          <pre tabIndex={0}>{context}</pre>
+          <p>
+            Review object names before sharing. No row values, filter values or
+            credentials are included in this context.
+          </p>
+          <CopyButton
+            value={`${title}\n${message}\n\n${context}`}
+            label="Copy diagnostic details"
+          />
+        </details>
+      )}
     </div>
   );
 }

@@ -1,0 +1,444 @@
+{
+  "benchmark": "opaline_restore",
+  "client_version": "17.11",
+  "database_bytes": 843997711,
+  "dump_bytes": 183205946,
+  "dump_ms": 9822,
+  "fingerprint": {
+    "foreign_keys": [
+      [
+        "records_0_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ],
+      [
+        "records_1_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ],
+      [
+        "records_2_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ],
+      [
+        "records_3_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ],
+      [
+        "records_4_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ],
+      [
+        "records_5_owner_id_fkey",
+        "FOREIGN KEY (owner_id) REFERENCES owners(id)"
+      ]
+    ],
+    "indexes": [
+      [
+        "owners_pkey",
+        "CREATE UNIQUE INDEX owners_pkey ON public.owners USING btree (id)"
+      ],
+      [
+        "records_0_label_idx",
+        "CREATE INDEX records_0_label_idx ON public.records_0 USING btree (label)"
+      ],
+      [
+        "records_0_owner_idx",
+        "CREATE INDEX records_0_owner_idx ON public.records_0 USING btree (owner_id)"
+      ],
+      [
+        "records_0_pkey",
+        "CREATE UNIQUE INDEX records_0_pkey ON public.records_0 USING btree (id)"
+      ],
+      [
+        "records_1_label_idx",
+        "CREATE INDEX records_1_label_idx ON public.records_1 USING btree (label)"
+      ],
+      [
+        "records_1_owner_idx",
+        "CREATE INDEX records_1_owner_idx ON public.records_1 USING btree (owner_id)"
+      ],
+      [
+        "records_1_pkey",
+        "CREATE UNIQUE INDEX records_1_pkey ON public.records_1 USING btree (id)"
+      ],
+      [
+        "records_2_label_idx",
+        "CREATE INDEX records_2_label_idx ON public.records_2 USING btree (label)"
+      ],
+      [
+        "records_2_owner_idx",
+        "CREATE INDEX records_2_owner_idx ON public.records_2 USING btree (owner_id)"
+      ],
+      [
+        "records_2_pkey",
+        "CREATE UNIQUE INDEX records_2_pkey ON public.records_2 USING btree (id)"
+      ],
+      [
+        "records_3_label_idx",
+        "CREATE INDEX records_3_label_idx ON public.records_3 USING btree (label)"
+      ],
+      [
+        "records_3_owner_idx",
+        "CREATE INDEX records_3_owner_idx ON public.records_3 USING btree (owner_id)"
+      ],
+      [
+        "records_3_pkey",
+        "CREATE UNIQUE INDEX records_3_pkey ON public.records_3 USING btree (id)"
+      ],
+      [
+        "records_4_label_idx",
+        "CREATE INDEX records_4_label_idx ON public.records_4 USING btree (label)"
+      ],
+      [
+        "records_4_owner_idx",
+        "CREATE INDEX records_4_owner_idx ON public.records_4 USING btree (owner_id)"
+      ],
+      [
+        "records_4_pkey",
+        "CREATE UNIQUE INDEX records_4_pkey ON public.records_4 USING btree (id)"
+      ],
+      [
+        "records_5_label_idx",
+        "CREATE INDEX records_5_label_idx ON public.records_5 USING btree (label)"
+      ],
+      [
+        "records_5_owner_idx",
+        "CREATE INDEX records_5_owner_idx ON public.records_5 USING btree (owner_id)"
+      ],
+      [
+        "records_5_pkey",
+        "CREATE UNIQUE INDEX records_5_pkey ON public.records_5 USING btree (id)"
+      ]
+    ],
+    "tables": [
+      {
+        "canonical_md5": "82c4c517d8b1d718bf72e8768eaa41d5",
+        "rows": 32,
+        "table": "owners"
+      },
+      {
+        "canonical_md5": "883c6439024b310bf4043706925256f1",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_0"
+      },
+      {
+        "canonical_md5": "b3038fe50f5e334490fe5c11ba1991ff",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_1"
+      },
+      {
+        "canonical_md5": "7969bd03ebf60382677bb9b1149cb61d",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_2"
+      },
+      {
+        "canonical_md5": "812d1361f807ad6beedd62037938a1b7",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_3"
+      },
+      {
+        "canonical_md5": "c22ffe56d6c84bf77559b33744547c4f",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_4"
+      },
+      {
+        "canonical_md5": "e5dff1bbd6e6871266c9280d5a1ce136",
+        "rows": 250000,
+        "sequence_is_called": true,
+        "sequence_last_value": 250000,
+        "table": "records_5"
+      }
+    ]
+  },
+  "host": {
+    "arch": "aarch64",
+    "available_parallelism": 10,
+    "os": "macos"
+  },
+  "independent_tables": 6,
+  "medians": [
+    {
+      "listing_ms": 59.595,
+      "mode": "app_atomic_jobs1",
+      "preparation_ms": 652.806583,
+      "restore_ms": 10512.329208000001,
+      "snapshot_ms": 593.0827079999999
+    },
+    {
+      "listing_ms": 59.807708,
+      "mode": "app_parallel_jobs2",
+      "preparation_ms": 653.783042,
+      "restore_ms": 9174.103166,
+      "snapshot_ms": 594.262042
+    },
+    {
+      "listing_ms": 61.326499999999996,
+      "mode": "app_parallel_jobs4",
+      "preparation_ms": 664.284959,
+      "restore_ms": 8382.898084,
+      "snapshot_ms": 602.958208
+    },
+    {
+      "listing_ms": 59.984833,
+      "mode": "experimental_raw_nonatomic_jobs1",
+      "preparation_ms": 665.0974170000001,
+      "restore_ms": 13962.7355,
+      "snapshot_ms": 605.112375
+    }
+  ],
+  "notes": "Fresh database per run; restore includes database creation, excludes preparation and verification. Preparation = private snapshot copy/hash/fsync plus pg_restore --list/version check, with tools already resolved. Warm cache, rotated order. Raw non-atomic serial control is benchmark-only. No durability or TLS defaults changed; loopback disposable fixture uses explicit non-TLS. No strict speed threshold.",
+  "reference_rows": 32,
+  "repeats_per_mode": 3,
+  "rows_per_table": 250000,
+  "samples": [
+    {
+      "app_reported_restore_ms": 14677,
+      "atomic": true,
+      "benchmark_only_runner": false,
+      "jobs": 1,
+      "listing_ms": 61.168583,
+      "mode": "app_atomic_jobs1",
+      "preparation_ms": 942.362667,
+      "restore_ms": 14682.794667,
+      "round": 0,
+      "snapshot_ms": 881.1938329999999,
+      "verified": true,
+      "warmup": true
+    },
+    {
+      "app_reported_restore_ms": 9037,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 2,
+      "listing_ms": 60.461915999999995,
+      "mode": "app_parallel_jobs2",
+      "preparation_ms": 660.578708,
+      "restore_ms": 9043.168,
+      "round": 0,
+      "snapshot_ms": 600.116583,
+      "verified": true,
+      "warmup": true
+    },
+    {
+      "app_reported_restore_ms": 7712,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 4,
+      "listing_ms": 59.610709,
+      "mode": "app_parallel_jobs4",
+      "preparation_ms": 645.789125,
+      "restore_ms": 7721.123167,
+      "round": 0,
+      "snapshot_ms": 586.178167,
+      "verified": true,
+      "warmup": true
+    },
+    {
+      "app_reported_restore_ms": null,
+      "atomic": false,
+      "benchmark_only_runner": true,
+      "jobs": 1,
+      "listing_ms": 60.360917,
+      "mode": "experimental_raw_nonatomic_jobs1",
+      "preparation_ms": 657.181833,
+      "restore_ms": 9901.646458,
+      "round": 0,
+      "snapshot_ms": 596.820625,
+      "verified": true,
+      "warmup": true
+    },
+    {
+      "app_reported_restore_ms": 9220,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 2,
+      "listing_ms": 59.807708,
+      "mode": "app_parallel_jobs2",
+      "preparation_ms": 644.483375,
+      "restore_ms": 9224.931790999999,
+      "round": 1,
+      "snapshot_ms": 584.675417,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 8380,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 4,
+      "listing_ms": 60.302667,
+      "mode": "app_parallel_jobs4",
+      "preparation_ms": 647.182542,
+      "restore_ms": 8382.898084,
+      "round": 1,
+      "snapshot_ms": 586.879708,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": null,
+      "atomic": false,
+      "benchmark_only_runner": true,
+      "jobs": 1,
+      "listing_ms": 59.984833,
+      "mode": "experimental_raw_nonatomic_jobs1",
+      "preparation_ms": 665.0974170000001,
+      "restore_ms": 9542.904,
+      "round": 1,
+      "snapshot_ms": 605.112375,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 11145,
+      "atomic": true,
+      "benchmark_only_runner": false,
+      "jobs": 1,
+      "listing_ms": 59.595,
+      "mode": "app_atomic_jobs1",
+      "preparation_ms": 645.2827920000001,
+      "restore_ms": 11150.200166999999,
+      "round": 1,
+      "snapshot_ms": 585.687333,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 13820,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 4,
+      "listing_ms": 74.17741699999999,
+      "mode": "app_parallel_jobs4",
+      "preparation_ms": 757.754084,
+      "restore_ms": 13824.151709,
+      "round": 2,
+      "snapshot_ms": 683.576417,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": null,
+      "atomic": false,
+      "benchmark_only_runner": true,
+      "jobs": 1,
+      "listing_ms": 62.050666,
+      "mode": "experimental_raw_nonatomic_jobs1",
+      "preparation_ms": 683.102417,
+      "restore_ms": 13962.7355,
+      "round": 2,
+      "snapshot_ms": 621.051625,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 10505,
+      "atomic": true,
+      "benchmark_only_runner": false,
+      "jobs": 1,
+      "listing_ms": 59.723709,
+      "mode": "app_atomic_jobs1",
+      "preparation_ms": 652.806583,
+      "restore_ms": 10512.329208000001,
+      "round": 2,
+      "snapshot_ms": 593.0827079999999,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 9170,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 2,
+      "listing_ms": 59.520875000000004,
+      "mode": "app_parallel_jobs2",
+      "preparation_ms": 653.783042,
+      "restore_ms": 9174.103166,
+      "round": 2,
+      "snapshot_ms": 594.262042,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": null,
+      "atomic": false,
+      "benchmark_only_runner": true,
+      "jobs": 1,
+      "listing_ms": 59.431667,
+      "mode": "experimental_raw_nonatomic_jobs1",
+      "preparation_ms": 661.69875,
+      "restore_ms": 14991.952166000001,
+      "round": 3,
+      "snapshot_ms": 602.266875,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 10321,
+      "atomic": true,
+      "benchmark_only_runner": false,
+      "jobs": 1,
+      "listing_ms": 59.003958000000004,
+      "mode": "app_atomic_jobs1",
+      "preparation_ms": 656.732333,
+      "restore_ms": 10325.78175,
+      "round": 3,
+      "snapshot_ms": 597.728167,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 8919,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 2,
+      "listing_ms": 67.715792,
+      "mode": "app_parallel_jobs2",
+      "preparation_ms": 702.21375,
+      "restore_ms": 8926.274791999998,
+      "round": 3,
+      "snapshot_ms": 634.497791,
+      "verified": true,
+      "warmup": false
+    },
+    {
+      "app_reported_restore_ms": 8373,
+      "atomic": false,
+      "benchmark_only_runner": false,
+      "jobs": 4,
+      "listing_ms": 61.326499999999996,
+      "mode": "app_parallel_jobs4",
+      "preparation_ms": 664.284959,
+      "restore_ms": 8377.054042,
+      "round": 3,
+      "snapshot_ms": 602.958208,
+      "verified": true,
+      "warmup": false
+    }
+  ],
+  "server_version": "PostgreSQL 17.11 on aarch64-apple-darwin25.3.0",
+  "settings": {
+    "checkpoint_completion_target": "0.9",
+    "checkpoint_timeout": "5min",
+    "data_checksums": "on",
+    "fsync": "on",
+    "full_page_writes": "on",
+    "maintenance_work_mem": "64MB",
+    "max_connections": "100",
+    "max_parallel_maintenance_workers": "2",
+    "max_wal_size": "1GB",
+    "shared_buffers": "128MB",
+    "synchronous_commit": "on"
+  },
+  "source_unchanged": true,
+  "warmups_per_mode": 1
+}

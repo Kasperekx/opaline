@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { CircleMinus, Plus, X } from "lucide-react";
 import type { TableFilter, ColumnInfo } from "../../shared/types/database";
 import type { TableDataController } from "./useTableData";
 
@@ -40,7 +40,7 @@ export function TableFilters({
                 title={`${filter.column} ${filterLabels[filter.operator]} ${filter.value}`}
               >
                 {filter.column} <span>{filterLabels[filter.operator]}</span>{" "}
-                {!filter.operator.startsWith("is_") && filter.value}
+                {!filter.operator.startsWith("is_") && <b>{filter.value}</b>}
               </button>
               <button
                 disabled={locked}
@@ -55,7 +55,11 @@ export function TableFilters({
               </button>
             </div>
           ))}
-          <button disabled={locked} onClick={() => table.applyConditions([])}>
+          <button
+            className="table-filter-clear"
+            disabled={locked}
+            onClick={() => table.applyConditions([])}
+          >
             Clear filters
           </button>
         </div>
@@ -115,8 +119,13 @@ function FilterEditor({
     >
       <header>
         <strong>Match all conditions</strong>
-        <button type="button" aria-label="Close filters" onClick={onClose}>
-          <X size={15} />
+        <button
+          type="button"
+          className="icon-button subtle"
+          aria-label="Close filters"
+          onClick={onClose}
+        >
+          <X size={13} />
         </button>
       </header>
       {draft.map((filter, index) => (
@@ -167,27 +176,31 @@ function FilterEditor({
           />
           <button
             type="button"
+            className="icon-button subtle"
             aria-label={`Delete condition ${index + 1}`}
             disabled={locked}
             onClick={() =>
               setDraft((current) => current.filter((_, i) => i !== index))
             }
           >
-            <X size={14} />
+            <CircleMinus size={15} />
           </button>
         </div>
       ))}
       <footer>
         <button
           type="button"
+          className="add-condition"
           disabled={locked || draft.length >= 20 || !columns.length}
           onClick={() => setDraft((current) => [...current, blank()])}
         >
-          <Plus size={14} /> Add condition
+          <Plus size={12} /> Add condition
         </button>
-        <span>Values use the column’s database type.</span>
+        <span>
+          Values use the column’s database type. Empty text is allowed.
+        </span>
         <button
-          className="button primary"
+          className="button primary compact"
           disabled={
             locked ||
             draft.some(

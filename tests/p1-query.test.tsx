@@ -264,7 +264,11 @@ it("a late save keeps edits made while saving and formatting never overwrites an
       }),
   );
   const editor = {
-    current: { getSubmission: () => undefined, replaceDocument: vi.fn() },
+    current: {
+      getSubmission: () => undefined,
+      replaceDocument: vi.fn(),
+      revealError: vi.fn(),
+    },
   };
   const hook = renderHook(
     () => {

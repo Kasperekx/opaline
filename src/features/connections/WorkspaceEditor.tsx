@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { connectionApi } from "./connection-api";
-import { ConnectionDialog } from "./ConnectionDialog";
+import { Sheet, SheetFooter } from "../../shared/components/Sheet";
 import { useFormSafety } from "../../shared/safety/useFormSafety";
 import { errorMessage } from "../../shared/lib/database-api";
 import type { ConnectionCatalog, ProductWorkspace } from "./connection-types";
@@ -23,7 +23,7 @@ export function WorkspaceEditor({
   );
   const [error, setError] = useState<string | null>(null);
   return (
-    <ConnectionDialog
+    <Sheet
       title={workspace ? "Rename workspace" : "New workspace"}
       subtitle="Organize connections by product"
       busy={busy}
@@ -63,13 +63,12 @@ export function WorkspaceEditor({
             </p>
           )}
         </fieldset>
-        <footer className="connection-dialog-footer">
-          <span>No account or cloud sync required</span>
+        <SheetFooter start="No account or cloud sync required">
           <button className="button primary" disabled={busy || !name.trim()}>
             {workspace ? "Save name" : "Create workspace"}
           </button>
-        </footer>
+        </SheetFooter>
       </form>
-    </ConnectionDialog>
+    </Sheet>
   );
 }
